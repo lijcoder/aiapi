@@ -1,0 +1,35 @@
+{
+    "candidates": [
+        {
+            "content": {
+                "role": "model",
+                "parts": [
+                    {
+                        "text": "今天是2025年11月27日（星期四），北京的天气情况如下：\n\n*   **天气状况**：白天大多**晴朗**，夜间转为多云或部分阴天。\n*   **气温**：最高气温约 **6°C 至 7°C**，夜间最低气温约 **-3°C 至 -4°C**。\n*   **风力**：受冷空气影响，白天风力较明显，阵风可达 **5级左右**，风寒效应显著，体感会比实际温度更冷。\n*   **空气**：空气相对干燥，湿度较低。\n\n**温馨提示**：\n由于有风且气温较低，出门请注意防风保暖，建议穿戴防风外套、帽子和围巾。天气干燥，也请注意适量补水。"
+                    }
+                ]
+            },
+            "finishReason": "STOP"
+        }
+    ],
+    "usageMetadata": {
+        "promptTokenCount": 5,
+        "candidatesTokenCount": 194,
+        "thoughtsTokenCount": 397,
+        "totalTokenCount": 596,
+        "promptTokensDetails": [
+            {
+                "modality": "TEXT",
+                "tokenCount": 5
+            }
+        ],
+        "candidatesTokensDetails": [
+            {
+                "modality": "TEXT",
+                "tokenCount": 194
+            }
+        ]
+    },
+    "responseId": "Dg4oabPYHdCgseMPld-qmAw",
+    "modelVersion": "gemini-3-pro-preview"
+}
