@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -26,7 +30,16 @@ type ProxyDirectModelConfig struct {
 	Headers map[string][]string `json:"headers"`
 }
 
+type ProxyDirect struct {
+	Request       *ProxyDirectRequest
+	Response      ProxyDirectResponseWrite
+	proxyResponse *ProxyDirectResponse
+}
+
 type ProxyDirectRequest struct {
+	Debug       bool
+	TraceId     string
+	Url         *url.URL
 	Type        string
 	Path        string
 	Method      string
@@ -42,6 +55,12 @@ type ProxyDirectResponse struct {
 	Body       io.ReadCloser
 }
 
+type ProxyDirectResponseWrite interface {
+	Header() http.Header
+	WriteStatusCode(statusCode int)
+	Write(body []byte) (int, error)
+}
+
 // 1、type 获取模型配置
 // 2、构建 url, domain + uri
 // 3、创建 request
@@ -51,22 +70,28 @@ type ProxyDirectResponse struct {
 // 7、获取响应。如何处理流式消息？
 // 7.1、response Headers
 // 7.2、response body. 流式如何处理？
-func Direct(pdr ProxyDirectRequest) (*ProxyDirectResponse, error) {
+func (p *ProxyDirect) Direct() error {
+	p.proxyTraceLog("RequestURL", p.Request.Url)
+	p.proxyTraceLog("RequestPath", p.Request.Path)
+	p.proxyTraceLog("RequestMethod", p.Request.Method)
+	p.proxyTraceLog("RequestHeaders", p.Request.Headers)
+	p.proxyTraceLog("RequestQueryParams", p.Request.QueryParams)
+	p.proxyTraceLog("RequestBody", string(p.Request.Body))
 	// 通过 type 获取模型配置
-	modelConfig, flag := getModelConfig(pdr.Type)
+	modelConfig, flag := getModelConfig(p.Request.Type)
 	if !flag {
-		return nil, errors.New("model config not found. type: " + pdr.Type)
+		return errors.New("model config not found. type: " + p.Request.Type)
 	}
 	domain := modelConfig.Domain
-	url := domain + "/" + pdr.Path
-	bodyReader := io.NopCloser(bytes.NewReader(pdr.Body))
-	req, error := http.NewRequest(pdr.Method, url, bodyReader)
+	url := domain + "/" + p.Request.Path
+	bodyReader := io.NopCloser(bytes.NewReader(p.Request.Body))
+	req, error := http.NewRequest(p.Request.Method, url, bodyReader)
 	if error != nil {
-		return nil, error
+		return error
 	}
 	// 添加查询参数
 	query := req.URL.Query()
-	for k, vs := range pdr.QueryParams {
+	for k, vs := range p.Request.QueryParams {
 		for _, v := range vs {
 			query.Add(k, v)
 		}
@@ -76,15 +101,100 @@ func Direct(pdr ProxyDirectRequest) (*ProxyDirectResponse, error) {
 	client := &http.Client{}
 	resp, error := client.Do(req)
 	if error != nil {
-		return nil, error
+		return error
 	}
-	pdresp := ProxyDirectResponse{
+	pdrs := ProxyDirectResponse{
 		Status:     resp.Status,
 		StatusCode: resp.StatusCode,
 		Headers:    resp.Header,
 		Body:       resp.Body,
 	}
-	return &pdresp, nil
+	p.proxyTraceLog("ResponseStatusCode", pdrs.StatusCode)
+	p.proxyTraceLog("ResponseHeaders", pdrs.Headers)
+	p.proxyResponse = &pdrs
+	p.proxyResponseProcess()
+	p.proxyTraceLog("RequestEnd", "------")
+	return nil
+}
+
+func (p *ProxyDirect) proxyResponseProcess() error {
+	// 设置 headers
+	for k, vs := range p.proxyResponse.Headers {
+		for _, v := range vs {
+			p.Response.Header().Add(k, v)
+		}
+	}
+	// 设置状态码，写响应头
+	p.Response.WriteStatusCode(p.proxyResponse.StatusCode)
+	// 根据 contentType 设置相应的响应格式
+	contentType := p.proxyResponse.Headers.Get("Content-Type")
+	sseContentType := "event-stream"
+	if strings.Contains(contentType, sseContentType) {
+		// stream
+		return p.proxyResponseStream()
+	} else {
+		// no stream
+		return p.proxyResponseNoStream()
+	}
+}
+
+func (p *ProxyDirect) proxyResponseNoStream() error {
+	bodyBytes, err := io.ReadAll(p.proxyResponse.Body)
+	if err != nil {
+		return err
+	}
+	p.proxyTraceLog("ResponseBody", string(bodyBytes))
+	_, err = p.Response.Write(bodyBytes)
+	return err
+}
+
+func (p *ProxyDirect) proxyResponseStream() error {
+	var currentMsg string
+	buf := make([]byte, 1024)
+	for {
+		n, err := p.proxyResponse.Body.Read(buf)
+		if n > 0 {
+			currentMsg += string(buf[:n])
+			messages := strings.Split(currentMsg, "\n\n")
+			currentMsg = messages[len(messages)-1]
+			for i := 0; i < len(messages)-1; i++ {
+				respMsg := messages[i] + "\n\n"
+				p.proxyTraceLog("ResponseSSEBody", respMsg)
+				if _, writeErr := p.Response.Write([]byte(respMsg)); writeErr != nil {
+					return writeErr
+				}
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+	}
+	if len(currentMsg) > 0 {
+		p.proxyTraceLog("ResponseSSEBody", currentMsg)
+		if _, writeErr := p.Response.Write([]byte(currentMsg)); writeErr != nil {
+			return writeErr
+		}
+	}
+	return nil
+}
+
+func (p *ProxyDirect) proxyTraceLog(title string, data any) {
+	if !p.Request.Debug {
+		return
+	}
+	var dataStr string
+	switch v := data.(type) {
+	case string:
+		dataStr = v
+	default:
+		json, _ := json.Marshal(v)
+		dataStr = string(json)
+	}
+	logData := fmt.Sprintf("traceId:%s, title[%s]\\\\%s", p.Request.TraceId, title, dataStr)
+	slog.Info(logData)
 }
 
 func getModelConfig(modelType string) (ProxyDirectModelConfig, bool) {
