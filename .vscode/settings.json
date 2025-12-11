@@ -1,0 +1,4 @@
+{
+    "go.goroot": "~/.local/programming/go/go-1.25.4/",
+    "go.testFlags": ["-v"]
+}
