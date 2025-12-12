@@ -76,7 +76,7 @@ func (p *ProxyDirect) Direct() error {
 	p.proxyTraceLog("RequestMethod", p.Request.Method)
 	p.proxyTraceLog("RequestHeaders", p.Request.Headers)
 	p.proxyTraceLog("RequestQueryParams", p.Request.QueryParams)
-	p.proxyTraceLog("RequestBody", string(p.Request.Body))
+	p.proxyTraceLog("RequestBody", p.Request.Body)
 	// 通过 type 获取模型配置
 	modelConfig, flag := getModelConfig(p.Request.Type)
 	if !flag {
@@ -103,6 +103,7 @@ func (p *ProxyDirect) Direct() error {
 	if error != nil {
 		return error
 	}
+	defer resp.Body.Close()
 	pdrs := ProxyDirectResponse{
 		Status:     resp.Status,
 		StatusCode: resp.StatusCode,
@@ -149,21 +150,30 @@ func (p *ProxyDirect) proxyResponseNoStream() error {
 }
 
 func (p *ProxyDirect) proxyResponseStream() error {
-	var currentMsg string
-	buf := make([]byte, 1024)
+	buffer := bytes.NewBuffer(make([]byte, 0, 1024))
+	scratchBuf := make([]byte, 512)
+	sep := []byte("\n\n")
 	for {
-		n, err := p.proxyResponse.Body.Read(buf)
+		n, err := p.proxyResponse.Body.Read(scratchBuf)
 		if n > 0 {
-			currentMsg += string(buf[:n])
-			messages := strings.Split(currentMsg, "\n\n")
-			currentMsg = messages[len(messages)-1]
-			for i := 0; i < len(messages)-1; i++ {
-				respMsg := messages[i] + "\n\n"
-				p.proxyTraceLog("ResponseSSEBody", respMsg)
-				if _, writeErr := p.Response.Write([]byte(respMsg)); writeErr != nil {
+			buffer.Write(scratchBuf[:n])
+			data := buffer.Bytes()
+			for {
+				idx := bytes.Index(data, sep)
+				if idx == -1 {
+					break
+				}
+				msgEnd := idx + 2
+				msg := data[:msgEnd]
+				p.proxyTraceLog("ResponseSSEBody", msg)
+				if _, writeErr := p.Response.Write(msg); writeErr != nil {
 					return writeErr
 				}
+				// 移除以处理的部分
+				data = data[msgEnd:]
 			}
+			buffer.Reset()
+			buffer.Write(data)
 		}
 		if err != nil {
 			if err == io.EOF {
@@ -172,9 +182,10 @@ func (p *ProxyDirect) proxyResponseStream() error {
 			return err
 		}
 	}
-	if len(currentMsg) > 0 {
-		p.proxyTraceLog("ResponseSSEBody", currentMsg)
-		if _, writeErr := p.Response.Write([]byte(currentMsg)); writeErr != nil {
+	if buffer.Len() > 0 {
+		remaining := buffer.Bytes()
+		p.proxyTraceLog("ResponseSSEBody", remaining)
+		if _, writeErr := p.Response.Write(remaining); writeErr != nil {
 			return writeErr
 		}
 	}
@@ -189,6 +200,8 @@ func (p *ProxyDirect) proxyTraceLog(title string, data any) {
 	switch v := data.(type) {
 	case string:
 		dataStr = v
+	case []byte:
+		dataStr = string(v)
 	default:
 		json, _ := json.Marshal(v)
 		dataStr = string(json)

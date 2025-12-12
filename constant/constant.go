@@ -6,17 +6,20 @@ import (
 )
 
 var (
-	ADDRESS = ":"
-	PORT    = 8888
+	ADDRESS   = ":"
+	PORT      = 8888
+	PPROF     = false
+	MEMLIMIT  = 20
+	GCPERCENT = 100
 )
 
 func ParseAgrs() {
-	argAddress := flag.String("address", ":", "http address")
-	argPort := flag.Int("port", 8888, "http port")
+	flag.StringVar(&ADDRESS, "address", ":", "http address")
+	flag.IntVar(&PORT, "port", 8888, "http port")
+	flag.BoolVar(&PPROF, "add-pprof", false, "add pprof")
+	flag.IntVar(&MEMLIMIT, "mem", 20, "memory limit(MB)")
+	flag.IntVar(&GCPERCENT, "gc", 100, "gc percent")
 	flag.Parse()
-
-	ADDRESS = *argAddress
-	PORT = *argPort
 }
 
 func Address() string {
