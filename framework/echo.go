@@ -61,7 +61,6 @@ func apiManager(e *echo.Echo, group string) {
 
 func apiProxy(e *echo.Echo, group string) {
 	proxyGroup := e.Group(group)
-	proxyGroup.Any("/route/*", proxyDirect)
 	proxyGroup.Any("/direct/:type/*", proxyDirect)
 }
 
