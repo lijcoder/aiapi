@@ -41,9 +41,9 @@ type Parser interface {
 
 // 无状态 Parser，包级单例
 var (
-	OpenAI     Parser = &OpenAIParser{}
-	// Gemini    Parser = &GeminiParser{}     // TODO
-	// Anthropic Parser = &AnthropicParser{}  // TODO
+	OpenAI    Parser = &OpenAIParser{}
+	Anthropic Parser = &AnthropicParser{}
+	// Gemini  Parser = &GeminiParser{}     // TODO
 )
 
 // GetParser 根据 API 协议格式获取对应的 Parser
@@ -54,7 +54,7 @@ func GetParser(format string) Parser {
 	case FormatGemini:
 		return nil // TODO
 	case FormatAnthropic:
-		return nil // TODO
+		return Anthropic
 	default:
 		return nil
 	}

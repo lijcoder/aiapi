@@ -87,7 +87,30 @@ func (b *Body) parseSSEEvent(data []byte) {
 			b.model = event.Model
 		}
 		if event.Usage != nil {
-			b.usage = event.Usage
+			if b.usage == nil {
+				b.usage = event.Usage
+			} else {
+				// 合并：Anthropic 的 usage 分散在 message_start + message_delta 两个事件
+				if event.Usage.InputTokens > 0 {
+					b.usage.InputTokens = event.Usage.InputTokens
+				}
+				if event.Usage.OutputTokens > 0 {
+					b.usage.OutputTokens = event.Usage.OutputTokens
+				}
+				if event.Usage.CachedTokens > 0 {
+					b.usage.CachedTokens = event.Usage.CachedTokens
+				}
+				if event.Usage.ReasoningTokens > 0 {
+					b.usage.ReasoningTokens = event.Usage.ReasoningTokens
+				}
+				if event.Usage.Model != "" {
+					b.usage.Model = event.Usage.Model
+				}
+				if event.Usage.RequestID != "" {
+					b.usage.RequestID = event.Usage.RequestID
+				}
+				b.usage.TotalTokens = b.usage.InputTokens + b.usage.OutputTokens
+			}
 		}
 	}
 }
