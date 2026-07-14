@@ -8,7 +8,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/lijcoder/aiapi/constant"
-	"github.com/lijcoder/aiapi/messages/gemini"
 	"github.com/lijcoder/aiapi/proxy"
 )
 
@@ -44,15 +43,9 @@ func (ep *EchoProxyDirectResponseWrite) Write(body []byte) (int, error) {
 type handlerFunc[T any] func(c echo.Context) (T, *constant.HttpCustomError)
 
 func EchoInit(e *echo.Echo) {
-	apiTest(e, "/test")
 	apiManager(e, "/manager")
 	apiProxy(e, "/proxy")
 	apiProxyDebug(e, "/proxy/debug/:traceid")
-}
-
-func apiTest(e *echo.Echo, group string) {
-	testGroup := e.Group(group)
-	testGroup.POST("/message/gemini/*", debugMessage)
 }
 
 func apiManager(e *echo.Echo, group string) {
@@ -85,15 +78,6 @@ func GeneralHandler[T any](handlerFunc handlerFunc[T]) echo.HandlerFunc {
 		}
 		return respErr
 	}
-}
-
-// debug set
-func debugMessage(c echo.Context) error {
-	req := new(gemini.Request)
-	if err := c.Bind(req); err != nil {
-		return c.String(http.StatusBadRequest, err.Error())
-	}
-	return c.JSON(http.StatusOK, req)
 }
 
 // manager set
