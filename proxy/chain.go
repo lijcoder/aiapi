@@ -3,10 +3,8 @@ package proxy
 import (
 	"bytes"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -18,19 +16,16 @@ import (
 // 任一步骤出错，后续步骤跳过
 type Chain struct {
 	// 输入
-	db      *sql.DB
-	p       parser.Parser
-	writer  ProxyResponseWrite
-	userID  int64
-	apiKey  string
-	debug   bool
-	traceId string
+	db     *sql.DB
+	p      parser.Parser
+	writer ProxyResponseWrite
+	userID int64
+	apiKey string
 
-	method  string
-	path    string
-	body    []byte
-	query   map[string][]string
-	headers http.Header // 原始请求头（调试用）
+	method string
+	path   string
+	body   []byte
+	query  map[string][]string
 
 	// 步骤间状态
 	providerType string
@@ -62,22 +57,10 @@ func (c *Chain) WithRequest(method, path string, body []byte, query map[string][
 	return c
 }
 
-// WithUser 设置用户 ID
-func (c *Chain) WithUser(userID int64) *Chain {
-	c.userID = userID
-	return c
-}
-
-// WithApiKey 设置调用来源的 API Key
-func (c *Chain) WithApiKey(apiKey string) *Chain {
+// WithAuth 设置认证信息（API Key）
+func (c *Chain) WithAuth(apiKey string) *Chain {
 	c.apiKey = apiKey
-	return c
-}
-
-// WithDebug 开启调试日志
-func (c *Chain) WithDebug(traceId string) *Chain {
-	c.debug = true
-	c.traceId = traceId
+	c.userID = 0 // TODO: 内部查询后设置
 	return c
 }
 
@@ -101,7 +84,6 @@ func (c *Chain) LoadConfig(providerType string) *Chain {
 	}
 	c.url = cfg.Domain + "/" + c.path
 	c.reqHeaders = cfg.Headers
-	c.traceLog("LoadConfig", map[string]string{"url": c.url, "headers": fmt.Sprintf("%v", c.reqHeaders)})
 	return c
 }
 
@@ -117,7 +99,6 @@ func (c *Chain) Forward() *Chain {
 		return c
 	}
 
-	// 注入 Provider 配置的 Headers
 	req.Header = make(http.Header)
 	for k, vs := range c.reqHeaders {
 		for _, v := range vs {
@@ -125,7 +106,6 @@ func (c *Chain) Forward() *Chain {
 		}
 	}
 
-	// 追加查询参数
 	q := req.URL.Query()
 	for k, vs := range c.query {
 		for _, v := range vs {
@@ -134,15 +114,12 @@ func (c *Chain) Forward() *Chain {
 	}
 	req.URL.RawQuery = q.Encode()
 
-	c.traceLog("Forward", req.URL.String())
-
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		c.err = err
 		return c
 	}
 	c.httpResp = resp
-	c.traceLog("Forward.Status", resp.Status)
 	return c
 }
 
@@ -152,7 +129,7 @@ func (c *Chain) Intercept() *Chain {
 		return c
 	}
 	if c.p == nil {
-		return c // 没有 parser，跳过解析
+		return c
 	}
 
 	body, err := io.ReadAll(c.httpResp.Body)
@@ -162,16 +139,13 @@ func (c *Chain) Intercept() *Chain {
 	}
 	c.httpResp.Body.Close()
 	c.respBody = body
-	c.traceLog("Intercept.Body", string(body))
 
 	usage, err := c.p.ParseUsage(body)
 	if err != nil {
-		c.traceLog("Intercept.ParseError", err.Error())
-		return c // 解析失败不影响响应
+		return c
 	}
 	if usage != nil {
 		c.usage = usage
-		c.traceLog("Intercept.Usage", usage)
 	}
 	return c
 }
@@ -192,7 +166,6 @@ func (c *Chain) Record() *Chain {
 		RequestID:    c.usage.RequestID,
 		Stream:       c.stream,
 	})
-	c.traceLog("Record", "async queued")
 	return c
 }
 
@@ -201,7 +174,6 @@ func (c *Chain) WriteResponse() *Chain {
 	if c.err != nil {
 		return c
 	}
-	// 写 Headers
 	for k, vs := range c.httpResp.Header {
 		for _, v := range vs {
 			c.writer.Header().Add(k, v)
@@ -209,7 +181,6 @@ func (c *Chain) WriteResponse() *Chain {
 	}
 	c.writer.WriteStatusCode(c.httpResp.StatusCode)
 
-	// 非流式：写完整 body
 	if len(c.respBody) > 0 {
 		_, c.err = c.writer.Write(c.respBody)
 	}
@@ -222,7 +193,6 @@ func (c *Chain) StreamResponse() *Chain {
 		return c
 	}
 
-	// 写 Headers
 	for k, vs := range c.httpResp.Header {
 		for _, v := range vs {
 			c.writer.Header().Add(k, v)
@@ -230,18 +200,15 @@ func (c *Chain) StreamResponse() *Chain {
 	}
 	c.writer.WriteStatusCode(c.httpResp.StatusCode)
 
-	// 创建 SSE 包装器
 	var body io.ReadCloser = c.httpResp.Body
 	if c.p != nil {
 		body = newSSEBody(c.httpResp.Body, c.p)
 	}
 
-	// 逐块读取并写出
 	buf := make([]byte, 512)
 	for {
 		n, err := body.Read(buf)
 		if n > 0 {
-			c.traceLog("Stream.Chunk", string(buf[:n]))
 			if _, writeErr := c.writer.Write(buf[:n]); writeErr != nil {
 				c.err = writeErr
 				return c
@@ -257,13 +224,11 @@ func (c *Chain) StreamResponse() *Chain {
 	}
 	body.Close()
 
-	// 从 sseBody 提取用量
 	if sb, ok := body.(*sseBody); ok {
 		if u := sb.Usage(); u != nil {
 			c.usage = u
 		}
 	}
-	c.traceLog("Stream.Done", "stream ended")
 	return c
 }
 
@@ -273,14 +238,6 @@ func (c *Chain) IsStreaming() bool {
 		return false
 	}
 	return strings.Contains(c.httpResp.Header.Get("Content-Type"), "event-stream")
-}
-
-// ContentType 返回响应的 Content-Type
-func (c *Chain) ContentType() string {
-	if c.httpResp == nil {
-		return ""
-	}
-	return c.httpResp.Header.Get("Content-Type")
 }
 
 // StatusCode 返回响应状态码
@@ -301,7 +258,6 @@ func (c *Chain) WriteError() {
 	if c.err == nil {
 		return
 	}
-	// 根据错误类型映射状态码
 	status := http.StatusInternalServerError
 	msg := c.err.Error()
 	if len(msg) > 13 && msg[:13] == "provider not found" {
@@ -312,22 +268,4 @@ func (c *Chain) WriteError() {
 	c.writer.Header().Set("Content-Type", "application/json")
 	c.writer.WriteStatusCode(status)
 	c.writer.Write([]byte(body))
-}
-
-// traceLog 调试日志
-func (c *Chain) traceLog(title string, data any) {
-	if !c.debug {
-		return
-	}
-	var dataStr string
-	switch v := data.(type) {
-	case string:
-		dataStr = v
-	case []byte:
-		dataStr = string(v)
-	default:
-		j, _ := json.Marshal(v)
-		dataStr = string(j)
-	}
-	slog.Info(fmt.Sprintf("traceId:%s, step[%s]\\\\%s", c.traceId, title, dataStr))
 }

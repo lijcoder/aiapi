@@ -25,8 +25,6 @@ type ProxyRequest struct {
 	Query    map[string][]string // 查询参数
 	Writer   ProxyResponseWrite  // 响应写入器
 	ApiKey   string              // 调用来源 API Key
-	Debug    bool                // 是否开启调试日志
-	TraceId  string              // 调试用 trace id
 }
 
 // Handle 代理主入口，使用链式调用完成代理全流程
@@ -35,12 +33,7 @@ func Handle(req ProxyRequest) error {
 
 	chain := NewChain(req.DB, p, req.Writer).
 		WithRequest(req.Method, req.Path, req.Body, req.Query).
-		WithUser(0). // TODO: 从请求上下文获取
-		WithApiKey(req.ApiKey)
-
-	if req.Debug {
-		chain = chain.WithDebug(req.TraceId)
-	}
+		WithAuth(req.ApiKey)
 
 	chain.
 		LoadConfig(req.Provider).

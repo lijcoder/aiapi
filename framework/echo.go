@@ -44,33 +44,20 @@ func EchoInit(e *echo.Echo, db *sql.DB) {
 
 	manager.RegisterRoutes(e, db)
 	apiProxy(e, "/proxy", db)
-	apiProxyDebug(e, "/proxy/debug/:traceid", db)
 }
 
 func apiProxy(e *echo.Echo, group string, db *sql.DB) {
 	proxyGroup := e.Group(group)
 	proxyGroup.Any("/:format/:provider/*", func(c echo.Context) error {
-		return proxyDirectProcess(c, false, db)
-	})
-}
-
-func apiProxyDebug(e *echo.Echo, group string, db *sql.DB) {
-	proxyGroup := e.Group(group)
-	proxyGroup.Any("/:format/:provider/*", func(c echo.Context) error {
-		return proxyDirectProcess(c, true, db)
+		return proxyDirectProcess(c, db)
 	})
 }
 
 // proxyDirectProcess 解析 HTTP 参数，交给 proxy 处理业务
-func proxyDirectProcess(c echo.Context, debug bool, database *sql.DB) error {
+func proxyDirectProcess(c echo.Context, database *sql.DB) error {
 	bodyBytes, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return err
-	}
-
-	var traceId string
-	if debug {
-		traceId = c.Param("traceid")
 	}
 
 	writer := &EchoProxyDirectResponseWrite{E: c}
@@ -84,7 +71,5 @@ func proxyDirectProcess(c echo.Context, debug bool, database *sql.DB) error {
 		Query:    c.QueryParams(),
 		Writer:   writer,
 		ApiKey:   parser.ExtractApiKey(c.Request().Header, c.Param("format")),
-		Debug:    debug,
-		TraceId:  traceId,
 	})
 }
