@@ -35,8 +35,9 @@ type Parser interface {
 	ParseUsage(body []byte) (*Usage, error)
 
 	// ParseStreamEvent 解析单条 SSE data 行
+	// cur 是当前累计的 usage（sseBody 传过来的），parser 可以在此基础上合并后返回完整 usage
 	// 返回 nil, nil 表示当前行不包含需要处理的事件
-	ParseStreamEvent(data []byte) (*StreamEvent, error)
+	ParseStreamEvent(data []byte, cur *Usage) (*StreamEvent, error)
 }
 
 // 无状态 Parser，包级单例
