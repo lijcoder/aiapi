@@ -77,7 +77,7 @@ func (p *AnthropicParser) ParseUsage(body []byte) (*Usage, error) {
 	}, nil
 }
 
-func (p *AnthropicParser) ParseStreamEvent(data []byte, cur *Usage) (*StreamEvent, error) {
+func (p *AnthropicParser) ParseStreamEvent(data []byte) (*StreamEvent, error) {
 	// 先解析 type 判断事件类型
 	var base anthropicStreamData
 	if err := json.Unmarshal(data, &base); err != nil {
@@ -121,18 +121,11 @@ func (p *AnthropicParser) ParseStreamEvent(data []byte, cur *Usage) (*StreamEven
 		if err := json.Unmarshal(data, &evt); err != nil {
 			return nil, err
 		}
-		// 合并到当前累计 usage 后返回完整值
-		if cur != nil {
-			cur.OutputTokens = evt.Usage.OutputTokens
-			cur.TotalTokens = cur.InputTokens + cur.OutputTokens
-			return &StreamEvent{EventType: "usage", Usage: cur}, nil
-		}
 		return &StreamEvent{
 			EventType: "usage",
 			Usage: &Usage{
 				Provider:     FormatAnthropic,
 				OutputTokens: evt.Usage.OutputTokens,
-				TotalTokens:  evt.Usage.OutputTokens,
 			},
 		}, nil
 
