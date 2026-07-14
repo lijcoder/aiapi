@@ -2,6 +2,8 @@ package constant
 
 import (
 	"flag"
+	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -24,4 +26,10 @@ func ParseAgrs() {
 
 func Address() string {
 	return ADDRESS + strconv.Itoa(PORT)
+}
+
+// DBFilePath 返回数据库文件路径：~/.aiapi/aiapi.db
+func DBFilePath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".aiapi", "aiapi.db")
 }

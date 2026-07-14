@@ -1,19 +1,19 @@
 package framework
 
 import (
-	"errors"
+	"database/sql"
 	"io"
-	"log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/lijcoder/aiapi/constant"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/lijcoder/aiapi/manager"
+	"github.com/lijcoder/aiapi/parser"
 	"github.com/lijcoder/aiapi/proxy"
 )
 
 type EchoProxyDirectResponseWrite struct {
-	E                echo.Context
-	respWriteFlusher http.Flusher
+	E echo.Context
 }
 
 func (ep *EchoProxyDirectResponseWrite) Header() http.Header {
@@ -25,89 +25,66 @@ func (ep *EchoProxyDirectResponseWrite) WriteStatusCode(statusCode int) {
 }
 
 func (ep *EchoProxyDirectResponseWrite) Write(body []byte) (int, error) {
-	if ep.respWriteFlusher == nil {
-		flusher, ok := ep.E.Response().Writer.(http.Flusher)
-		if !ok {
-			return 0, errors.New("http write flusher create fail")
-		}
-		ep.respWriteFlusher = flusher
+	len, err := ep.E.Response().Writer.Write(body)
+	if err != nil {
+		return len, err
 	}
-
-	len, err := ep.E.Response().Writer.Write((body))
-	ep.respWriteFlusher.Flush()
-	return len, err
-}
-
-// echo http set
-
-type handlerFunc[T any] func(c echo.Context) (T, *constant.HttpCustomError)
-
-func EchoInit(e *echo.Echo) {
-	apiManager(e, "/manager")
-	apiProxy(e, "/proxy")
-	apiProxyDebug(e, "/proxy/debug/:traceid")
-}
-
-func apiManager(e *echo.Echo, group string) {
-	// managerGroup := e.Group("/manager")
-}
-
-func apiProxy(e *echo.Echo, group string) {
-	proxyGroup := e.Group(group)
-	proxyGroup.Any("/direct/:type/*", proxyDirect)
-}
-
-func apiProxyDebug(e *echo.Echo, group string) {
-	proxyGroup := e.Group(group)
-	proxyGroup.Any("/direct/:type/*", proxyDirectDebug)
-}
-
-func GeneralHandler[T any](handlerFunc handlerFunc[T]) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		result, err := handlerFunc(c)
-		var resp constant.HttpGeneralResp
-		if err != nil {
-			slog.Error("http handler process error.", "api", c.Path(), "errStack", err)
-			resp = constant.BuildHttpResponseFail(err.Msg)
-		} else {
-			resp = constant.BuildHttpResponseSuccess(result)
-		}
-		respErr := c.JSON(http.StatusOK, resp)
-		if respErr != nil {
-			slog.Error("http handler response error.", "api", c.Path(), "errStack", respErr)
-		}
-		return respErr
+	// 尝试 Flush，不支持时忽略（如 Timeout 中间件包装的场景）
+	if flusher, ok := ep.E.Response().Writer.(http.Flusher); ok {
+		flusher.Flush()
 	}
+	return len, nil
 }
 
-// manager set
+func EchoInit(e *echo.Echo, db *sql.DB) {
+	// 全局中间件
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+	e.Use(middleware.BodyLimit("10M"))
 
-// proxy set
-func proxyDirectDebug(c echo.Context) error {
-	return proxyDirectProcess(c, true)
+	manager.RegisterRoutes(e, db)
+	apiProxy(e, "/proxy", db)
+	apiProxyDebug(e, "/proxy/debug/:traceid", db)
 }
 
-func proxyDirect(c echo.Context) error {
-	return proxyDirectProcess(c, false)
+func apiProxy(e *echo.Echo, group string, db *sql.DB) {
+	proxyGroup := e.Group(group)
+	proxyGroup.Any("/:format/:provider/*", func(c echo.Context) error {
+		return proxyDirectProcess(c, false, db)
+	})
 }
 
-func proxyDirectProcess(c echo.Context, debug bool) error {
+func apiProxyDebug(e *echo.Echo, group string, db *sql.DB) {
+	proxyGroup := e.Group(group)
+	proxyGroup.Any("/:format/:provider/*", func(c echo.Context) error {
+		return proxyDirectProcess(c, true, db)
+	})
+}
+
+// proxyDirectProcess 解析 HTTP 参数，交给 proxy 处理业务
+func proxyDirectProcess(c echo.Context, debug bool, database *sql.DB) error {
 	bodyBytes, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return err
 	}
-	pdr := &proxy.ProxyDirectRequest{
-		Debug:       debug,
-		TraceId:     c.Param("traceid"),
-		Url:         c.Request().URL,
-		Type:        c.Param("type"),
-		Path:        c.Param("*"),
-		Method:      c.Request().Method,
-		Headers:     c.Request().Header,
-		QueryParams: c.QueryParams(),
-		Body:        bodyBytes,
+
+	var traceId string
+	if debug {
+		traceId = c.Param("traceid")
 	}
-	pdw := EchoProxyDirectResponseWrite{E: c}
-	p := proxy.ProxyDirect{Request: pdr, Response: &pdw}
-	return p.Direct()
+
+	writer := &EchoProxyDirectResponseWrite{E: c}
+	return proxy.Handle(proxy.ProxyRequest{
+		DB:       database,
+		Format:   c.Param("format"),
+		Provider: c.Param("provider"),
+		Method:   c.Request().Method,
+		Path:     c.Param("*"),
+		Body:     bodyBytes,
+		Query:    c.QueryParams(),
+		Writer:   writer,
+		ApiKey:   parser.ExtractApiKey(c.Request().Header, c.Param("format")),
+		Debug:    debug,
+		TraceId:  traceId,
+	})
 }

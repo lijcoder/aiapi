@@ -9,14 +9,23 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/lijcoder/aiapi/constant"
+	"github.com/lijcoder/aiapi/db"
 	"github.com/lijcoder/aiapi/framework"
 )
 
 func main() {
 	constant.ParseAgrs()
 	slog.SetLogLoggerLevel(slog.LevelInfo)
+
+	database, err := db.Init()
+	if err != nil {
+		slog.Error("db init failed", "err", err)
+		panic(err)
+	}
+	defer database.Close()
+
 	e := echo.New()
-	framework.EchoInit(e)
+	framework.EchoInit(e, database)
 	if constant.PPROF {
 		registerRoutes(e)
 	}
