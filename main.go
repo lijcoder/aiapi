@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	constant.ParseAgrs()
+	constant.ParseArgs()
 	slog.SetLogLoggerLevel(slog.LevelInfo)
 
 	database, err := db.Init()

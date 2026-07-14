@@ -15,7 +15,7 @@ var (
 	GCPERCENT = 100
 )
 
-func ParseAgrs() {
+func ParseArgs() {
 	flag.StringVar(&ADDRESS, "address", ":", "http address")
 	flag.IntVar(&PORT, "port", 8888, "http port")
 	flag.BoolVar(&PPROF, "add-pprof", false, "add pprof")
