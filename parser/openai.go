@@ -19,8 +19,6 @@ type openaiUsage struct {
 	CompletionTokensDetails *struct {
 		ReasoningTokens int `json:"reasoning_tokens"`
 	} `json:"completion_tokens_details"`
-	PromptCacheHitTokens  int `json:"prompt_cache_hit_tokens"`
-	PromptCacheMissTokens int `json:"prompt_cache_miss_tokens"`
 }
 type openaiNonStreamResp struct {
 	ID      string `json:"id"`
@@ -129,12 +127,12 @@ func SSEParseData(line []byte) []byte {
 	return nil
 }
 
-// extractCachedTokens 从 usage 中提取缓存命中 token（兼容两种写法）
+// extractCachedTokens 从 usage 中提取缓存命中 token
 func extractCachedTokens(u *openaiUsage) int {
 	if u.PromptTokensDetails != nil {
 		return u.PromptTokensDetails.CachedTokens
 	}
-	return u.PromptCacheHitTokens
+	return 0
 }
 
 // extractReasoningTokens 从 usage 中提取推理 token
