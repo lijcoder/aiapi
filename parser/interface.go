@@ -64,7 +64,15 @@ func GetParser(format string) Parser {
 func ExtractApiKey(h http.Header, format string) string {
 	switch format {
 	case FormatAnthropic:
-		return h.Get("x-api-key")
+		if k := h.Get("x-api-key"); k != "" {
+			return k
+		}
+		// Anthropic 也支持 Authorization: Bearer
+		v := h.Get("Authorization")
+		if len(v) > 7 && v[:7] == "Bearer " {
+			return v[7:]
+		}
+		return v
 	case FormatGemini:
 		return h.Get("x-goog-api-key")
 	default:
