@@ -22,7 +22,7 @@ type Body struct {
 
 // NewBody 创建 SSE body 包装器
 func NewBody(src io.ReadCloser, p parser.Parser) *Body {
-	return &Body{src: src, parser: p}
+	return &Body{src: src, parser: p, usage: &parser.Usage{}}
 }
 
 func (b *Body) Read(p []byte) (n int, err error) {
@@ -87,28 +87,28 @@ func (b *Body) parseSSEEvent(data []byte) {
 			b.model = event.Model
 		}
 		if event.Usage != nil {
-			if b.usage == nil {
-				b.usage = event.Usage
+			// 累加：非零字段覆盖，零值保留（OpenAI 全量覆盖，Anthropic 跨事件累加）
+			if event.Usage.InputTokens > 0 {
+				b.usage.InputTokens = event.Usage.InputTokens
+			}
+			if event.Usage.OutputTokens > 0 {
+				b.usage.OutputTokens = event.Usage.OutputTokens
+			}
+			if event.Usage.CachedTokens > 0 {
+				b.usage.CachedTokens = event.Usage.CachedTokens
+			}
+			if event.Usage.ReasoningTokens > 0 {
+				b.usage.ReasoningTokens = event.Usage.ReasoningTokens
+			}
+			if event.Usage.Model != "" {
+				b.usage.Model = event.Usage.Model
+			}
+			if event.Usage.RequestID != "" {
+				b.usage.RequestID = event.Usage.RequestID
+			}
+			if event.Usage.TotalTokens > 0 {
+				b.usage.TotalTokens = event.Usage.TotalTokens
 			} else {
-				// 合并：包含非零值的字段覆盖已有值（Anthropic 的 usage 跨事件拆分）
-				if event.Usage.InputTokens > 0 {
-					b.usage.InputTokens = event.Usage.InputTokens
-				}
-				if event.Usage.OutputTokens > 0 {
-					b.usage.OutputTokens = event.Usage.OutputTokens
-				}
-				if event.Usage.CachedTokens > 0 {
-					b.usage.CachedTokens = event.Usage.CachedTokens
-				}
-				if event.Usage.ReasoningTokens > 0 {
-					b.usage.ReasoningTokens = event.Usage.ReasoningTokens
-				}
-				if event.Usage.Model != "" {
-					b.usage.Model = event.Usage.Model
-				}
-				if event.Usage.RequestID != "" {
-					b.usage.RequestID = event.Usage.RequestID
-				}
 				b.usage.TotalTokens = b.usage.InputTokens + b.usage.OutputTokens
 			}
 		}
