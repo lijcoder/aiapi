@@ -11,12 +11,14 @@ const (
 
 // Usage 统一的用量结构
 type Usage struct {
-	Provider     string  `json:"provider"`
-	Model        string  `json:"model"`
-	InputTokens  int     `json:"input_tokens"`
-	OutputTokens int     `json:"output_tokens"`
-	TotalTokens  int     `json:"total_tokens"`
-	RequestID    string  `json:"request_id"`
+	Provider        string `json:"provider"`
+	Model           string `json:"model"`
+	InputTokens     int    `json:"input_tokens"`
+	OutputTokens    int    `json:"output_tokens"`
+	TotalTokens     int    `json:"total_tokens"`
+	RequestID       string `json:"request_id"`
+	CachedTokens    int    `json:"cached_tokens"`
+	ReasoningTokens int    `json:"reasoning_tokens"`
 }
 
 // StreamEvent 流式 SSE 事件

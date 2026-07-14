@@ -39,17 +39,19 @@ type ApiKey struct {
 
 // UsageRecord Token 用量记录
 type UsageRecord struct {
-	ID            int64     `json:"id"`
-	UserID        int64     `json:"user_id"`
-	ApiKey        string    `json:"api_key"`
-	Provider      string    `json:"provider"`       // openai / gemini / anthropic
-	Model         string    `json:"model"`           // gpt-4, claude-3.5-sonnet 等
-	InputTokens   int       `json:"input_tokens"`
-	OutputTokens  int       `json:"output_tokens"`
-	TotalTokens   int       `json:"total_tokens"`
-	RequestID     string    `json:"request_id"`      // 上游返回的 request id
-	Stream        bool      `json:"stream"`          // 是否流式
-	CreatedAt     time.Time `json:"created_at"`
+	ID              int64     `json:"id"`
+	UserID          int64     `json:"user_id"`
+	ApiKey          string    `json:"api_key"`
+	Provider        string    `json:"provider"`
+	Model           string    `json:"model"`
+	InputTokens     int       `json:"input_tokens"`
+	OutputTokens    int       `json:"output_tokens"`
+	TotalTokens     int       `json:"total_tokens"`
+	RequestID       string    `json:"request_id"`
+	Stream          bool      `json:"stream"`
+	CachedTokens    int       `json:"cached_tokens"`
+	ReasoningTokens int       `json:"reasoning_tokens"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 // RequestLog HTTP 请求日志

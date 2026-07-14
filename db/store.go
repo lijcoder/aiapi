@@ -147,11 +147,12 @@ func LookupApiKey(db *sql.DB, apikey string) (*ApiKey, *User, error) {
 
 func InsertUsage(db *sql.DB, usage *UsageRecord) error {
 	_, err := db.Exec(
-		`INSERT INTO usage_records (user_id, api_key, provider, model, input_tokens, output_tokens, total_tokens, request_id, stream)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO usage_records (user_id, api_key, provider, model, input_tokens, output_tokens, total_tokens, request_id, stream, cached_tokens, reasoning_tokens)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		usage.UserID, usage.ApiKey, usage.Provider, usage.Model,
 		usage.InputTokens, usage.OutputTokens, usage.TotalTokens,
 		usage.RequestID, boolToInt(usage.Stream),
+		usage.CachedTokens, usage.ReasoningTokens,
 	)
 	return err
 }

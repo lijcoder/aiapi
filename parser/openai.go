@@ -8,7 +8,20 @@ import (
 // OpenAIParser OpenAI 响应解析器
 type OpenAIParser struct{}
 
-// openaiNonStreamResp 非流式响应结构
+// openaiUsage 非流式/流式通用的 usage 结构
+type openaiUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+	PromptTokensDetails *struct {
+		CachedTokens int `json:"cached_tokens"`
+	} `json:"prompt_tokens_details"`
+	CompletionTokensDetails *struct {
+		ReasoningTokens int `json:"reasoning_tokens"`
+	} `json:"completion_tokens_details"`
+	PromptCacheHitTokens  int `json:"prompt_cache_hit_tokens"`
+	PromptCacheMissTokens int `json:"prompt_cache_miss_tokens"`
+}
 type openaiNonStreamResp struct {
 	ID      string `json:"id"`
 	Model   string `json:"model"`
@@ -17,11 +30,7 @@ type openaiNonStreamResp struct {
 		Index        int    `json:"index"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
-	Usage struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-		TotalTokens      int `json:"total_tokens"`
-	} `json:"usage"`
+	Usage openaiUsage `json:"usage"`
 }
 
 // openaiStreamChunk 流式 chunk 结构
@@ -37,11 +46,7 @@ type openaiStreamChunk struct {
 		} `json:"delta"`
 		FinishReason *string `json:"finish_reason"`
 	} `json:"choices"`
-	Usage *struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-		TotalTokens      int `json:"total_tokens"`
-	} `json:"usage"`
+	Usage *openaiUsage `json:"usage"`
 }
 
 func (p *OpenAIParser) ParseUsage(body []byte) (*Usage, error) {
@@ -50,12 +55,14 @@ func (p *OpenAIParser) ParseUsage(body []byte) (*Usage, error) {
 		return nil, err
 	}
 	return &Usage{
-		Provider:     FormatOpenAI,
-		Model:        resp.Model,
-		InputTokens:  resp.Usage.PromptTokens,
-		OutputTokens: resp.Usage.CompletionTokens,
-		TotalTokens:  resp.Usage.TotalTokens,
-		RequestID:    resp.ID,
+		Provider:        FormatOpenAI,
+		Model:           resp.Model,
+		InputTokens:     resp.Usage.PromptTokens,
+		OutputTokens:    resp.Usage.CompletionTokens,
+		TotalTokens:     resp.Usage.TotalTokens,
+		RequestID:       resp.ID,
+		CachedTokens:    extractCachedTokens(&resp.Usage),
+		ReasoningTokens: extractReasoningTokens(&resp.Usage),
 	}, nil
 }
 
@@ -87,12 +94,14 @@ func (p *OpenAIParser) ParseStreamEvent(data []byte) (*StreamEvent, error) {
 	// 提取 usage（最后一条 SSE 事件）
 	if chunk.Usage != nil {
 		event.Usage = &Usage{
-			Provider:     FormatOpenAI,
-			Model:        chunk.Model,
-			InputTokens:  chunk.Usage.PromptTokens,
-			OutputTokens: chunk.Usage.CompletionTokens,
-			TotalTokens:  chunk.Usage.TotalTokens,
-			RequestID:    chunk.ID,
+			Provider:        FormatOpenAI,
+			Model:           chunk.Model,
+			InputTokens:     chunk.Usage.PromptTokens,
+			OutputTokens:    chunk.Usage.CompletionTokens,
+			TotalTokens:     chunk.Usage.TotalTokens,
+			RequestID:       chunk.ID,
+			CachedTokens:    extractCachedTokens(chunk.Usage),
+			ReasoningTokens: extractReasoningTokens(chunk.Usage),
 		}
 		event.EventType = "usage"
 	}
@@ -118,4 +127,20 @@ func SSEParseData(line []byte) []byte {
 		return []byte(strings.TrimPrefix(lineStr, "data:"))
 	}
 	return nil
+}
+
+// extractCachedTokens 从 usage 中提取缓存命中 token（兼容两种写法）
+func extractCachedTokens(u *openaiUsage) int {
+	if u.PromptTokensDetails != nil {
+		return u.PromptTokensDetails.CachedTokens
+	}
+	return u.PromptCacheHitTokens
+}
+
+// extractReasoningTokens 从 usage 中提取推理 token
+func extractReasoningTokens(u *openaiUsage) int {
+	if u.CompletionTokensDetails != nil {
+		return u.CompletionTokensDetails.ReasoningTokens
+	}
+	return 0
 }

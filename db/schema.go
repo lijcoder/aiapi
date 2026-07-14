@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS usage_records (
     total_tokens   INTEGER NOT NULL DEFAULT 0,
     request_id     TEXT DEFAULT '',
     stream         INTEGER DEFAULT 0,
+    cached_tokens  INTEGER DEFAULT 0,
+    reasoning_tokens INTEGER DEFAULT 0,
     created_at     DATETIME DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
