@@ -64,7 +64,7 @@ func (p *OpenAIParser) ParseUsage(body []byte) (*Usage, error) {
 	}, nil
 }
 
-func (p *OpenAIParser) ParseStreamEvent(data []byte, cur *Usage) (*StreamEvent, error) {
+func (p *OpenAIParser) ParseStreamEvent(data []byte) (*StreamEvent, error) {
 	// 跳过 [DONE]
 	line := strings.TrimSpace(string(data))
 	if line == "[DONE]" {
