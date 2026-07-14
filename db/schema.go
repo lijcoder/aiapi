@@ -48,4 +48,23 @@ CREATE INDEX IF NOT EXISTS idx_usage_records_user   ON usage_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_usage_records_date   ON usage_records(created_at);
 CREATE INDEX IF NOT EXISTS idx_usage_records_model  ON usage_records(model);
 CREATE INDEX IF NOT EXISTS idx_api_keys_key         ON api_keys(key);
+
+CREATE TABLE IF NOT EXISTS request_logs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    api_key         TEXT DEFAULT '',
+    format          TEXT NOT NULL,
+    provider        TEXT NOT NULL DEFAULT '',
+    method          TEXT NOT NULL,
+    path            TEXT NOT NULL,
+    status_code     INTEGER DEFAULT 0,
+    request_headers TEXT DEFAULT '',
+    request_body    TEXT DEFAULT '',
+    model           TEXT DEFAULT '',
+    input_tokens    INTEGER DEFAULT 0,
+    output_tokens   INTEGER DEFAULT 0,
+    total_tokens    INTEGER DEFAULT 0,
+    error           TEXT DEFAULT '',
+    latency_ms      INTEGER DEFAULT 0,
+    created_at      DATETIME DEFAULT (datetime('now'))
+);
 `

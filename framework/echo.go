@@ -4,12 +4,14 @@ import (
 	"database/sql"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/lijcoder/aiapi/manager"
 	"github.com/lijcoder/aiapi/parser"
 	"github.com/lijcoder/aiapi/proxy"
+	"github.com/lijcoder/aiapi/proxy/types"
 )
 
 type EchoProxyDirectResponseWrite struct {
@@ -38,7 +40,6 @@ func (ep *EchoProxyDirectResponseWrite) Write(body []byte) (int, error) {
 
 func EchoInit(e *echo.Echo, db *sql.DB) {
 	// 全局中间件
-	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e.Use(middleware.BodyLimit("10M"))
 
@@ -61,15 +62,17 @@ func proxyDirectProcess(c echo.Context, database *sql.DB) error {
 	}
 
 	writer := &EchoProxyDirectResponseWrite{E: c}
-	return proxy.Handle(proxy.ProxyRequest{
-		DB:       database,
-		Format:   c.Param("format"),
-		Provider: c.Param("provider"),
-		Method:   c.Request().Method,
-		Path:     c.Param("*"),
-		Body:     bodyBytes,
-		Query:    c.QueryParams(),
-		Writer:   writer,
-		ApiKey:   parser.ExtractApiKey(c.Request().Header, c.Param("format")),
+	return proxy.Handle(types.ProxyRequest{
+		DB:        database,
+		Format:    c.Param("format"),
+		Provider:  c.Param("provider"),
+		Method:    c.Request().Method,
+		Path:      c.Param("*"),
+		Body:      bodyBytes,
+		Query:     c.QueryParams(),
+		Writer:    writer,
+		ApiKey:    parser.ExtractApiKey(c.Request().Header, c.Param("format")),
+		Headers:   c.Request().Header,
+		StartTime: time.Now(),
 	})
 }

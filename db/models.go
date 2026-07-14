@@ -51,3 +51,23 @@ type UsageRecord struct {
 	Stream        bool      `json:"stream"`          // 是否流式
 	CreatedAt     time.Time `json:"created_at"`
 }
+
+// RequestLog HTTP 请求日志
+type RequestLog struct {
+	ID            int64     `json:"id"`
+	ApiKey        string    `json:"api_key"`
+	Format        string    `json:"format"`         // openai/gemini/anthropic
+	Provider      string    `json:"provider"`       // 后端 provider type
+	Method        string    `json:"method"`
+	Path          string    `json:"path"`
+	StatusCode    int       `json:"status_code"`
+	RequestHeaders string   `json:"request_headers"` // JSON
+	RequestBody   string    `json:"request_body"`
+	Model         string    `json:"model"`
+	InputTokens   int       `json:"input_tokens"`
+	OutputTokens  int       `json:"output_tokens"`
+	TotalTokens   int       `json:"total_tokens"`
+	Error         string    `json:"error"`
+	LatencyMs     int64     `json:"latency_ms"`
+	CreatedAt     time.Time `json:"created_at"`
+}

@@ -165,6 +165,20 @@ func RecordUsageAsync(db *sql.DB, usage *UsageRecord) {
 	}()
 }
 
+// ==================== RequestLog ====================
+
+func InsertRequestLog(db *sql.DB, log *RequestLog) error {
+	_, err := db.Exec(
+		`INSERT INTO request_logs (api_key, format, provider, method, path, status_code, request_headers, request_body, model, input_tokens, output_tokens, total_tokens, error, latency_ms)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		log.ApiKey, log.Format, log.Provider, log.Method, log.Path,
+		log.StatusCode, log.RequestHeaders, log.RequestBody,
+		log.Model, log.InputTokens, log.OutputTokens, log.TotalTokens,
+		log.Error, log.LatencyMs,
+	)
+	return err
+}
+
 // ==================== Budget ====================
 
 func GetUserBudget(db *sql.DB, userID int64) (float64, error) {
