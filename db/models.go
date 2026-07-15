@@ -74,3 +74,15 @@ type RequestLog struct {
 	LatencyMs     int64     `json:"latency_ms"`
 	CreatedAt     time.Time `json:"created_at"`
 }
+
+// ModelPricing 模型价格配置
+type ModelPricing struct {
+	ID                int64     `json:"id"`
+	Provider          string    `json:"provider"`
+	Model             string    `json:"model"`
+	InputCacheHitPrice  float64 `json:"input_cache_hit_price"`
+	InputCacheMissPrice float64 `json:"input_cache_miss_price"`
+	OutputPrice         float64 `json:"output_price"`
+	Enabled           bool      `json:"enabled"`
+	CreatedAt         time.Time `json:"created_at"`
+}

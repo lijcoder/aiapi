@@ -70,4 +70,16 @@ CREATE TABLE IF NOT EXISTS request_logs (
     latency_ms      INTEGER DEFAULT 0,
     created_at      DATETIME DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS model_pricing (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider              TEXT NOT NULL,
+    model                 TEXT NOT NULL,
+    input_cache_hit_price  REAL NOT NULL DEFAULT 0,
+    input_cache_miss_price REAL NOT NULL DEFAULT 0,
+    output_price           REAL NOT NULL DEFAULT 0,
+    enabled               INTEGER DEFAULT 1,
+    created_at            DATETIME DEFAULT (datetime('now')),
+    UNIQUE(provider, model)
+);
 `

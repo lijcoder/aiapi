@@ -219,6 +219,67 @@ func GetRemainingBudget(db *sql.DB, userID int64) (float64, error) {
 	return remaining, nil
 }
 
+// ==================== ModelPricing ====================
+
+// GetModelPricing 查询模型价格
+func GetModelPricing(db *sql.DB, provider, model string) (*ModelPricing, error) {
+	var p ModelPricing
+	var enabled int
+	err := db.QueryRow(
+		`SELECT id, provider, model, input_cache_hit_price, input_cache_miss_price, output_price, enabled, created_at
+		 FROM model_pricing WHERE provider = ? AND model = ? AND enabled = 1`,
+		provider, model,
+	).Scan(&p.ID, &p.Provider, &p.Model,
+		&p.InputCacheHitPrice, &p.InputCacheMissPrice, &p.OutputPrice,
+		&enabled, &p.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	p.Enabled = enabled == 1
+	return &p, nil
+}
+
+// ListModelPricing 列出所有价格配置
+func ListModelPricing(db *sql.DB) ([]*ModelPricing, error) {
+	rows, err := db.Query(
+		`SELECT id, provider, model, input_cache_hit_price, input_cache_miss_price, output_price, enabled, created_at
+		 FROM model_pricing ORDER BY provider, model`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*ModelPricing
+	for rows.Next() {
+		var p ModelPricing
+		var enabled int
+		if err := rows.Scan(&p.ID, &p.Provider, &p.Model,
+			&p.InputCacheHitPrice, &p.InputCacheMissPrice, &p.OutputPrice,
+			&enabled, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		p.Enabled = enabled == 1
+		list = append(list, &p)
+	}
+	return list, nil
+}
+
+// AddModelPricing 新增价格配置
+func AddModelPricing(db *sql.DB, p *ModelPricing) error {
+	_, err := db.Exec(
+		`INSERT INTO model_pricing (provider, model, input_cache_hit_price, input_cache_miss_price, output_price)
+		 VALUES (?, ?, ?, ?, ?)`,
+		p.Provider, p.Model, p.InputCacheHitPrice, p.InputCacheMissPrice, p.OutputPrice,
+	)
+	return err
+}
+
+// DeleteModelPricing 删除价格配置
+func DeleteModelPricing(db *sql.DB, id int64) error {
+	_, err := db.Exec(`DELETE FROM model_pricing WHERE id = ?`, id)
+	return err
+}
+
 // ==================== Utils ====================
 
 func boolToInt(b bool) int {
