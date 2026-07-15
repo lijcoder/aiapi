@@ -8,7 +8,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/lijcoder/aiapi/manager"
 	"github.com/lijcoder/aiapi/parser"
 	"github.com/lijcoder/aiapi/proxy"
 	"github.com/lijcoder/aiapi/proxy/types"
@@ -43,7 +42,6 @@ func EchoInit(e *echo.Echo, db *sql.DB) {
 	e.Use(middleware.Recover())
 	e.Use(middleware.BodyLimit("10M"))
 
-	manager.RegisterRoutes(e, db)
 	apiProxy(e, "/proxy", db)
 }
 

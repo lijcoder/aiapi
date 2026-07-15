@@ -48,44 +48,6 @@ func GetProvider(db *sql.DB, providerType string) (*Provider, bool) {
 	return &p, true
 }
 
-// ListProviders 查询所有启用的 provider
-func ListProviders(db *sql.DB) ([]Provider, error) {
-	rows, err := db.Query(`SELECT id, type, config, enabled, created_at, updated_at FROM providers WHERE enabled = 1`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var providers []Provider
-	for rows.Next() {
-		var p Provider
-		if err := rows.Scan(&p.ID, &p.Type, &p.Config, &p.Enabled, &p.CreatedAt, &p.UpdatedAt); err != nil {
-			return nil, err
-		}
-		providers = append(providers, p)
-	}
-	return providers, rows.Err()
-}
-
-// AddProvider 新增 provider
-func AddProvider(db *sql.DB, p *Provider) error {
-	config := p.Config
-	if config == "" {
-		config = "{}"
-	}
-	_, err := db.Exec(
-		`INSERT OR REPLACE INTO providers (type, config, enabled, updated_at) VALUES (?, ?, ?, datetime('now'))`,
-		p.Type, config, boolToInt(p.Enabled),
-	)
-	return err
-}
-
-// DeleteProvider 删除 provider
-func DeleteProvider(db *sql.DB, providerType string) error {
-	_, err := db.Exec(`DELETE FROM providers WHERE type = ?`, providerType)
-	return err
-}
-
 // ParseConfig 解析 provider.config JSON
 func (p *Provider) ParseConfig() (*ProviderConfig, error) {
 	var cfg ProviderConfig
