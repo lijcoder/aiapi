@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_at DATETIME DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
+CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(key);
 
 CREATE TABLE IF NOT EXISTS usage_records (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -45,11 +46,9 @@ CREATE TABLE IF NOT EXISTS usage_records (
     created_at     DATETIME DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_usage_records_user   ON usage_records(user_id);
-CREATE INDEX IF NOT EXISTS idx_usage_records_date   ON usage_records(created_at);
-CREATE INDEX IF NOT EXISTS idx_usage_records_model  ON usage_records(model);
-CREATE INDEX IF NOT EXISTS idx_api_keys_key         ON api_keys(key);
+CREATE INDEX IF NOT EXISTS idx_usage_records_user  ON usage_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_usage_records_date  ON usage_records(created_at);
+CREATE INDEX IF NOT EXISTS idx_usage_records_model ON usage_records(model);
 
 CREATE TABLE IF NOT EXISTS request_logs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
