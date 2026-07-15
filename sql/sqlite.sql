@@ -19,7 +19,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_providers_type ON providers(type);
 CREATE TABLE IF NOT EXISTS users (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT NOT NULL,
-    budget     REAL DEFAULT 0,
     enabled    INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT (datetime('now'))
 );
