@@ -19,9 +19,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_providers_type ON providers(type);
 CREATE TABLE IF NOT EXISTS users (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT NOT NULL,
+    account    TEXT NOT NULL,
     enabled    INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT (datetime('now'))
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_account ON users(account);
 
 CREATE TABLE IF NOT EXISTS api_keys (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
