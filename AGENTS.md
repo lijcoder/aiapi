@@ -17,9 +17,10 @@ aiapi/
 ├── main.go                  # 入口：解析参数 → 初始化 DB → 启动 HTTP 服务
 ├── constant/
 │   └── constant.go          # 全局常量（端口、内存限制等）
+├── sql/
+│   └── sqlite.sql           # SQLite DDL（手动执行，未来可加 mysql.sql）
 ├── db/
-│   ├── models.go            # 数据模型（Provider, User, ApiKey, UsageRecord, RequestLog）
-│   ├── schema.go            # DDL（参考用，手动建表）
+│   ├── models.go            # 数据模型（Provider, User, ApiKey, UsageRecord, RequestLog, ModelPricing）
 │   └── store.go             # CRUD + Init()
 ├── parser/
 │   ├── interface.go         # Parser 接口 + 格式常量 + ExtractApiKey

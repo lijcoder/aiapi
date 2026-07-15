@@ -1,6 +1,6 @@
-package db
+-- SQLite DDL — 手动执行: sqlite3 ~/.aiapi/aiapi.db < sql/sqlite.sql
+-- 如果迁移到 MySQL, 参考 sql/mysql.sql
 
-const schema = `
 CREATE TABLE IF NOT EXISTS providers (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     type       TEXT NOT NULL,
@@ -82,4 +82,3 @@ CREATE TABLE IF NOT EXISTS model_pricing (
     created_at            DATETIME DEFAULT (datetime('now')),
     UNIQUE(provider, model)
 );
-`
