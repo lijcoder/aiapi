@@ -41,6 +41,7 @@ type Context struct {
 	Query                                      map[string][]string
 	OrigHeaders                                map[string][]string
 	StartTime                                  time.Time
+	UserID                                     int64
 
 	URL        string
 	ReqHeaders map[string][]string

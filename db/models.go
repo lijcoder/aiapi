@@ -21,8 +21,8 @@ type ProviderConfig struct {
 // User 用户
 type User struct {
 	ID        int64     `json:"id"`
+	Account   string    `json:"account"`
 	Name      string    `json:"name"`
-	Budget    float64   `json:"budget"`     // 预算上限（USD），0 表示无限制
 	Enabled   bool      `json:"enabled"`
 	CreatedAt time.Time `json:"created_at"`
 }

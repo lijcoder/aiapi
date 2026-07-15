@@ -14,6 +14,7 @@ func Record(ctx *types.Context) {
 		return
 	}
 	db.RecordUsageAsync(ctx.DB, &db.UsageRecord{
+		UserID:          ctx.UserID,
 		ApiKey:          ctx.ApiKey,
 		Provider:        ctx.ProviderType,
 		Model:           ctx.Usage.Model,

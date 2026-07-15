@@ -57,6 +57,30 @@ func (p *Provider) ParseConfig() (*ProviderConfig, error) {
 	return &cfg, nil
 }
 
+// ==================== ApiKey ====================
+
+// LookupApiKey 查询 API Key，返回 key 信息和关联的用户
+func LookupApiKey(db *sql.DB, key string) (*ApiKey, *User, error) {
+	var k ApiKey
+	err := db.QueryRow(
+		`SELECT id, user_id, key, name, enabled, created_at FROM api_keys WHERE key = ? AND enabled = 1`,
+		key,
+	).Scan(&k.ID, &k.UserID, &k.Key, &k.Name, &k.Enabled, &k.CreatedAt)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var u User
+	err = db.QueryRow(
+		`SELECT id, account, name, enabled, created_at FROM users WHERE id = ? AND enabled = 1`,
+		k.UserID,
+	).Scan(&u.ID, &u.Account, &u.Name, &u.Enabled, &u.CreatedAt)
+	if err != nil {
+		return &k, nil, err // key 有效但用户异常
+	}
+	return &k, &u, nil
+}
+
 // ==================== UsageRecord ====================
 
 func InsertUsage(db *sql.DB, usage *UsageRecord) error {

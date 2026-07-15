@@ -15,6 +15,7 @@ func (c BizCode) HTTPStatus() int {
 }
 
 var (
-	CodeUnknown  = BizCode{0, 500}
-	CodeNotFound = BizCode{1001, 404}
+	CodeUnknown      = BizCode{0, 500}
+	CodeNotFound     = BizCode{1001, 404}
+	CodeUnauthorized = BizCode{1002, 401}
 )
