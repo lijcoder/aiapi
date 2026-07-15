@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     status_code     INTEGER DEFAULT 0,
     request_headers TEXT DEFAULT '',
     request_body    TEXT DEFAULT '',
+    response_body   TEXT DEFAULT '',
     model           TEXT DEFAULT '',
     input_tokens    INTEGER DEFAULT 0,
     output_tokens   INTEGER DEFAULT 0,

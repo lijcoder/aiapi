@@ -1,12 +1,19 @@
 package handler
 
 import (
+	"bytes"
 	"io"
 	"strings"
 
 	"github.com/lijcoder/aiapi/proxy/sse"
 	"github.com/lijcoder/aiapi/proxy/types"
 )
+
+// logReadCloser io.TeeReader 的 ReadCloser 包装
+type logReadCloser struct {
+	io.Reader
+	io.Closer
+}
 
 // Response 响应处理：流式或非流式
 func Response(ctx *types.Context) {
@@ -32,9 +39,16 @@ func streamResponse(ctx *types.Context) {
 	}
 	ctx.Writer.WriteStatusCode(ctx.HttpResp.StatusCode)
 
-	var body io.ReadCloser = ctx.HttpResp.Body
+	// 用 TeeReader 透传的同时缓存原始响应体用于日志
+	var logBuf bytes.Buffer
+	logSrc := &logReadCloser{
+		Reader: io.TeeReader(ctx.HttpResp.Body, &logBuf),
+		Closer: ctx.HttpResp.Body,
+	}
+
+	var body io.ReadCloser = logSrc
 	if ctx.P != nil {
-		body = sse.NewBody(ctx.HttpResp.Body, ctx.P)
+		body = sse.NewBody(logSrc, ctx.P)
 	}
 
 	buf := make([]byte, 512)
@@ -61,6 +75,8 @@ func streamResponse(ctx *types.Context) {
 			ctx.Usage = u
 		}
 	}
+
+	ctx.RespBody = logBuf.Bytes()
 }
 
 func interceptResponse(ctx *types.Context) {

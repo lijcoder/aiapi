@@ -170,10 +170,10 @@ func RecordUsageAsync(db *sql.DB, usage *UsageRecord) {
 
 func InsertRequestLog(db *sql.DB, log *RequestLog) error {
 	_, err := db.Exec(
-		`INSERT INTO request_logs (api_key, format, provider, method, path, status_code, request_headers, request_body, model, input_tokens, output_tokens, total_tokens, error, latency_ms)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO request_logs (api_key, format, provider, method, path, status_code, request_headers, request_body, response_body, model, input_tokens, output_tokens, total_tokens, error, latency_ms)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		log.ApiKey, log.Format, log.Provider, log.Method, log.Path,
-		log.StatusCode, log.RequestHeaders, log.RequestBody,
+		log.StatusCode, log.RequestHeaders, log.RequestBody, log.ResponseBody,
 		log.Model, log.InputTokens, log.OutputTokens, log.TotalTokens,
 		log.Error, log.LatencyMs,
 	)

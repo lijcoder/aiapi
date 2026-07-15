@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -43,7 +44,7 @@ func Log(ctx *types.Context) {
 
 	latency := time.Since(ctx.StartTime).Milliseconds()
 
-	db.InsertRequestLog(ctx.DB, &db.RequestLog{
+	if err := db.InsertRequestLog(ctx.DB, &db.RequestLog{
 		ApiKey:         ctx.ApiKey,
 		Format:         ctx.Format,
 		Provider:       ctx.ProviderType,
@@ -52,11 +53,14 @@ func Log(ctx *types.Context) {
 		StatusCode:     statusCode,
 		RequestHeaders: string(headerJSON),
 		RequestBody:    string(ctx.Body),
+		ResponseBody:   string(ctx.RespBody),
 		Model:          model,
 		InputTokens:    inTokens,
 		OutputTokens:   outTokens,
 		TotalTokens:    totalTokens,
 		Error:          errMsg,
 		LatencyMs:      latency,
-	})
+	}); err != nil {
+		slog.Warn("insert request log failed", "error", err)
+	}
 }

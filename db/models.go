@@ -65,6 +65,7 @@ type RequestLog struct {
 	StatusCode    int       `json:"status_code"`
 	RequestHeaders string   `json:"request_headers"` // JSON
 	RequestBody   string    `json:"request_body"`
+	ResponseBody  string    `json:"response_body"`
 	Model         string    `json:"model"`
 	InputTokens   int       `json:"input_tokens"`
 	OutputTokens  int       `json:"output_tokens"`
