@@ -13,14 +13,17 @@ var (
 	PPROF     = false
 	MEMLIMIT  = 20
 	GCPERCENT = 100
+	DataDir   string // 数据根目录
 )
 
 func ParseArgs() {
+	home, _ := os.UserHomeDir()
 	flag.StringVar(&ADDRESS, "address", ":", "http address")
 	flag.IntVar(&PORT, "port", 8888, "http port")
 	flag.BoolVar(&PPROF, "add-pprof", false, "add pprof")
 	flag.IntVar(&MEMLIMIT, "mem", 20, "memory limit(MB)")
 	flag.IntVar(&GCPERCENT, "gc", 100, "gc percent")
+	flag.StringVar(&DataDir, "data-dir", filepath.Join(home, ".aiapi"), "data root directory")
 	flag.Parse()
 }
 
@@ -28,14 +31,12 @@ func Address() string {
 	return ADDRESS + strconv.Itoa(PORT)
 }
 
-// DBFilePath 返回数据库文件路径：~/.aiapi/aiapi.db
+// DBFilePath 返回数据库文件路径
 func DBFilePath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".aiapi", "aiapi.db")
+	return filepath.Join(DataDir, "db", "aiapi.db")
 }
 
-// LogDir 返回日志目录：~/.aiapi/logs
+// LogDir 返回日志目录
 func LogDir() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".aiapi", "logs")
+	return filepath.Join(DataDir, "logs")
 }
