@@ -7,7 +7,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/lijcoder/aiapi/parser"
 	"github.com/lijcoder/aiapi/proxy"
 	"github.com/lijcoder/aiapi/proxy/types"
 )
@@ -60,7 +59,6 @@ func proxyDirectProcess(c echo.Context) error {
 		Body:      bodyBytes,
 		Query:     c.QueryParams(),
 		Writer:    writer,
-		ApiKey:    parser.ExtractApiKey(c.Request().Header, c.Param("format")),
 		Headers:   c.Request().Header,
 		StartTime: time.Now(),
 	})

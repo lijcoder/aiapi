@@ -2,7 +2,9 @@ package handler
 
 import (
 	"errors"
+	"net/http"
 
+	"github.com/lijcoder/aiapi/parser"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/proxy/types"
 )
@@ -15,6 +17,7 @@ var (
 
 // Auth 校验 API Key
 func Auth(ctx *types.Context) {
+	ctx.ApiKey = parser.ExtractApiKey(http.Header(ctx.OrigHeaders), ctx.Format)
 	if ctx.ApiKey == "" {
 		ctx.Err = errMissingKey
 		ctx.Code = types.CodeUnauthorized
@@ -28,7 +31,6 @@ func Auth(ctx *types.Context) {
 		return
 	}
 
-	// key 有效但关联用户异常（不存在或禁用）
 	if user == nil {
 		ctx.Err = errUserDisabled
 		ctx.Code = types.CodeUnauthorized

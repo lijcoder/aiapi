@@ -23,7 +23,6 @@ type ProxyRequest struct {
 	Body      []byte
 	Query     map[string][]string
 	Writer    ProxyResponseWrite
-	ApiKey    string
 	Headers   map[string][]string
 	StartTime time.Time
 }
@@ -33,12 +32,13 @@ type Context struct {
 	P      parser.Parser
 	Writer ProxyResponseWrite
 
-	Method, Path, Format, ApiKey, ProviderType string
-	Body                                       []byte
-	Query                                      map[string][]string
-	OrigHeaders                                map[string][]string
-	StartTime                                  time.Time
-	UserID                                     int64
+	Method, Path, Format, ProviderType string
+	ApiKey                             string
+	Body                               []byte
+	Query                              map[string][]string
+	OrigHeaders                        map[string][]string
+	StartTime                          time.Time
+	UserID                             int64
 
 	URL        string
 	ReqHeaders map[string][]string
@@ -63,7 +63,6 @@ func NewContext(req ProxyRequest, p parser.Parser) *Context {
 		Format:       req.Format,
 		OrigHeaders:  req.Headers,
 		StartTime:    req.StartTime,
-		ApiKey:       req.ApiKey,
 		ProviderType: req.Provider,
 	}
 }
