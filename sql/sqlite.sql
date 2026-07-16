@@ -5,14 +5,18 @@
 --   PRIMARY KEY         → 放在 CREATE TABLE 内
 --   UNIQUE / INDEX      → 统一用 CREATE INDEX / CREATE UNIQUE INDEX
 --   FOREIGN KEY         → 不使用（业务层保证引用完整性）
+--
+-- 时区说明:
+--   datetime('now', 'localtime') 使用系统本地时间（非 UTC）
+--   存量数据修复: UPDATE 表名 SET created_at = datetime(created_at, '+8 hours');
 
 CREATE TABLE IF NOT EXISTS providers (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     type       TEXT NOT NULL,
     config     TEXT NOT NULL DEFAULT '{}',
     enabled    INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT (datetime('now')),
-    updated_at DATETIME DEFAULT (datetime('now'))
+    created_at DATETIME DEFAULT (datetime('now', 'localtime')),
+    updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_providers_type ON providers(type);
 
@@ -21,7 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
     name       TEXT NOT NULL,
     account    TEXT NOT NULL,
     enabled    INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT (datetime('now'))
+    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_account ON users(account);
 
@@ -31,7 +35,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
     key        TEXT NOT NULL,
     name       TEXT DEFAULT '',
     enabled    INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT (datetime('now'))
+    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_key ON api_keys(key);
 
@@ -48,7 +52,7 @@ CREATE TABLE IF NOT EXISTS usage_records (
     stream         INTEGER DEFAULT 0,
     cached_tokens  INTEGER DEFAULT 0,
     reasoning_tokens INTEGER DEFAULT 0,
-    created_at     DATETIME DEFAULT (datetime('now'))
+    created_at     DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_usage_records_user  ON usage_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_usage_records_date  ON usage_records(created_at);
@@ -70,7 +74,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     total_tokens    INTEGER DEFAULT 0,
     error           TEXT DEFAULT '',
     latency_ms      INTEGER DEFAULT 0,
-    created_at      DATETIME DEFAULT (datetime('now'))
+    created_at      DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE TABLE IF NOT EXISTS model_pricing (
@@ -80,6 +84,6 @@ CREATE TABLE IF NOT EXISTS model_pricing (
     input_cache_hit_price  REAL NOT NULL DEFAULT 0,
     input_cache_miss_price REAL NOT NULL DEFAULT 0,
     output_price           REAL NOT NULL DEFAULT 0,
-    created_at            DATETIME DEFAULT (datetime('now'))
+    created_at            DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_model_pricing ON model_pricing(provider, model);
