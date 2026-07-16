@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/pprof"
@@ -45,13 +46,16 @@ func initStore() {
 func initLogger() {
 	logDir := constant.LogDir()
 	os.MkdirAll(logDir, 0755)
-	w := &lumberjack.Logger{
+
+	fileWriter := &lumberjack.Logger{
 		Filename:   logDir + "/app.log",
 		MaxSize:    100,   // MB
 		MaxAge:     30,    // 天
 		MaxBackups: 10,    // 最多保留 10 个旧文件
 		LocalTime:  true,  // 使用本地时间命名
 	}
+
+	w := io.MultiWriter(os.Stdout, fileWriter)
 	slog.SetDefault(slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})))
