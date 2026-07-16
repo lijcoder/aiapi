@@ -11,8 +11,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/lijcoder/aiapi/constant"
-	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/framework"
+	aiapiLog "github.com/lijcoder/aiapi/log"
+	"github.com/lijcoder/aiapi/store"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -23,6 +24,7 @@ func main() {
 	defer store.Close()
 
 	e := echo.New()
+	e.HideBanner = true
 	framework.EchoInit(e)
 	if constant.PPROF {
 		registerRoutes(e)
@@ -49,16 +51,14 @@ func initLogger() {
 
 	fileWriter := &lumberjack.Logger{
 		Filename:   logDir + "/app.log",
-		MaxSize:    100,   // MB
-		MaxAge:     30,    // 天
-		MaxBackups: 10,    // 最多保留 10 个旧文件
-		LocalTime:  true,  // 使用本地时间命名
+		MaxSize:    100,  // MB
+		MaxAge:     30,   // 天
+		MaxBackups: 10,   // 最多保留 10 个旧文件
+		LocalTime:  true, // 使用本地时间命名
 	}
 
 	w := io.MultiWriter(os.Stdout, fileWriter)
-	slog.SetDefault(slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	})))
+	slog.SetDefault(slog.New(aiapiLog.NewFormatter(w, slog.LevelInfo)))
 }
 
 func registerRuntime() {
