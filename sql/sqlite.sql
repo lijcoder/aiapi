@@ -59,7 +59,6 @@ CREATE TABLE IF NOT EXISTS request_logs (
     api_key         TEXT DEFAULT '',
     format          TEXT NOT NULL,
     provider        TEXT NOT NULL DEFAULT '',
-    method          TEXT NOT NULL,
     path            TEXT NOT NULL,
     status_code     INTEGER DEFAULT 0,
     request_headers TEXT DEFAULT '',

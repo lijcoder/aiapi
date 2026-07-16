@@ -76,8 +76,8 @@ func (s *commonStore) InsertUsage(usage *UsageRecord) error {
 
 func (s *commonStore) InsertRequestLog(log *RequestLog) error {
 	_, err := s.db.NamedExec(
-		`INSERT INTO request_logs (api_key, format, provider, method, path, status_code, request_headers, request_body, response_body, model, input_tokens, output_tokens, total_tokens, error, latency_ms)
-		 VALUES (:api_key, :format, :provider, :method, :path, :status_code, :request_headers, :request_body, :response_body, :model, :input_tokens, :output_tokens, :total_tokens, :error, :latency_ms)`,
+		`INSERT INTO request_logs (api_key, format, provider, path, status_code, request_headers, request_body, response_body, model, input_tokens, output_tokens, total_tokens, error, latency_ms)
+		 VALUES (:api_key, :format, :provider, :path, :status_code, :request_headers, :request_body, :response_body, :model, :input_tokens, :output_tokens, :total_tokens, :error, :latency_ms)`,
 		log,
 	)
 	return err

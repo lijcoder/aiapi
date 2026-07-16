@@ -60,7 +60,6 @@ type RequestLog struct {
 	ApiKey         string    `db:"api_key" json:"api_key"`
 	Format         string    `db:"format" json:"format"`
 	Provider       string    `db:"provider" json:"provider"`
-	Method         string    `db:"method" json:"method"`
 	Path           string    `db:"path" json:"path"`
 	StatusCode     int       `db:"status_code" json:"status_code"`
 	RequestHeaders string    `db:"request_headers" json:"request_headers"`

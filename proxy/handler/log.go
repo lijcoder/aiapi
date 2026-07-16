@@ -2,11 +2,12 @@ package handler
 
 import (
 	"encoding/json"
+	"strings"
+	"time"
+
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
 	"github.com/lijcoder/aiapi/store"
-	"strings"
-	"time"
 )
 
 // Log 保存 HTTP 请求日志（用于 AddFinally）
@@ -21,7 +22,7 @@ func Log(ctx *types.Context) {
 	}
 	errMsg := ""
 	if ctx.Err != nil {
-		errMsg = ctx.Err.Error()
+		errMsg = ctx.ErrorMessage
 	}
 	headers := make(map[string][]string)
 	for k, vs := range ctx.OrigHeaders {
@@ -42,7 +43,6 @@ func Log(ctx *types.Context) {
 		ApiKey:         ctx.ApiKey,
 		Format:         ctx.Format,
 		Provider:       ctx.ProviderType,
-		Method:         ctx.Method,
 		Path:           ctx.Path,
 		StatusCode:     statusCode,
 		RequestHeaders: string(headerJSON),
