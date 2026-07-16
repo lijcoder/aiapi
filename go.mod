@@ -6,6 +6,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/mattn/go-sqlite3 v1.14.48
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (

@@ -33,3 +33,9 @@ func DBFilePath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".aiapi", "aiapi.db")
 }
+
+// LogDir 返回日志目录：~/.aiapi/logs
+func LogDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".aiapi", "logs")
+}

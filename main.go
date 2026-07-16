@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"runtime/debug"
 	"time"
 
@@ -11,16 +12,13 @@ import (
 	"github.com/lijcoder/aiapi/constant"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/framework"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func main() {
 	constant.ParseArgs()
-	slog.SetLogLoggerLevel(slog.LevelInfo)
-
-	if err := store.Init(); err != nil {
-		slog.Error("db init failed", "err", err)
-		panic(err)
-	}
+	initLogger()
+	initStore()
 	defer store.Close()
 
 	e := echo.New()
@@ -35,6 +33,28 @@ func main() {
 		ReadHeaderTimeout: time.Second * 2,
 		WriteTimeout:      time.Second * 90,
 	}))
+}
+
+func initStore() {
+	if err := store.Init(); err != nil {
+		slog.Error("db init failed", "err", err)
+		panic(err)
+	}
+}
+
+func initLogger() {
+	logDir := constant.LogDir()
+	os.MkdirAll(logDir, 0755)
+	w := &lumberjack.Logger{
+		Filename:   logDir + "/app.log",
+		MaxSize:    100,   // MB
+		MaxAge:     30,    // 天
+		MaxBackups: 10,    // 最多保留 10 个旧文件
+		LocalTime:  true,  // 使用本地时间命名
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
 }
 
 func registerRuntime() {
