@@ -6,6 +6,7 @@ import (
 	"github.com/lijcoder/aiapi/proxy/sse"
 	"github.com/lijcoder/aiapi/proxy/types"
 	"io"
+	"log/slog"
 	"strings"
 )
 
@@ -50,6 +51,10 @@ func streamResponse(ctx *types.Context) {
 		n, err := body.Read(buf)
 		if n > 0 {
 			if _, writeErr := ctx.Writer.Write(buf[:n]); writeErr != nil {
+				if isBrokenPipe(writeErr) {
+					slog.Warn("client disconnected", "path", ctx.Path)
+					return
+				}
 				ctx.Err = log.WithStack(writeErr)
 				ctx.ErrorMessage = "response write failed"
 				return
@@ -101,9 +106,21 @@ func writeResponse(ctx *types.Context) {
 	ctx.Writer.WriteStatusCode(ctx.HttpResp.StatusCode)
 	if len(ctx.RespBody) > 0 {
 		_, err := ctx.Writer.Write(ctx.RespBody)
-		if err != nil {
+		if err != nil && !isBrokenPipe(err) {
 			ctx.Err = log.WithStack(err)
 			ctx.ErrorMessage = "response write failed"
+		} else if err != nil {
+			slog.Warn("client disconnected", "path", ctx.Path)
 		}
 	}
+}
+
+// isBrokenPipe 判断是否是客户端断连导致的 write 错误
+// broken pipe / connection reset by peer 都是正常现象，不视为系统异常
+func isBrokenPipe(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "broken pipe") || strings.Contains(s, "connection reset by peer")
 }
