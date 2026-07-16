@@ -42,9 +42,10 @@ type Context struct {
 
 	URL        string
 	ReqHeaders map[string][]string
+	Model      string        // 从请求体解析的模型名（始终有值）
 	HttpResp   *http.Response
 	RespBody   []byte
-	Usage      *parser.Usage
+	Usage      *parser.Usage // 从响应解析的用量（仅在成功请求时有值）
 	Stream     bool
 
 	Err  error   // 系统错误（管道中断 + 内部日志）

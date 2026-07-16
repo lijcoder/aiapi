@@ -3,10 +3,8 @@ package handler
 import (
 	"errors"
 	"github.com/lijcoder/aiapi/log"
-	"github.com/lijcoder/aiapi/parser"
 	"github.com/lijcoder/aiapi/proxy/types"
 	"github.com/lijcoder/aiapi/store"
-	"net/http"
 )
 
 var (
@@ -17,7 +15,6 @@ var (
 
 // Auth 校验 API Key
 func Auth(ctx *types.Context) {
-	ctx.ApiKey = parser.ExtractApiKey(http.Header(ctx.OrigHeaders), ctx.Format)
 	if ctx.ApiKey == "" {
 		ctx.Err = log.WithStack(errMissingKey)
 		ctx.ErrorMessage = "missing api key"

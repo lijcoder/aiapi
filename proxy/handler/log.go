@@ -12,10 +12,8 @@ import (
 
 // Log 保存 HTTP 请求日志（用于 AddFinally）
 func Log(ctx *types.Context) {
-	var model string
 	var inTokens, outTokens, totalTokens int
 	if ctx.Usage != nil {
-		model = ctx.Usage.Model
 		inTokens = ctx.Usage.InputTokens
 		outTokens = ctx.Usage.OutputTokens
 		totalTokens = ctx.Usage.TotalTokens
@@ -48,7 +46,7 @@ func Log(ctx *types.Context) {
 		RequestHeaders: string(headerJSON),
 		RequestBody:    string(ctx.Body),
 		ResponseBody:   string(ctx.RespBody),
-		Model:          model,
+		Model:          ctx.Model,
 		InputTokens:    inTokens,
 		OutputTokens:   outTokens,
 		TotalTokens:    totalTokens,

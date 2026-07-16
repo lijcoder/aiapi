@@ -65,11 +65,13 @@ aiapi/
 Handle(req)
   │
   └─ NewPipeline()
-       ├── AddLast(handler.LoadConfig)   ← 查 DB 加载 provider
-       ├── AddLast(handler.Forward)      ← 转发请求到上游
-       ├── AddLast(handler.Response)     ← 流式/非流式分流处理
-       ├── AddLast(handler.Record)       ← 记录 token 用量（成功时）
-       ├── AddFinally(handler.Log)       ← 始终执行：写请求日志
+       ├── AddLast(handler.Auth)          ← 校验 API Key
+       ├── AddLast(handler.LoadConfig)    ← 查 DB 加载 provider
+       ├── AddLast(handler.ParseRequest)  ← 从请求体解析模型名
+       ├── AddLast(handler.Forward)       ← 转发请求到上游
+       ├── AddLast(handler.Response)      ← 流式/非流式分流处理
+       ├── AddLast(handler.Record)        ← 记录 token 用量（成功时）
+       ├── AddFinally(handler.Log)        ← 始终执行：写请求日志
        └── Execute(ctx)
               │
               ├── for 循环遍历 handlers，遇 ctx.Err != nil 终止

@@ -18,7 +18,7 @@ func Record(ctx *types.Context) {
 		UserID:          ctx.UserID,
 		ApiKey:          ctx.ApiKey,
 		Provider:        ctx.ProviderType,
-		Model:           ctx.Usage.Model,
+		Model:           ctx.Model,
 		InputTokens:     ctx.Usage.InputTokens,
 		OutputTokens:    ctx.Usage.OutputTokens,
 		TotalTokens:     ctx.Usage.TotalTokens,

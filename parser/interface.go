@@ -1,6 +1,6 @@
 package parser
 
-import "net/http"
+import "strings"
 
 // API 协议格式常量
 const (
@@ -29,8 +29,14 @@ type StreamEvent struct {
 	Model     string  // 模型名
 }
 
-// Parser 各 Provider 的响应解析器接口
+// Parser 各 Provider 的请求/响应解析器接口
 type Parser interface {
+	// ParseModel 从请求 body 中提取模型名
+	ParseModel(body []byte) string
+
+	// ParseApiKey 从请求头中提取 API Key
+	ParseApiKey(headers map[string][]string) string
+
 	// ParseUsage 从非流式响应 body 中提取用量
 	ParseUsage(body []byte) (*Usage, error)
 
@@ -60,27 +66,22 @@ func GetParser(format string) Parser {
 	}
 }
 
-// ExtractApiKey 根据协议格式从请求头中提取 API Key
-func ExtractApiKey(h http.Header, format string) string {
-	switch format {
-	case FormatAnthropic:
-		if k := h.Get("x-api-key"); k != "" {
-			return k
+// headerGet 从 map[string][]string 头部中获取指定 key 的值（不区分大小写）
+func headerGet(headers map[string][]string, key string) string {
+	lower := strings.ToLower(key)
+	for k, vs := range headers {
+		if strings.ToLower(k) == lower && len(vs) > 0 {
+			return vs[0]
 		}
-		// Anthropic 也支持 Authorization: Bearer
-		v := h.Get("Authorization")
-		if len(v) > 7 && v[:7] == "Bearer " {
-			return v[7:]
-		}
-		return v
-	case FormatGemini:
-		return h.Get("x-goog-api-key")
-	default:
-		// openai 和其他兼容格式：Authorization: Bearer xxx
-		v := h.Get("Authorization")
-		if len(v) > 7 && v[:7] == "Bearer " {
-			return v[7:]
-		}
-		return v
 	}
+	return ""
+}
+
+// extractBearerToken 从 Authorization 头中提取 Bearer token
+func extractBearerToken(headers map[string][]string) string {
+	v := headerGet(headers, "Authorization")
+	if len(v) > 7 && strings.ToLower(v[:7]) == "bearer " {
+		return v[7:]
+	}
+	return v
 }

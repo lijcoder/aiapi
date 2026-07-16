@@ -5,8 +5,25 @@ import (
 	"strings"
 )
 
-// OpenAIParser OpenAI 响应解析器
+// OpenAIParser OpenAI 请求/响应解析器
 type OpenAIParser struct{}
+
+// openaiRequest 请求体结构（仅用于提取 model）
+type openaiRequest struct {
+	Model string `json:"model"`
+}
+
+func (p *OpenAIParser) ParseModel(body []byte) string {
+	var req openaiRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return ""
+	}
+	return req.Model
+}
+
+func (p *OpenAIParser) ParseApiKey(headers map[string][]string) string {
+	return extractBearerToken(headers)
+}
 
 // openaiUsage 非流式/流式通用的 usage 结构
 type openaiUsage struct {

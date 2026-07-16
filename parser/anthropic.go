@@ -2,8 +2,28 @@ package parser
 
 import "encoding/json"
 
-// AnthropicParser Anthropic 响应解析器
+// AnthropicParser Anthropic 请求/响应解析器
 type AnthropicParser struct{}
+
+// anthropicRequest 请求体结构（仅用于提取 model）
+type anthropicRequest struct {
+	Model string `json:"model"`
+}
+
+func (p *AnthropicParser) ParseModel(body []byte) string {
+	var req anthropicRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return ""
+	}
+	return req.Model
+}
+
+func (p *AnthropicParser) ParseApiKey(headers map[string][]string) string {
+	if k := headerGet(headers, "x-api-key"); k != "" {
+		return k
+	}
+	return extractBearerToken(headers)
+}
 
 // anthropicNonStreamResp 非流式响应结构
 type anthropicNonStreamResp struct {
