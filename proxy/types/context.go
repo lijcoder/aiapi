@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/lijcoder/aiapi/parser"
+	"github.com/lijcoder/aiapi/store"
 )
 
 // ProxyResponseWrite 响应写入接口
@@ -42,16 +43,17 @@ type Context struct {
 
 	URL        string
 	ReqHeaders map[string][]string
-	Model      string        // 从请求体解析的模型名（始终有值）
+	Model      string       // 从请求体解析的模型名（始终有值）
+	ModelInfo  *store.Model // 模型价格配置（Auth 校验后设置）
 	HttpResp   *http.Response
 	RespBody   []byte
 	Usage      *parser.Usage // 从响应解析的用量（仅在成功请求时有值）
 	Stream     bool
 
-	Err  error   // 系统错误（管道中断 + 内部日志）
-	Code BizCode // HTTP 状态码
-	ErrorMessage string // 返回给客户端的错误描述，为空时使用固定提示
-	OtherErrs []error // 非中断性错误（finally 阶段收集，仅用于日志）
+	Err          error   // 系统错误（管道中断 + 内部日志）
+	Code         BizCode // HTTP 状态码
+	ErrorMessage string  // 返回给客户端的错误描述，为空时使用固定提示
+	OtherErrs    []error // 非中断性错误（finally 阶段收集，仅用于日志）
 }
 
 // NewContext 创建管道上下文

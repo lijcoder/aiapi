@@ -74,8 +74,8 @@ type RequestLog struct {
 	CreatedAt      time.Time `db:"created_at" json:"created_at"`
 }
 
-// ModelPricing 模型价格配置
-type ModelPricing struct {
+// Model 模型价格配置
+type Model struct {
 	ID                  int64     `db:"id" json:"id"`
 	Provider            string    `db:"provider" json:"provider"`
 	Model               string    `db:"model" json:"model"`

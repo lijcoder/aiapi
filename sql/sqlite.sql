@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     created_at      DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 
-CREATE TABLE IF NOT EXISTS model_pricing (
+CREATE TABLE IF NOT EXISTS models (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     provider              TEXT NOT NULL,
     model                 TEXT NOT NULL,
@@ -86,4 +86,4 @@ CREATE TABLE IF NOT EXISTS model_pricing (
     output_price           REAL NOT NULL DEFAULT 0,
     created_at            DATETIME DEFAULT (datetime('now', 'localtime'))
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uq_model_pricing ON model_pricing(provider, model);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_models_provider_model ON models(provider, model);

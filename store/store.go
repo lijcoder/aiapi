@@ -13,6 +13,7 @@ import (
 type Store interface {
 	GetProvider(providerType string) (*Provider, error)
 	GetApiKey(key string) (*ApiKey, *User, error)
+	GetModel(provider, model string) (*Model, error)
 	InsertUsage(usage *UsageRecord) error
 	InsertRequestLog(log *RequestLog) error
 	Close() error
@@ -23,6 +24,7 @@ var current Store
 // 包级包装函数 — handler 调用 store.GetProvider() 走 current 转发
 func GetProvider(t string) (*Provider, error)        { return current.GetProvider(t) }
 func GetApiKey(k string) (*ApiKey, *User, error) { return current.GetApiKey(k) }
+func GetModel(provider, model string) (*Model, error) { return current.GetModel(provider, model) }
 func InsertUsage(u *UsageRecord) error               { return current.InsertUsage(u) }
 func InsertRequestLog(l *RequestLog) error           { return current.InsertRequestLog(l) }
 func Close() error                                    { return current.Close() }
@@ -63,6 +65,18 @@ func (s *commonStore) GetApiKey(key string) (*ApiKey, *User, error) {
 		return &k, nil, err
 	}
 	return &k, &u, nil
+}
+
+func (s *commonStore) GetModel(provider, model string) (*Model, error) {
+	var p Model
+	err := s.db.Get(&p, `SELECT * FROM models WHERE provider = ? AND model = ?`, provider, model)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
 }
 
 func (s *commonStore) InsertUsage(usage *UsageRecord) error {

@@ -23,6 +23,7 @@ var (
 	CodeUnknown      = BizCode{0, 500}
 	CodeNotFound     = BizCode{1001, 404}
 	CodeUnauthorized = BizCode{1002, 401}
+	CodeModelNotFound = BizCode{1003, 404}
 )
 
 const InternalServerError = "internal server error"

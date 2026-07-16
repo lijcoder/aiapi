@@ -2,6 +2,8 @@ package handler
 
 import (
 	"errors"
+	"fmt"
+
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
 	"github.com/lijcoder/aiapi/store"
@@ -41,4 +43,20 @@ func Auth(ctx *types.Context) {
 		return
 	}
 	ctx.UserID = user.ID
+
+	// 校验模型定价配置是否存在
+	pvd, err := store.GetModel(ctx.ProviderType, ctx.Model)
+	if err != nil {
+		ctx.Err = log.WithStack(err)
+		ctx.ErrorMessage = types.InternalServerError
+		ctx.Code = types.CodeUnknown
+		return
+	}
+	if pvd == nil {
+		ctx.Err = log.WithStack(fmt.Errorf("model not found: %s/%s", ctx.ProviderType, ctx.Model))
+		ctx.ErrorMessage = fmt.Sprintf("model not found: %s/%s", ctx.ProviderType, ctx.Model)
+		ctx.Code = types.CodeModelNotFound
+		return
+	}
+	ctx.ModelInfo = pvd
 }
