@@ -23,6 +23,11 @@ func main() {
 	initStore()
 	defer store.Close()
 
+	slog.Info("server starting",
+		"port", constant.PORT,
+		"data-dir", constant.DataDir,
+	)
+
 	e := echo.New()
 	e.HideBanner = true
 	framework.EchoInit(e)
