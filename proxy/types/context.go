@@ -40,6 +40,8 @@ type Context struct {
 	OrigHeaders                        map[string][]string
 	StartTime                          time.Time
 	UserID                             int64
+	UserUnlimited                      bool
+	KeyUnlimited                       bool
 
 	URL        string
 	ReqHeaders map[string][]string

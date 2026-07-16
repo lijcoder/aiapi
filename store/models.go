@@ -23,6 +23,8 @@ type User struct {
 	ID        int64     `db:"id" json:"id"`
 	Account   string    `db:"account" json:"account"`
 	Name      string    `db:"name" json:"name"`
+	Budget    float64   `db:"budget" json:"budget"`
+	Unlimited bool      `db:"unlimited" json:"unlimited"`
 	Enabled   bool      `db:"enabled" json:"enabled"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
@@ -33,6 +35,8 @@ type ApiKey struct {
 	UserID    int64     `db:"user_id" json:"user_id"`
 	Key       string    `db:"key" json:"key"`
 	Name      string    `db:"name" json:"name"`
+	Budget    float64   `db:"budget" json:"budget"`
+	Unlimited bool      `db:"unlimited" json:"unlimited"`
 	Enabled   bool      `db:"enabled" json:"enabled"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
@@ -51,6 +55,8 @@ type UsageRecord struct {
 	Stream          bool      `db:"stream" json:"stream"`
 	CachedTokens    int       `db:"cached_tokens" json:"cached_tokens"`
 	ReasoningTokens int       `db:"reasoning_tokens" json:"reasoning_tokens"`
+	Cost            float64   `db:"cost" json:"cost"`
+	Unlimited       bool      `db:"unlimited" json:"unlimited"`
 	CreatedAt       time.Time `db:"created_at" json:"created_at"`
 }
 

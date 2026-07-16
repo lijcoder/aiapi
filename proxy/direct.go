@@ -15,6 +15,7 @@ func Handle(req types.ProxyRequest) error {
 	NewPipeline().
 		AddLast(handler.ParseRequest).
 		AddLast(handler.Auth).
+		AddLast(handler.BudgetCheck).
 		AddLast(handler.LoadConfig).
 		AddLast(handler.Forward).
 		AddLast(handler.Response).

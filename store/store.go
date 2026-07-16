@@ -16,6 +16,8 @@ type Store interface {
 	GetModel(provider, model string) (*Model, error)
 	InsertUsage(usage *UsageRecord) error
 	InsertRequestLog(log *RequestLog) error
+	DeductUserBudget(userID int64, cost float64) error
+	DeductKeyBudget(key string, cost float64) error
 	Close() error
 }
 
@@ -27,6 +29,8 @@ func GetApiKey(k string) (*ApiKey, *User, error) { return current.GetApiKey(k) }
 func GetModel(provider, model string) (*Model, error) { return current.GetModel(provider, model) }
 func InsertUsage(u *UsageRecord) error               { return current.InsertUsage(u) }
 func InsertRequestLog(l *RequestLog) error           { return current.InsertRequestLog(l) }
+func DeductUserBudget(id int64, cost float64) error  { return current.DeductUserBudget(id, cost) }
+func DeductKeyBudget(key string, cost float64) error { return current.DeductKeyBudget(key, cost) }
 func Close() error                                    { return current.Close() }
 
 // commonStore 公共存储实现，所有驱动共用同一套 SQL
@@ -81,10 +85,20 @@ func (s *commonStore) GetModel(provider, model string) (*Model, error) {
 
 func (s *commonStore) InsertUsage(usage *UsageRecord) error {
 	_, err := s.db.NamedExec(
-		`INSERT INTO usage_records (user_id, api_key, provider, model, input_tokens, output_tokens, total_tokens, request_id, stream, cached_tokens, reasoning_tokens)
-		 VALUES (:user_id, :api_key, :provider, :model, :input_tokens, :output_tokens, :total_tokens, :request_id, :stream, :cached_tokens, :reasoning_tokens)`,
+		`INSERT INTO usage_records (user_id, api_key, provider, model, input_tokens, output_tokens, total_tokens, request_id, stream, cached_tokens, reasoning_tokens, cost, unlimited)
+		 VALUES (:user_id, :api_key, :provider, :model, :input_tokens, :output_tokens, :total_tokens, :request_id, :stream, :cached_tokens, :reasoning_tokens, :cost, :unlimited)`,
 		usage,
 	)
+	return err
+}
+
+func (s *commonStore) DeductUserBudget(userID int64, cost float64) error {
+	_, err := s.db.Exec(`UPDATE users SET budget = budget - ? WHERE id = ?`, cost, userID)
+	return err
+}
+
+func (s *commonStore) DeductKeyBudget(key string, cost float64) error {
+	_, err := s.db.Exec(`UPDATE api_keys SET budget = budget - ? WHERE key = ?`, cost, key)
 	return err
 }
 

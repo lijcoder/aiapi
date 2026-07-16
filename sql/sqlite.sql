@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS users (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT NOT NULL,
     account    TEXT NOT NULL,
+    budget     REAL NOT NULL DEFAULT 0,
+    unlimited  INTEGER NOT NULL DEFAULT 0,
     enabled    INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 );
@@ -34,6 +36,8 @@ CREATE TABLE IF NOT EXISTS api_keys (
     user_id    INTEGER NOT NULL,
     key        TEXT NOT NULL,
     name       TEXT DEFAULT '',
+    budget     REAL NOT NULL DEFAULT 0,
+    unlimited  INTEGER NOT NULL DEFAULT 0,
     enabled    INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 );
@@ -52,6 +56,8 @@ CREATE TABLE IF NOT EXISTS usage_records (
     stream         INTEGER DEFAULT 0,
     cached_tokens  INTEGER DEFAULT 0,
     reasoning_tokens INTEGER DEFAULT 0,
+    cost             REAL DEFAULT 0,
+    unlimited        INTEGER DEFAULT 0,
     created_at     DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_usage_records_user  ON usage_records(user_id);
