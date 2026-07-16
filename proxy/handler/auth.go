@@ -3,7 +3,7 @@ package handler
 import (
 	"errors"
 
-	"github.com/lijcoder/aiapi/db"
+	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/proxy/types"
 )
 
@@ -21,7 +21,7 @@ func Auth(ctx *types.Context) {
 		return
 	}
 
-	_, user, err := db.LookupApiKey(ctx.DB, ctx.ApiKey)
+	_, user, err := store.GetApiKey(ctx.ApiKey)
 	if err != nil {
 		ctx.Err = errInvalidKey
 		ctx.Code = types.CodeUnauthorized

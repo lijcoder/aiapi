@@ -3,13 +3,13 @@ package handler
 import (
 	"fmt"
 
-	"github.com/lijcoder/aiapi/db"
 	"github.com/lijcoder/aiapi/proxy/types"
+	"github.com/lijcoder/aiapi/store"
 )
 
 // LoadConfig 从数据库加载 Provider 配置
 func LoadConfig(ctx *types.Context) {
-	pvd, ok := db.GetProvider(ctx.DB, ctx.ProviderType)
+	pvd, ok := store.GetProvider(ctx.ProviderType)
 	if !ok {
 		ctx.Err = fmt.Errorf("provider not found: %s", ctx.ProviderType)
 		ctx.Code = types.CodeNotFound

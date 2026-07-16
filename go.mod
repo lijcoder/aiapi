@@ -3,6 +3,7 @@ module github.com/lijcoder/aiapi
 go 1.25.4
 
 require (
+	github.com/jmoiron/sqlx v1.4.0
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/mattn/go-sqlite3 v1.14.48
 )

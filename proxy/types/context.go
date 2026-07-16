@@ -1,7 +1,6 @@
 package types
 
 import (
-	"database/sql"
 	"net/http"
 	"time"
 
@@ -17,7 +16,6 @@ type ProxyResponseWrite interface {
 
 // ProxyRequest 代理请求参数
 type ProxyRequest struct {
-	DB        *sql.DB
 	Format    string
 	Provider  string
 	Method    string
@@ -32,7 +30,6 @@ type ProxyRequest struct {
 
 // Context 管道上下文，承载所有请求/响应状态
 type Context struct {
-	DB     *sql.DB
 	P      parser.Parser
 	Writer ProxyResponseWrite
 
@@ -57,7 +54,6 @@ type Context struct {
 // NewContext 创建管道上下文
 func NewContext(req ProxyRequest, p parser.Parser) *Context {
 	return &Context{
-		DB:           req.DB,
 		P:            p,
 		Writer:       req.Writer,
 		Method:       req.Method,

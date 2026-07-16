@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lijcoder/aiapi/db"
+	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/proxy/types"
 )
 
@@ -44,7 +44,7 @@ func Log(ctx *types.Context) {
 
 	latency := time.Since(ctx.StartTime).Milliseconds()
 
-	if err := db.InsertRequestLog(ctx.DB, &db.RequestLog{
+	if err := store.InsertRequestLog(&store.RequestLog{
 		ApiKey:         ctx.ApiKey,
 		Format:         ctx.Format,
 		Provider:       ctx.ProviderType,

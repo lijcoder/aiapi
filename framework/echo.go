@@ -1,7 +1,6 @@
 package framework
 
 import (
-	"database/sql"
 	"io"
 	"net/http"
 	"time"
@@ -30,30 +29,23 @@ func (ep *EchoProxyDirectResponseWrite) Write(body []byte) (int, error) {
 	if err != nil {
 		return len, err
 	}
-	// 尝试 Flush，不支持时忽略（如 Timeout 中间件包装的场景）
 	if flusher, ok := ep.E.Response().Writer.(http.Flusher); ok {
 		flusher.Flush()
 	}
 	return len, nil
 }
 
-func EchoInit(e *echo.Echo, db *sql.DB) {
-	// 全局中间件
+func EchoInit(e *echo.Echo) {
 	e.Use(middleware.Recover())
 	e.Use(middleware.BodyLimit("10M"))
 
-	apiProxy(e, "/proxy", db)
-}
-
-func apiProxy(e *echo.Echo, group string, db *sql.DB) {
-	proxyGroup := e.Group(group)
+	proxyGroup := e.Group("/proxy")
 	proxyGroup.Any("/:format/:provider/*", func(c echo.Context) error {
-		return proxyDirectProcess(c, db)
+		return proxyDirectProcess(c)
 	})
 }
 
-// proxyDirectProcess 解析 HTTP 参数，交给 proxy 处理业务
-func proxyDirectProcess(c echo.Context, database *sql.DB) error {
+func proxyDirectProcess(c echo.Context) error {
 	bodyBytes, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return err
@@ -61,7 +53,6 @@ func proxyDirectProcess(c echo.Context, database *sql.DB) error {
 
 	writer := &EchoProxyDirectResponseWrite{E: c}
 	return proxy.Handle(types.ProxyRequest{
-		DB:        database,
 		Format:    c.Param("format"),
 		Provider:  c.Param("provider"),
 		Method:    c.Request().Method,

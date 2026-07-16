@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"github.com/lijcoder/aiapi/db"
+	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/proxy/types"
 )
 
-// Record 异步记录 Token 用量
+// Record 记录 Token 用量
 func Record(ctx *types.Context) {
 	if ctx.Usage == nil {
 		return
@@ -13,7 +13,8 @@ func Record(ctx *types.Context) {
 	if ctx.HttpResp != nil && ctx.HttpResp.StatusCode >= 300 {
 		return
 	}
-	db.RecordUsageAsync(ctx.DB, &db.UsageRecord{
+
+	_ = store.InsertUsage(&store.UsageRecord{
 		UserID:          ctx.UserID,
 		ApiKey:          ctx.ApiKey,
 		Provider:        ctx.ProviderType,
