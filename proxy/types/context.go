@@ -47,8 +47,10 @@ type Context struct {
 	Usage      *parser.Usage
 	Stream     bool
 
-	Err  error
-	Code BizCode
+	Err  error   // 系统错误（管道中断 + 内部日志）
+	Code BizCode // HTTP 状态码
+	ErrorMessage string // 返回给客户端的错误描述，为空时使用固定提示
+	OtherErrs []error // 非中断性错误（finally 阶段收集，仅用于日志）
 }
 
 // NewContext 创建管道上下文

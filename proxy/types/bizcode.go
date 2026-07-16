@@ -14,8 +14,15 @@ func (c BizCode) HTTPStatus() int {
 	return c.httpStatus
 }
 
+// IsZero 判断 BizCode 是否未被显式设置（零值）
+func (c BizCode) IsZero() bool {
+	return c == BizCode{}
+}
+
 var (
 	CodeUnknown      = BizCode{0, 500}
 	CodeNotFound     = BizCode{1001, 404}
 	CodeUnauthorized = BizCode{1002, 401}
 )
+
+const InternalServerError = "internal server error"

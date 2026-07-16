@@ -52,7 +52,19 @@ func (p *Pipeline) writeError(ctx *types.Context) {
 	if ctx.Err == nil {
 		return
 	}
-	body := fmt.Sprintf(`{"error":{"message":"%s"}}`, ctx.Err.Error())
+
+	// 兜底：Handler 只设了 Err 没设 Code 时给默认值
+	if ctx.Code.IsZero() {
+		ctx.Code = types.CodeUnknown
+	}
+
+	// 返回给客户端的消息：优先用 Message，没有则用固定提示
+	msg := ctx.ErrorMessage
+	if msg == "" {
+		msg = types.InternalServerError
+	}
+
+	body := fmt.Sprintf(`{"error":{"message":"%s"}}`, msg)
 	ctx.Writer.Header().Set("Content-Type", "application/json")
 	ctx.Writer.WriteStatusCode(ctx.Code.HTTPStatus())
 	ctx.Writer.Write([]byte(body))

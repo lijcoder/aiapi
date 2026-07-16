@@ -1,7 +1,9 @@
 package store
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 
 	"github.com/jmoiron/sqlx"
@@ -9,7 +11,7 @@ import (
 
 // Store 数据存储接口，可替换实现（SQLite / MySQL / ...）
 type Store interface {
-	GetProvider(providerType string) (*Provider, bool)
+	GetProvider(providerType string) (*Provider, error)
 	GetApiKey(key string) (*ApiKey, *User, error)
 	InsertUsage(usage *UsageRecord) error
 	InsertRequestLog(log *RequestLog) error
@@ -19,7 +21,7 @@ type Store interface {
 var current Store
 
 // 包级包装函数 — handler 调用 store.GetProvider() 走 current 转发
-func GetProvider(t string) (*Provider, bool)        { return current.GetProvider(t) }
+func GetProvider(t string) (*Provider, error)        { return current.GetProvider(t) }
 func GetApiKey(k string) (*ApiKey, *User, error) { return current.GetApiKey(k) }
 func InsertUsage(u *UsageRecord) error               { return current.InsertUsage(u) }
 func InsertRequestLog(l *RequestLog) error           { return current.InsertRequestLog(l) }
@@ -30,24 +32,33 @@ type commonStore struct {
 	db *sqlx.DB
 }
 
-func (s *commonStore) GetProvider(providerType string) (*Provider, bool) {
+func (s *commonStore) GetProvider(providerType string) (*Provider, error) {
 	var p Provider
 	err := s.db.Get(&p, `SELECT * FROM providers WHERE type = ? AND enabled = 1`, providerType)
-	if err != nil {
-		return nil, false
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
 	}
-	return &p, true
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
 }
 
 func (s *commonStore) GetApiKey(key string) (*ApiKey, *User, error) {
 	var k ApiKey
 	err := s.db.Get(&k, `SELECT * FROM api_keys WHERE key = ? AND enabled = 1`, key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil, nil
+	}
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var u User
 	err = s.db.Get(&u, `SELECT * FROM users WHERE id = ? AND enabled = 1`, k.UserID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return &k, nil, nil
+	}
 	if err != nil {
 		return &k, nil, err
 	}

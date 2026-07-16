@@ -1,23 +1,31 @@
 package handler
 
 import (
-	"fmt"
-
+	"errors"
+	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
 	"github.com/lijcoder/aiapi/store"
 )
 
 // LoadConfig 从数据库加载 Provider 配置
 func LoadConfig(ctx *types.Context) {
-	pvd, ok := store.GetProvider(ctx.ProviderType)
-	if !ok {
-		ctx.Err = fmt.Errorf("provider not found: %s", ctx.ProviderType)
+	pvd, err := store.GetProvider(ctx.ProviderType)
+	if err != nil {
+		ctx.Err = log.WithStack(err)
+		ctx.ErrorMessage = types.InternalServerError
+		ctx.Code = types.CodeUnknown
+		return
+	}
+	if pvd == nil {
+		ctx.Err = log.WithStack(errors.New("provider not found"))
+		ctx.ErrorMessage = "provider not found: " + ctx.ProviderType
 		ctx.Code = types.CodeNotFound
 		return
 	}
 	cfg, err := pvd.ParseConfig()
 	if err != nil {
-		ctx.Err = fmt.Errorf("invalid provider config: %s", err.Error())
+		ctx.Err = log.WithStack(err)
+		ctx.ErrorMessage = "invalid provider config"
 		ctx.Code = types.CodeNotFound
 		return
 	}
