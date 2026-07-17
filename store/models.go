@@ -88,5 +88,7 @@ type Model struct {
 	InputCacheHitPrice  float64   `db:"input_cache_hit_price" json:"input_cache_hit_price"`
 	InputCacheMissPrice float64   `db:"input_cache_miss_price" json:"input_cache_miss_price"`
 	OutputPrice         float64   `db:"output_price" json:"output_price"`
+	MaxContextTokens    int       `db:"max_context_tokens" json:"max_context_tokens"`
+	MaxCompletionTokens int       `db:"max_completion_tokens" json:"max_completion_tokens"`
 	CreatedAt           time.Time `db:"created_at" json:"created_at"`
 }

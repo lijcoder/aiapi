@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS models (
     input_cache_hit_price  REAL NOT NULL DEFAULT 0,
     input_cache_miss_price REAL NOT NULL DEFAULT 0,
     output_price           REAL NOT NULL DEFAULT 0,
+    max_context_tokens    INTEGER DEFAULT 0,
+    max_completion_tokens INTEGER DEFAULT 0,
     created_at            DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_models_provider_model ON models(provider, model);
