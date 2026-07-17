@@ -78,9 +78,6 @@ func streamResponse(ctx *types.Context) {
 	ctx.RespBody = logBuf.Bytes()
 }
 func interceptResponse(ctx *types.Context) {
-	if ctx.P == nil {
-		return
-	}
 	body, err := io.ReadAll(ctx.HttpResp.Body)
 	if err != nil {
 		ctx.Err = log.WithStack(err)
@@ -89,12 +86,13 @@ func interceptResponse(ctx *types.Context) {
 	}
 	ctx.HttpResp.Body.Close()
 	ctx.RespBody = body
-	usage, err := ctx.P.ParseUsage(body)
-	if err != nil {
-		return
-	}
-	if usage != nil {
-		ctx.Usage = usage
+
+	// 尝试解析用量（不设 ctx.Err，不影响响应转发）
+	if ctx.P != nil {
+		usage, parseErr := ctx.P.ParseUsage(body)
+		if parseErr == nil && usage != nil {
+			ctx.Usage = usage
+		}
 	}
 }
 func writeResponse(ctx *types.Context) {
