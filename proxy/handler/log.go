@@ -8,6 +8,7 @@ import (
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
 	"github.com/lijcoder/aiapi/store"
+	"github.com/lijcoder/aiapi/store/model"
 )
 
 // Log 保存 HTTP 请求日志（用于 AddFinally）
@@ -37,7 +38,7 @@ func Log(ctx *types.Context) {
 		statusCode = ctx.HttpResp.StatusCode
 	}
 	latency := time.Since(ctx.StartTime).Milliseconds()
-	if err := store.InsertRequestLog(&store.RequestLog{
+	if err := store.C().InsertRequestLog(&model.RequestLog{
 		ApiKey:         ctx.ApiKey,
 		Format:         ctx.Format,
 		Provider:       ctx.ProviderType,

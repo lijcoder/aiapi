@@ -1,188 +1,57 @@
 package store
 
 import (
-	"database/sql"
-	"encoding/json"
-	"errors"
-	"log/slog"
-
 	"github.com/jmoiron/sqlx"
+	"github.com/lijcoder/aiapi/store/base"
 )
 
-// Store 数据存储接口，可替换实现（SQLite / MySQL / ...）
-type Store interface {
-	GetProvider(providerType string) (*Provider, error)
-	GetApiKey(key string) (*ApiKey, *User, error)
-	GetModel(provider, model string) (*Model, error)
-	InsertUsage(usage *UsageRecord) error
-	InsertRequestLog(log *RequestLog) error
-	DeductUserBudget(userID int64, cost float64) error
-	DeductKeyBudget(key string, cost float64) error
-	Recharge(userID int64, amount float64, operator, remark string) (*RechargeRecord, error)
-	Close() error
+// Init 使用外部传入的 *sqlx.DB 初始化全局 Storage 及默认 DB
+func Init(db *sqlx.DB) error {
+	return base.Init(db)
 }
 
-var current Store
-
-// 包级包装函数 — handler 调用 store.GetProvider() 走 current 转发
-func GetProvider(t string) (*Provider, error)        { return current.GetProvider(t) }
-func GetApiKey(k string) (*ApiKey, *User, error) { return current.GetApiKey(k) }
-func GetModel(provider, model string) (*Model, error) { return current.GetModel(provider, model) }
-func InsertUsage(u *UsageRecord) error               { return current.InsertUsage(u) }
-func InsertRequestLog(l *RequestLog) error           { return current.InsertRequestLog(l) }
-func DeductUserBudget(id int64, cost float64) error  { return current.DeductUserBudget(id, cost) }
-func DeductKeyBudget(key string, cost float64) error { return current.DeductKeyBudget(key, cost) }
-func Recharge(userID int64, amount float64, operator, remark string) (*RechargeRecord, error) {
-	return current.Recharge(userID, amount, operator, remark)
-}
-func Close() error { return current.Close() }
-
-// commonStore 公共存储实现，所有驱动共用同一套 SQL
-type commonStore struct {
-	db *sqlx.DB
+// Close 关闭数据库连接
+func Close() error {
+	return base.Close()
 }
 
-func (s *commonStore) GetProvider(providerType string) (*Provider, error) {
-	var p Provider
-	err := s.db.Get(&p, `SELECT * FROM providers WHERE type = ? AND enabled = 1`, providerType)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
+// C 返回一个普通 Session，用于非事务 SQL 调用。
+func C() *Session {
+	return &Session{Session: base.WithContext()}
+}
+
+// T 开启事务，fn 中使用 *Session 的所有 SQL 方法自动在事务内执行。
+// fn 返回错误时自动回滚，否则提交。
+func T(fn func(*Session) error) error {
+	return C().Transaction(func(s *Session) error {
+		return fn(s)
+	})
+}
+
+// Session 是数据库会话，业务 SQL 方法挂载在它上面。
+type Session struct {
+	*base.Session
+}
+
+// Transaction 在 Session 的 context 下开启事务，fn 中所有 Session 方法自动使用事务连接。
+// fn 返回错误时自动回滚，否则提交。
+func (s *Session) Transaction(fn func(*Session) error) error {
+	return s.Session.Transaction(func(bs *base.Session) error {
+		return fn(&Session{Session: bs})
+	})
+}
+
+// RawExec 执行任意 SQL，用于测试建表或初始化数据。
+func (s *Session) RawExec(query string, args ...any) (int64, error) {
+	res, err := dbFrom(s.Ctx).Exec(query, args...)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return &p, nil
+	return res.LastInsertId()
 }
 
-func (s *commonStore) GetApiKey(key string) (*ApiKey, *User, error) {
-	var k ApiKey
-	err := s.db.Get(&k, `SELECT * FROM api_keys WHERE key = ? AND enabled = 1`, key)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, nil
-	}
-	if err != nil {
-		return nil, nil, err
-	}
+// db 是内部对 base.DB 的别名，业务 SQL 文件复用。
+type db = base.DB
 
-	var u User
-	err = s.db.Get(&u, `SELECT * FROM users WHERE id = ? AND enabled = 1`, k.UserID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return &k, nil, nil
-	}
-	if err != nil {
-		return &k, nil, err
-	}
-	return &k, &u, nil
-}
-
-func (s *commonStore) GetModel(provider, model string) (*Model, error) {
-	var p Model
-	err := s.db.Get(&p, `SELECT * FROM models WHERE provider = ? AND model = ?`, provider, model)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &p, nil
-}
-
-func (s *commonStore) InsertUsage(usage *UsageRecord) error {
-	_, err := s.db.NamedExec(
-		`INSERT INTO usage_records (user_id, api_key, provider, model, input_tokens, output_tokens, total_tokens, request_id, stream, cached_tokens, reasoning_tokens, cost, unlimited)
-		 VALUES (:user_id, :api_key, :provider, :model, :input_tokens, :output_tokens, :total_tokens, :request_id, :stream, :cached_tokens, :reasoning_tokens, :cost, :unlimited)`,
-		usage,
-	)
-	return err
-}
-
-func (s *commonStore) DeductUserBudget(userID int64, cost float64) error {
-	_, err := s.db.Exec(`UPDATE users SET budget = budget - ? WHERE id = ?`, cost, userID)
-	return err
-}
-
-func (s *commonStore) DeductKeyBudget(key string, cost float64) error {
-	_, err := s.db.Exec(`UPDATE api_keys SET budget = budget - ? WHERE key = ?`, cost, key)
-	return err
-}
-
-func (s *commonStore) InsertRequestLog(log *RequestLog) error {
-	_, err := s.db.NamedExec(
-		`INSERT INTO request_logs (api_key, format, provider, path, status_code, request_headers, request_body, response_body, model, input_tokens, output_tokens, total_tokens, error, latency_ms)
-		 VALUES (:api_key, :format, :provider, :path, :status_code, :request_headers, :request_body, :response_body, :model, :input_tokens, :output_tokens, :total_tokens, :error, :latency_ms)`,
-		log,
-	)
-	return err
-}
-
-func (s *commonStore) Recharge(userID int64, amount float64, operator, remark string) (*RechargeRecord, error) {
-	tx, err := s.db.Beginx()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-
-	var before float64
-	err = tx.Get(&before, `SELECT budget FROM users WHERE id = ? AND enabled = 1`, userID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, errors.New("user not found")
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	after := before + amount
-	_, err = tx.Exec(`UPDATE users SET budget = ? WHERE id = ?`, after, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	rec := &RechargeRecord{
-		UserID:        userID,
-		Amount:        amount,
-		BalanceBefore: before,
-		BalanceAfter:  after,
-		Operator:      operator,
-		Remark:        remark,
-	}
-	res, err := tx.NamedExec(
-		`INSERT INTO recharge_records (user_id, amount, balance_before, balance_after, operator, remark)
-		 VALUES (:user_id, :amount, :balance_before, :balance_after, :operator, :remark)`,
-		rec,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	id, _ := res.LastInsertId()
-	rec.ID = id
-	return rec, nil
-}
-
-func (s *commonStore) Close() error {
-	return s.db.Close()
-}
-
-// Init 初始化存储（当前为 SQLite）
-func Init() error {
-	s, err := newSQLiteStore()
-	if err != nil {
-		return err
-	}
-	current = s
-	slog.Info("store init success", "driver", "sqlite")
-	return nil
-}
-
-// ParseConfig 解析 provider.config JSON
-func (p *Provider) ParseConfig() (*ProviderConfig, error) {
-	var cfg ProviderConfig
-	if err := json.Unmarshal([]byte(p.Config), &cfg); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
-}
+// dbFrom 是内部对 base.DBFrom 的别名。
+var dbFrom = base.DBFrom

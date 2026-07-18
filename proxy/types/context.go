@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/lijcoder/aiapi/parser"
-	"github.com/lijcoder/aiapi/store"
+	"github.com/lijcoder/aiapi/store/model"
 )
 
 // ProxyResponseWrite 响应写入接口
@@ -46,7 +46,7 @@ type Context struct {
 	URL        string
 	ReqHeaders map[string][]string
 	Model      string       // 从请求体解析的模型名（始终有值）
-	ModelInfo  *store.Model // 模型价格配置（Auth 校验后设置）
+	ModelInfo  *model.Model // 模型价格配置（Auth 校验后设置）
 	HttpResp   *http.Response
 	RespBody   []byte
 	Usage      *parser.Usage // 从响应解析的用量（仅在成功请求时有值）

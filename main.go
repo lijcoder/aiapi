@@ -14,6 +14,7 @@ import (
 	"github.com/lijcoder/aiapi/framework"
 	aiapiLog "github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/store"
+	"github.com/lijcoder/aiapi/store/driver"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -44,8 +45,19 @@ func main() {
 }
 
 func initStore() {
-	if err := store.Init(); err != nil {
-		slog.Error("db init failed", "err", err)
+	db, err := driver.NewSQLite(constant.DBFilePath())
+	if err != nil {
+		slog.Error("db driver init failed", "err", err)
+		panic(err)
+	}
+
+	// 连接池配置
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(time.Hour)
+
+	if err := store.Init(db); err != nil {
+		slog.Error("db store init failed", "err", err)
 		panic(err)
 	}
 }

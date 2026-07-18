@@ -1,8 +1,11 @@
-package store
+package model
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
-// Provider 大模型提供商配置
+// Provider 上游服务配置
 type Provider struct {
 	ID        int64     `db:"id" json:"id"`
 	Type      string    `db:"type" json:"type"`
@@ -18,18 +21,27 @@ type ProviderConfig struct {
 	Headers map[string][]string `json:"headers"`
 }
 
+// ParseConfig 解析 provider.config JSON
+func (p *Provider) ParseConfig() (*ProviderConfig, error) {
+	var cfg ProviderConfig
+	if err := json.Unmarshal([]byte(p.Config), &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
 // User 用户
 type User struct {
 	ID        int64     `db:"id" json:"id"`
-	Account   string    `db:"account" json:"account"`
 	Name      string    `db:"name" json:"name"`
+	Account   string    `db:"account" json:"account"`
 	Budget    float64   `db:"budget" json:"budget"`
 	Unlimited bool      `db:"unlimited" json:"unlimited"`
 	Enabled   bool      `db:"enabled" json:"enabled"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
-// ApiKey 用户 API Key
+// ApiKey API 密钥
 type ApiKey struct {
 	ID        int64     `db:"id" json:"id"`
 	UserID    int64     `db:"user_id" json:"user_id"`
@@ -41,7 +53,20 @@ type ApiKey struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
-// UsageRecord Token 用量记录
+// Model 模型价格配置
+type Model struct {
+	ID                  int64     `db:"id" json:"id"`
+	Provider            string    `db:"provider" json:"provider"`
+	Model               string    `db:"model" json:"model"`
+	InputCacheHitPrice  float64   `db:"input_cache_hit_price" json:"input_cache_hit_price"`
+	InputCacheMissPrice float64   `db:"input_cache_miss_price" json:"input_cache_miss_price"`
+	OutputPrice         float64   `db:"output_price" json:"output_price"`
+	MaxContextTokens    int       `db:"max_context_tokens" json:"max_context_tokens"`
+	MaxCompletionTokens int       `db:"max_completion_tokens" json:"max_completion_tokens"`
+	CreatedAt           time.Time `db:"created_at" json:"created_at"`
+}
+
+// UsageRecord token 使用记录
 type UsageRecord struct {
 	ID              int64     `db:"id" json:"id"`
 	UserID          int64     `db:"user_id" json:"user_id"`
@@ -60,7 +85,7 @@ type UsageRecord struct {
 	CreatedAt       time.Time `db:"created_at" json:"created_at"`
 }
 
-// RequestLog HTTP 请求日志
+// RequestLog 请求日志
 type RequestLog struct {
 	ID             int64     `db:"id" json:"id"`
 	ApiKey         string    `db:"api_key" json:"api_key"`
@@ -80,20 +105,7 @@ type RequestLog struct {
 	CreatedAt      time.Time `db:"created_at" json:"created_at"`
 }
 
-// Model 模型价格配置
-type Model struct {
-	ID                  int64     `db:"id" json:"id"`
-	Provider            string    `db:"provider" json:"provider"`
-	Model               string    `db:"model" json:"model"`
-	InputCacheHitPrice  float64   `db:"input_cache_hit_price" json:"input_cache_hit_price"`
-	InputCacheMissPrice float64   `db:"input_cache_miss_price" json:"input_cache_miss_price"`
-	OutputPrice         float64   `db:"output_price" json:"output_price"`
-	MaxContextTokens    int       `db:"max_context_tokens" json:"max_context_tokens"`
-	MaxCompletionTokens int       `db:"max_completion_tokens" json:"max_completion_tokens"`
-	CreatedAt           time.Time `db:"created_at" json:"created_at"`
-}
-
-// RechargeRecord 用户充值记录
+// RechargeRecord 充值记录
 type RechargeRecord struct {
 	ID            int64     `db:"id" json:"id"`
 	UserID        int64     `db:"user_id" json:"user_id"`

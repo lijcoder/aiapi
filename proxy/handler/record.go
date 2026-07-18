@@ -4,6 +4,7 @@ import (
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
 	"github.com/lijcoder/aiapi/store"
+	"github.com/lijcoder/aiapi/store/model"
 )
 
 // Record 记录 Token 用量、计算费用、扣减余额
@@ -23,7 +24,7 @@ func Record(ctx *types.Context) {
 		float64(ctx.Usage.OutputTokens)*ctx.ModelInfo.OutputPrice) / 1_000_000
 
 	// 2. 记录用量（始终写入）
-	rec := &store.UsageRecord{
+	rec := &model.UsageRecord{
 		UserID:          ctx.UserID,
 		ApiKey:          ctx.ApiKey,
 		Provider:        ctx.ProviderType,
@@ -38,7 +39,7 @@ func Record(ctx *types.Context) {
 		Cost:            cost,
 		Unlimited:       ctx.UserUnlimited,
 	}
-	if err := store.InsertUsage(rec); err != nil {
+	if err := store.C().InsertUsage(rec); err != nil {
 		ctx.OtherErrs = append(ctx.OtherErrs, log.WithStack(err))
 	}
 
@@ -48,13 +49,13 @@ func Record(ctx *types.Context) {
 	}
 
 	// 4. 扣用户余额
-	if err := store.DeductUserBudget(ctx.UserID, cost); err != nil {
+	if err := store.C().DeductUserBudget(ctx.UserID, cost); err != nil {
 		ctx.OtherErrs = append(ctx.OtherErrs, log.WithStack(err))
 	}
 
 	// 5. Key 有限额 → 额外扣 Key
 	if !ctx.KeyUnlimited {
-		if err := store.DeductKeyBudget(ctx.ApiKey, cost); err != nil {
+		if err := store.C().DeductKeyBudget(ctx.ApiKey, cost); err != nil {
 			ctx.OtherErrs = append(ctx.OtherErrs, log.WithStack(err))
 		}
 	}
