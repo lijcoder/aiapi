@@ -10,7 +10,7 @@ import (
 // GetProvider 按类型查询启用中的 Provider
 func (s *Session) GetProvider(providerType string) (*model.Provider, error) {
 	var p model.Provider
-	err := dbFrom(s.Ctx).Get(&p, `SELECT * FROM providers WHERE type = ? AND enabled = 1`, providerType)
+	err := s.namedGet(&p, `SELECT * FROM providers WHERE type = :type AND enabled = 1`, map[string]any{"type": providerType})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}

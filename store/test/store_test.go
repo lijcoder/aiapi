@@ -122,7 +122,7 @@ func TestSessionTransaction(t *testing.T) {
 		if err := s.InsertRechargeRecord(rec); err != nil {
 			return err
 		}
-		return s.UpdateUserBudget(user.ID, rec.BalanceAfter)
+		return s.RechargeUserBudget(user.ID, rec.Amount)
 	})
 	if err != nil {
 		t.Fatalf("transaction failed: %v", err)
@@ -151,7 +151,7 @@ func TestSessionTransactionRollback(t *testing.T) {
 
 	// 事务内失败，应回滚
 	err := store.T(func(s *store.Session) error {
-		if err := s.UpdateUserBudget(1, 999); err != nil {
+		if err := s.DeductUserBudget(1, 10); err != nil {
 			return err
 		}
 		return errors.New("rollback")

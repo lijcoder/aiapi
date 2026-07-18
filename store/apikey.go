@@ -10,7 +10,7 @@ import (
 // GetApiKey 按 key 查询 API Key 及关联用户
 func (s *Session) GetApiKey(key string) (*model.ApiKey, *model.User, error) {
 	var k model.ApiKey
-	err := dbFrom(s.Ctx).Get(&k, `SELECT * FROM api_keys WHERE key = ? AND enabled = 1`, key)
+	err := s.namedGet(&k, `SELECT * FROM api_keys WHERE key = :key AND enabled = 1`, map[string]any{"key": key})
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, nil
 	}

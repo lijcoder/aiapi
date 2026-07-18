@@ -1,6 +1,8 @@
 package store
 
 import (
+	"database/sql"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/lijcoder/aiapi/store/base"
 )
@@ -48,6 +50,29 @@ func (s *Session) RawExec(query string, args ...any) (int64, error) {
 		return 0, err
 	}
 	return res.LastInsertId()
+}
+
+// namedGet 使用命名参数查询单行。
+func (s *Session) namedGet(dest any, query string, arg any) error {
+	q, args, err := sqlx.Named(query, arg)
+	if err != nil {
+		return err
+	}
+	return dbFrom(s.Ctx).Get(dest, q, args...)
+}
+
+// namedSelect 使用命名参数查询多行。
+func (s *Session) namedSelect(dest any, query string, arg any) error {
+	q, args, err := sqlx.Named(query, arg)
+	if err != nil {
+		return err
+	}
+	return dbFrom(s.Ctx).Select(dest, q, args...)
+}
+
+// namedExec 使用命名参数执行写操作。
+func (s *Session) namedExec(query string, arg any) (sql.Result, error) {
+	return dbFrom(s.Ctx).NamedExec(query, arg)
 }
 
 // db 是内部对 base.DB 的别名，业务 SQL 文件复用。
