@@ -92,3 +92,15 @@ type Model struct {
 	MaxCompletionTokens int       `db:"max_completion_tokens" json:"max_completion_tokens"`
 	CreatedAt           time.Time `db:"created_at" json:"created_at"`
 }
+
+// RechargeRecord 用户充值记录
+type RechargeRecord struct {
+	ID            int64     `db:"id" json:"id"`
+	UserID        int64     `db:"user_id" json:"user_id"`
+	Amount        float64   `db:"amount" json:"amount"`
+	BalanceBefore float64   `db:"balance_before" json:"balance_before"`
+	BalanceAfter  float64   `db:"balance_after" json:"balance_after"`
+	Operator      string    `db:"operator" json:"operator"`
+	Remark        string    `db:"remark" json:"remark"`
+	CreatedAt     time.Time `db:"created_at" json:"created_at"`
+}

@@ -95,3 +95,16 @@ CREATE TABLE IF NOT EXISTS models (
     created_at            DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_models_provider_model ON models(provider, model);
+
+CREATE TABLE IF NOT EXISTS recharge_records (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id        INTEGER NOT NULL,
+    amount         REAL NOT NULL,
+    balance_before REAL NOT NULL,
+    balance_after  REAL NOT NULL,
+    operator       TEXT DEFAULT '',
+    remark         TEXT DEFAULT '',
+    created_at     DATETIME DEFAULT (datetime('now', 'localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_recharge_records_user ON recharge_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_recharge_records_date ON recharge_records(created_at);

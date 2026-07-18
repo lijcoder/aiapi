@@ -18,6 +18,7 @@ type Store interface {
 	InsertRequestLog(log *RequestLog) error
 	DeductUserBudget(userID int64, cost float64) error
 	DeductKeyBudget(key string, cost float64) error
+	Recharge(userID int64, amount float64, operator, remark string) (*RechargeRecord, error)
 	Close() error
 }
 
@@ -31,7 +32,10 @@ func InsertUsage(u *UsageRecord) error               { return current.InsertUsag
 func InsertRequestLog(l *RequestLog) error           { return current.InsertRequestLog(l) }
 func DeductUserBudget(id int64, cost float64) error  { return current.DeductUserBudget(id, cost) }
 func DeductKeyBudget(key string, cost float64) error { return current.DeductKeyBudget(key, cost) }
-func Close() error                                    { return current.Close() }
+func Recharge(userID int64, amount float64, operator, remark string) (*RechargeRecord, error) {
+	return current.Recharge(userID, amount, operator, remark)
+}
+func Close() error { return current.Close() }
 
 // commonStore 公共存储实现，所有驱动共用同一套 SQL
 type commonStore struct {
@@ -109,6 +113,54 @@ func (s *commonStore) InsertRequestLog(log *RequestLog) error {
 		log,
 	)
 	return err
+}
+
+func (s *commonStore) Recharge(userID int64, amount float64, operator, remark string) (*RechargeRecord, error) {
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var before float64
+	err = tx.Get(&before, `SELECT budget FROM users WHERE id = ? AND enabled = 1`, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, errors.New("user not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	after := before + amount
+	_, err = tx.Exec(`UPDATE users SET budget = ? WHERE id = ?`, after, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	rec := &RechargeRecord{
+		UserID:        userID,
+		Amount:        amount,
+		BalanceBefore: before,
+		BalanceAfter:  after,
+		Operator:      operator,
+		Remark:        remark,
+	}
+	res, err := tx.NamedExec(
+		`INSERT INTO recharge_records (user_id, amount, balance_before, balance_after, operator, remark)
+		 VALUES (:user_id, :amount, :balance_before, :balance_after, :operator, :remark)`,
+		rec,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	id, _ := res.LastInsertId()
+	rec.ID = id
+	return rec, nil
 }
 
 func (s *commonStore) Close() error {
