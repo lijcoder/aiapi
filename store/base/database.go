@@ -2,18 +2,14 @@ package base
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 
 	"github.com/jmoiron/sqlx"
 )
 
-// DB 是 sqlx DB 和 Tx 的最小公共接口，便于事务内外复用。
+// DB 是 sqlx DB 和 Tx 的最小公共接口，便于事务内外复用，同时可直接传给 QueryBuilder 等工具。
 type DB interface {
-	Get(dest interface{}, query string, args ...interface{}) error
-	Select(dest interface{}, query string, args ...interface{}) error
-	Exec(query string, args ...interface{}) (sql.Result, error)
-	NamedExec(query string, arg interface{}) (sql.Result, error)
+	sqlx.Ext
 }
 
 // 编译期校验：*sqlx.DB 和 *sqlx.Tx 都实现 DB
@@ -23,6 +19,9 @@ var _ DB = (*sqlx.Tx)(nil)
 type ctxKey struct{}
 
 var defaultDB DB
+
+// driverName 缓存当前数据库驱动名，用于 Tx 场景构造占位符。
+var driverName string
 
 // storage 全局实例，负责底层连接管理与事务生命周期。
 var storage *Storage
@@ -60,11 +59,17 @@ func WithDBContext(ctx context.Context, d DB) context.Context {
 	return context.WithValue(ctx, ctxKey{}, d)
 }
 
+// DriverName 返回初始化时缓存的驱动名，供 queryx 在非 DB 场景使用。
+func DriverName() string {
+	return driverName
+}
+
 // Init 使用外部传入的 *sqlx.DB 初始化全局 Storage 及默认 DB
 func Init(db *sqlx.DB) error {
 	storage = &Storage{db: db}
+	driverName = db.DriverName()
 	SetDefaultDB(db)
-	slog.Info("store init success", "driver", "sqlx")
+	slog.Info("store init success", "driver", db.DriverName())
 	return nil
 }
 

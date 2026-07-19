@@ -23,7 +23,7 @@ func Auth(ctx *types.Context) {
 		ctx.Code = types.CodeUnauthorized
 		return
 	}
-	key, user, err := store.C().GetApiKey(ctx.ApiKey)
+	key, user, err := store.C().ApiKey().Get(ctx.ApiKey)
 	if err != nil {
 		ctx.Err = log.WithStack(err)
 		ctx.ErrorMessage = types.InternalServerError
@@ -45,7 +45,7 @@ func Auth(ctx *types.Context) {
 	ctx.UserID = user.ID
 
 	// 校验模型定价配置是否存在
-	pvd, err := store.C().GetModel(ctx.ProviderType, ctx.Model)
+	pvd, err := store.C().Model().Get(ctx.ProviderType, ctx.Model)
 	if err != nil {
 		ctx.Err = log.WithStack(err)
 		ctx.ErrorMessage = types.InternalServerError

@@ -10,7 +10,7 @@ import (
 
 // LoadConfig 从数据库加载 Provider 配置
 func LoadConfig(ctx *types.Context) {
-	pvd, err := store.C().GetProvider(ctx.ProviderType)
+	pvd, err := store.C().Provider().Get(ctx.ProviderType)
 	if err != nil {
 		ctx.Err = log.WithStack(err)
 		ctx.ErrorMessage = types.InternalServerError

@@ -38,7 +38,7 @@ func Log(ctx *types.Context) {
 		statusCode = ctx.HttpResp.StatusCode
 	}
 	latency := time.Since(ctx.StartTime).Milliseconds()
-	if err := store.C().InsertRequestLog(&model.RequestLog{
+	if err := store.C().Log().Insert(&model.RequestLog{
 		ApiKey:         ctx.ApiKey,
 		Format:         ctx.Format,
 		Provider:       ctx.ProviderType,

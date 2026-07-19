@@ -39,7 +39,7 @@ func Record(ctx *types.Context) {
 		Cost:            cost,
 		Unlimited:       ctx.UserUnlimited,
 	}
-	if err := store.C().InsertUsage(rec); err != nil {
+	if err := store.C().Usage().Insert(rec); err != nil {
 		ctx.OtherErrs = append(ctx.OtherErrs, log.WithStack(err))
 	}
 
@@ -51,12 +51,12 @@ func Record(ctx *types.Context) {
 	// 4. 用户余额和 Key 余额扣减放在同一事务中
 	err := store.T(func(s *store.Session) error {
 		// 4.1 扣用户余额
-		if err := s.DeductUserBudget(ctx.UserID, cost); err != nil {
+		if err := s.Charge().DeductUserBudget(ctx.UserID, cost); err != nil {
 			return err
 		}
 		// 4.2 Key 有限额 → 额外扣 Key
 		if !ctx.KeyUnlimited {
-			if err := s.DeductKeyBudget(ctx.ApiKey, cost); err != nil {
+			if err := s.Charge().DeductKeyBudget(ctx.ApiKey, cost); err != nil {
 				return err
 			}
 		}

@@ -7,10 +7,23 @@ import (
 	"github.com/lijcoder/aiapi/store/model"
 )
 
-// GetModel 按 provider+model 查询模型定价配置
-func (s *Session) GetModel(provider, name string) (*model.Model, error) {
+// Model 返回模型定价相关操作的命名空间。
+func (s *Session) Model() *ModelStore {
+	return &ModelStore{s: s}
+}
+
+// ModelStore 是模型定价相关操作的命名空间。
+type ModelStore struct {
+	s *Session
+}
+
+// Get 按 provider+model 查询模型定价配置
+func (ms *ModelStore) Get(provider, name string) (*model.Model, error) {
 	var p model.Model
-	err := s.namedGet(&p, `SELECT * FROM models WHERE provider = :provider AND model = :model`, map[string]any{"provider": provider, "model": name})
+	err := ms.s.Query(
+		`SELECT * FROM models WHERE provider = :provider AND model = :model`,
+		map[string]any{"provider": provider, "model": name},
+	).Get(&p)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
