@@ -3,3 +3,6 @@ out
 .workbuddy/
 temp/
 .claude/
+frontend/node_modules/
+frontend/dist/*
+!frontend/dist/index.html

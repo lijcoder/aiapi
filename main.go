@@ -32,6 +32,7 @@ func main() {
 	e := echo.New()
 	e.HideBanner = true
 	framework.EchoInit(e)
+	ServeFrontend(e)
 	if constant.PPROF {
 		registerRoutes(e)
 	}

@@ -7,6 +7,10 @@
 
 ### 2026-07-19
 
+- 新增后台管理前端（`frontend/`）：Vue 3 + Vite 管理台，Go `embed` 嵌进二进制。
+  - 页面：登录 / 充值（弹窗充值 + 流水表格）。
+  - 开发期 `make dev-ui`（端口 3000），自动代理 API 到 Go 后端。
+  - 生产构建 `make build-all`，一个 `aiapi` 文件启动即带前端页面。
 - 新增后台管理功能（`manager/`）：账号密码登录 / 登出、接口级权限 `(role_id, entity, action, value)`、普通用户自充值、管理员给任意用户充值。
   - 登录态基于服务端 `user_sessions` 表 + HttpOnly Cookie，不使用 `Authorization` 头。
   - 多角色（用户-角色多对多）；接口级 ACL，`role_permission` 表用 `entity=API, value=接口路径` 授权，请求路径命中即放行；`action` 保留暂作通配。

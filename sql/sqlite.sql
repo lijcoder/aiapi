@@ -171,6 +171,7 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
 --     (1, 'API', '*', '/manager/self'),
 --     (1, 'API', '*', '/manager/recharge'),
 --     (1, 'API', '*', '/manager/recharge/records'),
+--     (1, 'API', '*', '/manager/recharge/records/self'),
 --     (2, 'API', '*', '/manager/self'),
 --     (2, 'API', '*', '/manager/recharge/self'),
 --     (2, 'API', '*', '/manager/recharge/records/self');

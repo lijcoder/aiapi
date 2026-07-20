@@ -122,6 +122,16 @@
 3. 在 `store/` 下新增对应 Store 文件，提供 CRUD 方法。
 4. 命名空间入口写在该 Store 文件内（如 `func (s *Session) Xxx() *XxxStore`），不要集中放到 `store/base.go`。
 
+### 7.5 开发管理台前端
+
+`frontend/` 是 Vue 3 + Vite 管理台前端，编译后通过 Go `embed` 嵌进二进制分发。
+
+1. 开发期 `make dev-ui`（端口 3000），Vite 自动代理 `/manager` API 到 Go。
+2. 新增页面：在 `frontend/src/views/` 下写 Vue 单文件组件，`router/index.js` 加入 Home 路由的 children。
+3. 新增接口调用：在 `frontend/src/api/index.js` 封装 `request(PATH, body)`。
+4. 侧栏菜单：在 `frontend/src/views/Home.vue` 的 `<nav>` 中加 `<router-link>`。
+5. 发布：`make build-all`，Go 二进制自动嵌入 `frontend/dist/`。
+
 ## 8. 测试与质量
 
 - 新增 handler 应配套单元测试，优先覆盖失败路径。

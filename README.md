@@ -12,6 +12,7 @@
 - **Provider 管理**：内置 CRUD 接口动态管理上游配置
 - **API Key 管理**：校验调用方身份，支持启用/禁用
 - **pprof 调试**：可选启用 Go 性能分析接口
+- **管理台**：内置 Web 管理界面，支持登录、充值、流水查询
 
 ## 架构概览
 
@@ -77,6 +78,16 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
     "model": "gpt-4o-mini",
     "messages": [{"role": "user", "content": "Hello"}]
   }'
+```
+
+### 管理台
+
+```bash
+# 开发模式（前端热更新）
+make dev-ui     # → http://localhost:3000（自动代理 API 到 8887）
+
+# 生产构建（前端嵌入 Go 二进制）
+make build-all  # → ./aiapi 一个文件启动，浏览器打开 http://localhost:8887
 ```
 
 ## 配置 Provider
@@ -228,6 +239,7 @@ INSERT INTO role_permission (role_id, entity, action, value) VALUES
   (1, 'API', '*', '/manager/self'),
   (1, 'API', '*', '/manager/recharge'),
   (1, 'API', '*', '/manager/recharge/records'),
+  (1, 'API', '*', '/manager/recharge/records/self'),
   (2, 'API', '*', '/manager/self'),
   (2, 'API', '*', '/manager/recharge/self'),
   (2, 'API', '*', '/manager/recharge/records/self');
