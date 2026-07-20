@@ -24,4 +24,6 @@ func Register(g *echo.Group) {
 	g.POST("/recharge", base.Wrap(handler.RechargeAdmin))
 	g.POST("/recharge/records", base.Wrap(handler.RechargeRecords))
 	g.POST("/recharge/records/self", base.Wrap(handler.RechargeSelfRecords))
+
+	g.POST("/models", base.Wrap(handler.ListModels))
 }

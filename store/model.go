@@ -32,3 +32,13 @@ func (ms *ModelStore) Get(provider, name string) (*model.Model, error) {
 	}
 	return &p, nil
 }
+
+// List 查询全部模型定价配置
+func (ms *ModelStore) List() ([]model.Model, error) {
+	var models []model.Model
+	err := ms.s.Query(`SELECT * FROM models ORDER BY provider, model`, nil).Select(&models)
+	if err != nil {
+		return nil, err
+	}
+	return models, nil
+}

@@ -21,6 +21,9 @@ type QueryBuilder struct {
 // driverName 用于确定占位符类型；DB 场景可传 db.DriverName()，Tx 场景需调用方手动传入
 func NewQuery(ext sqlx.Ext, driverName string, query string, params any) *QueryBuilder {
 	qb := &QueryBuilder{ext: ext}
+	if params == nil {
+		params = map[string]any{}
+	}
 
 	// 第 1 步：Named — 将 :name 替换为 ?，并按参数顺序排列参数值
 	bound, args, err := sqlx.Named(query, params)

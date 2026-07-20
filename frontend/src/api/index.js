@@ -37,6 +37,10 @@ export function rechargeSelfRecords() {
   return request('/recharge/records/self')
 }
 
+export function listModels() {
+  return request('/models')
+}
+
 export function rechargeRecords(userId) {
   if (userId) return request('/recharge/records', { userId })
   return request('/recharge/records/self')
