@@ -124,10 +124,10 @@
 
 ### 7.5 开发管理台前端
 
-`frontend/` 是 Vue 3 + Vite 管理台前端，编译后通过 Go `embed` 嵌进二进制分发。
+`frontend/` 是 Vue 3 + Vite + Naive UI 管理台前端，编译后通过 Go `embed` 嵌进二进制分发。
 
 1. 开发期 `make dev-ui`（端口 3000），Vite 自动代理 `/manager` API 到 Go。
-2. 新增页面：在 `frontend/src/views/` 下写 Vue 单文件组件，`router/index.js` 加入 Home 路由的 children。
+2. 新增页面：在 `frontend/src/views/` 下写 Vue 单文件组件，使用 Naive UI 组件（`n-card`/`n-button`/`n-data-table`/`n-modal` 等），图标库用 `@vicons/ionicons5`。`router/index.js` 加入 Home 路由的 children。
 3. 新增接口调用：在 `frontend/src/api/index.js` 封装 `request(PATH, body)`。
 4. 侧栏菜单：在 `frontend/src/views/Home.vue` 的 `<nav>` 中加 `<router-link>`。
 5. 发布：`make build-all`，Go 二进制自动嵌入 `frontend/dist/`。

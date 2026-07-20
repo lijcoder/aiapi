@@ -82,6 +82,8 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
 
 ### 管理台
 
+`frontend/` 是 Vue 3 + Vite + Naive UI 管理台前端，编译后通过 Go `embed` 嵌进二进制。
+
 ```bash
 # 开发模式（前端热更新）
 make dev-ui     # → http://localhost:3000（自动代理 API 到 8887）
