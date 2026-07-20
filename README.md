@@ -187,7 +187,67 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 
 - 新增上游响应解析逻辑：参考 `parser/openai.go` 与 `parser/anthropic.go`
 - 新增 Pipeline 处理步骤：参考 `proxy/handler/` 目录
-- 新增管理接口：参考 `manager/provider.go`
+- 新增管理接口：参考 `manager/handler/` 目录与 `manager/router/router.go`
+
+## 后台管理 API
+
+`/manager` 下提供账号密码登录、权限与充值管理。**所有接口均为 POST，参数放在 JSON body**；登录态通过 HttpOnly Cookie（`token`）传递。
+
+### 权限模型
+
+采用接口级权限 `(role_id, entity, action, value)`，存于 `role_permission` 表：
+- `entity`：资源类型，如 `API`
+- `action`：操作，如 `*`（通配，暂未启用细粒度，保留字段）
+- `value`：资源标识，即接口路径，如 `/manager/self`
+- 用户经 `user_roles` 关联多个角色，权限取并集
+- 判定规则：当前请求路径 `c.Path()` 命中某条 `(entity=API, value=path)` 即通过；否则 403
+
+即"某角色被授权某接口路径，就能访问该接口"。`self` / `all` 的区分由**接口本身**承担（如 `/manager/recharge/self` 只作用于自己，`/manager/recharge` 由管理员给任意用户充值）。
+
+### 接口一览
+
+| 路径 | 说明 | 需登录 |
+|------|------|--------|
+| `POST /manager/login` | 登录，body `{account, password}` | 否 |
+| `POST /manager/logout` | 登出 | 是 |
+| `POST /manager/self` | 当前用户基本信息 | 是 |
+| `POST /manager/recharge/self` | 给自己充值，body `{amount, remark}` | 是 |
+| `POST /manager/recharge` | 管理员充值，body `{userId, amount, remark}` | 是 |
+| `POST /manager/recharge/records` | 管理员查指定用户充值流水，body `{userId}` | 是 |
+| `POST /manager/recharge/records/self` | 查自己的充值流水 | 是 |
+
+### 初始化管理员
+
+执行 `sql/sqlite.sql` 建表后，手动插入角色、权限与初始管理员（`password` 列写 bcrypt 哈希）：
+
+```sql
+INSERT INTO roles (name, description) VALUES ('admin', '管理员');
+INSERT INTO roles (name, description) VALUES ('user',  '普通用户');
+-- admin.id=1, user.id=2
+INSERT INTO role_permission (role_id, entity, action, value) VALUES
+  (1, 'API', '*', '/manager/self'),
+  (1, 'API', '*', '/manager/recharge'),
+  (1, 'API', '*', '/manager/recharge/records'),
+  (2, 'API', '*', '/manager/self'),
+  (2, 'API', '*', '/manager/recharge/self'),
+  (2, 'API', '*', '/manager/recharge/records/self');
+INSERT INTO users (name, account, password, enabled) VALUES ('管理员', 'admin', '<bcrypt-hash>', 1);
+INSERT INTO user_roles (user_id, role_id) VALUES ((SELECT id FROM users WHERE account='admin'), 1);
+```
+
+### 调用示例
+
+```bash
+# 登录（cookie 保存到 jar）
+curl -c cookie.jar -X POST http://localhost:8888/manager/login \
+  -H 'Content-Type: application/json' \
+  -d '{"account":"admin","password":"你的密码"}'
+
+# 管理员给 userId=2 充值 10
+curl -b cookie.jar -X POST http://localhost:8888/manager/recharge \
+  -H 'Content-Type: application/json' \
+  -d '{"userId":2,"amount":10,"remark":"月度充值"}'
+```
 
 > 注意：当前项目仅代理 OpenAI 兼容格式的请求。若未来需要支持非 OpenAI 的客户端协议，需新增 `parser/` 实现并在 `framework/echo.go` 或 `proxy/direct.go` 中做必要适配。
 

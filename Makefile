@@ -9,7 +9,7 @@ test:
 	go test ./...
 
 run:
-	./aiapi -port 8887
+	./aiapi --port 8887 --data-dir ~/.aiapi-debug
 
 clean:
 	rm -rf aiapi

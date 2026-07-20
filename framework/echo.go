@@ -7,6 +7,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	managerRouter "github.com/lijcoder/aiapi/manager/router"
 	"github.com/lijcoder/aiapi/proxy"
 	"github.com/lijcoder/aiapi/proxy/types"
 )
@@ -42,6 +43,10 @@ func EchoInit(e *echo.Echo) {
 	proxyGroup.Any("/:format/:provider/*", func(c echo.Context) error {
 		return proxyDirectProcess(c)
 	})
+
+	// 后台管理 API
+	managerGroup := e.Group("/manager")
+	managerRouter.Register(managerGroup)
 }
 
 func proxyDirectProcess(c echo.Context) error {

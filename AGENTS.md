@@ -23,6 +23,7 @@
 | 业务编排层 | 组装并执行请求处理 Pipeline | `proxy/direct.go` |
 | 业务处理层 | 单一职责的 handler，完成具体业务逻辑 | `proxy/handler/*.go` |
 | 协议解析层 | 不同厂商的请求/响应解析与 Key 提取 | `parser/*.go` |
+| 后台管理层 | 登录/权限/充值等管理 API | `manager/handler/*.go` |
 | 数据持久层 | 数据库访问、模型定义、查询构造 | `store/*.go` |
 | 通用工具层 | 常量、日志格式化、SSE 包装等 | `constant/`、`log/`、`proxy/sse/` |
 
@@ -110,9 +111,9 @@
 
 `manager/` 是后端管理服务的总入口，不仅限于 Provider，还包括用户、充值、数据统计、模型配置等管理功能。
 
-1. 在 `manager/` 下按业务领域新增文件（如 `user.go`、`charge.go`）。
-2. 遵循 Echo 标准 handler 签名：`func(c echo.Context) error`。
-3. 在当前文件内的 `RegisterRoutes` 函数中注册自己的路由；若不存在，则新建并确保 `framework/echo.go` 在初始化时调用。
+1. 在 `manager/handler/` 下按业务领域新增文件（如 `user.go`、`charge.go`）。
+2. 业务函数签名自由组合 `(context.Context, *Req)` 等入参，返回 `(Resp, *base.BizError)`；由 `base.Wrap` 动态包装成 echo.HandlerFunc。
+3. 在 `manager/router/router.go` 的 `Register(g *echo.Group)` 中用 `base.Wrap(handler.Xxx)` 注册路由；路由组根路径 `/manager` 由 `framework/echo.go` 直写。
 
 ### 7.4 新增数据库实体
 
@@ -143,3 +144,6 @@
 - API Key 只在认证阶段使用，禁止在日志、错误信息或响应中泄露完整 Key。
 - 请求体中的敏感内容应谨慎记录，必要时提供脱敏开关。
 - 管理接口应考虑访问控制，避免任意用户修改 Provider 配置。
+- `manager/` 下所有需登录态的接口必须经过 `manager/middleware.Auth` 中间件（登录校验 + 接口级权限 `role_permission(entity=API, value=path)` 判定 + 注入登录态），业务函数由 `base.Wrap` 做参数包装与响应输出。
+- 登录态只走 Cookie + 服务端 `user_sessions` 表，不使用 `Authorization` 头、不复用 proxy 的 header 鉴权字段。
+- `manager` 自有业务码定义在 `manager/base/bizcode.go`，与 `proxy/types/bizcode.go` 解耦，两套独立编号。

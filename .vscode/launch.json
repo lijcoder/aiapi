@@ -13,6 +13,8 @@
             "args": [
                 "--port",
                 "8887",
+                "--data-dir",
+                "${env:HOME}/.aiapi-debug",
             ]
         }
     ]

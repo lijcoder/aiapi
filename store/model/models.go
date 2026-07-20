@@ -35,9 +35,46 @@ type User struct {
 	ID        int64     `db:"id" json:"id"`
 	Name      string    `db:"name" json:"name"`
 	Account   string    `db:"account" json:"account"`
+	Password  string    `db:"password" json:"-"` // bcrypt 哈希，不对外输出
 	Budget    float64   `db:"budget" json:"budget"`
 	Unlimited bool      `db:"unlimited" json:"unlimited"`
 	Enabled   bool      `db:"enabled" json:"enabled"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
+}
+
+// Role 角色
+type Role struct {
+	ID          int64     `db:"id" json:"id"`
+	Name        string    `db:"name" json:"name"`
+	Description string    `db:"description" json:"description"`
+	CreatedAt   time.Time `db:"created_at" json:"created_at"`
+}
+
+// UserRole 用户-角色关联
+type UserRole struct {
+	ID        int64     `db:"id" json:"id"`
+	UserID    int64     `db:"user_id" json:"user_id"`
+	RoleID    int64     `db:"role_id" json:"role_id"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+}
+
+// RolePermission 接口级权限 (subject=role_id, entity, action, value)
+type RolePermission struct {
+	ID        int64     `db:"id" json:"id"`
+	RoleID    int64     `db:"role_id" json:"role_id"`
+	Entity    string    `db:"entity" json:"entity"`
+	Action    string    `db:"action" json:"action"`
+	Value     string    `db:"value" json:"value"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+}
+
+// UserSession 用户登录会话
+type UserSession struct {
+	ID        int64     `db:"id" json:"id"`
+	Token     string    `db:"token" json:"-"`
+	UserID    int64     `db:"user_id" json:"user_id"`
+	ExpiresAt time.Time `db:"expires_at" json:"expires_at"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 

@@ -1,3 +1,5 @@
 aiapi
 out
 .workbuddy/
+temp/
+.claude/
