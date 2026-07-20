@@ -229,6 +229,12 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/recharge/records` | 管理员查指定用户充值流水，body `{userId}` | 是 |
 | `POST /manager/recharge/records/self` | 查自己的充值流水 | 是 |
 | `POST /manager/models` | 模型定价列表 | 是 |
+| `POST /manager/apikeys/list/self` | 查自己的 API Key 列表（key 脱敏） | 是 |
+| `POST /manager/apikeys/create/self` | 创建 API Key，body `{name, budget, unlimited}`，明文 key 仅本次返回 | 是 |
+| `POST /manager/apikeys/toggle/self` | 启用/禁用 API Key，body `{id}` | 是 |
+| `POST /manager/apikeys/delete/self` | 删除 API Key，body `{id}` | 是 |
+| `POST /manager/apikeys/rename/self` | 重命名 API Key，body `{id, name}` | 是 |
+| `POST /manager/apikeys/budget/self` | 修改 API Key 额度/限额模式，body `{id, budget, unlimited}`，有限额 key 总和不能超过账户余额 | 是 |
 
 ### 初始化管理员
 

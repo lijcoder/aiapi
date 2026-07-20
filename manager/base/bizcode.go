@@ -26,6 +26,8 @@ var (
 	CodeSessionExpired = BizCode{1006, 401}
 	CodeUserDisabled   = BizCode{1007, 403}
 	CodeInvalidParams  = BizCode{1008, 400}
+	CodeApiKeyNotFound = BizCode{1009, 404}
+	CodeBudgetExceeded = BizCode{1010, 400}
 )
 
 const InternalServerError = "internal server error"

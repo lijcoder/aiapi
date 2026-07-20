@@ -41,6 +41,30 @@ export function listModels() {
   return request('/models')
 }
 
+export function listMyApiKeys() {
+  return request('/apikeys/list/self')
+}
+
+export function createApiKey(name, budget, unlimited) {
+  return request('/apikeys/create/self', { name, budget, unlimited })
+}
+
+export function toggleApiKey(id) {
+  return request('/apikeys/toggle/self', { id })
+}
+
+export function deleteApiKey(id) {
+  return request('/apikeys/delete/self', { id })
+}
+
+export function renameApiKey(id, name) {
+  return request('/apikeys/rename/self', { id, name })
+}
+
+export function updateApiKeyBudget(id, budget, unlimited) {
+  return request('/apikeys/budget/self', { id, budget, unlimited })
+}
+
 export function rechargeRecords(userId) {
   if (userId) return request('/recharge/records', { userId })
   return request('/recharge/records/self')
