@@ -226,6 +226,7 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/recharge` | 管理员充值，body `{userId, amount, remark}` | 是 |
 | `POST /manager/recharge/records` | 管理员查指定用户充值流水，body `{userId}` | 是 |
 | `POST /manager/recharge/records/self` | 查自己的充值流水 | 是 |
+| `POST /manager/models` | 模型定价列表 | 是 |
 
 ### 初始化管理员
 
@@ -240,6 +241,7 @@ INSERT INTO role_permission (role_id, entity, action, value) VALUES
   (1, 'API', '*', '/manager/recharge'),
   (1, 'API', '*', '/manager/recharge/records'),
   (1, 'API', '*', '/manager/recharge/records/self'),
+  (1, 'API', '*', '/manager/models'),
   (2, 'API', '*', '/manager/self'),
   (2, 'API', '*', '/manager/recharge/self'),
   (2, 'API', '*', '/manager/recharge/records/self');
