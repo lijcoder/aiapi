@@ -111,9 +111,10 @@
 
 `manager/` 是后端管理服务的总入口，不仅限于 Provider，还包括用户、充值、数据统计、模型配置等管理功能。
 
-1. 在 `manager/handler/` 下按业务领域新增文件（如 `user.go`、`charge.go`）。
+1. 在 `manager/handler/` 下按业务领域新增文件（如 `user.go`、`charge.go`）。同一领域的普通用户版与超管版合并到同一文件，不单独起 `*_admin.go` 文件。
 2. 业务函数签名自由组合 `(context.Context, *Req)` 等入参，返回 `(Resp, *base.BizError)`；由 `base.Wrap` 动态包装成 echo.HandlerFunc。
 3. 在 `manager/router/router.go` 的 `Register(g *echo.Group)` 中用 `base.Wrap(handler.Xxx)` 注册路由；路由组根路径 `/manager` 由 `framework/echo.go` 直写。
+4. **接口命名**：列表查询统一用 `/list` 后缀（如 `/users/list`、`/providers/list`、`/models/list`、`/recharge/records/list`）。普通用户自助接口用 `/self` 后缀，超管接口不加 `/self`。
 
 ### 7.4 新增数据库实体
 
@@ -148,6 +149,15 @@
 - 金额列统一用 `fix4()` 格式化
 - 时间列统一用 `formatTime()` + `ellipsis: { tooltip: true }` 防换行
 - 空数据兜底 `value = (await xxx()) || []`
+- 删除/禁用等危险操作用 `useDialog` 二次确认，不用 `window.confirm`
+
+#### 菜单与权限模型
+
+- **动态菜单**：侧栏菜单由后端 `/manager/self` 返回的 `menus` 树驱动，前端 `Home.vue` 动态渲染，不硬编码。菜单数据存于 `menus` 表，角色与菜单通过 `role_menus` 关联。
+- **菜单形态**：有 `children` 为分组容器（点击展开/收起）；无 `children` 且 `path` 非空为直接跳转；`path` 为空为纯标题。
+- **超管特权**：`role_permission` 中 `value='*'` 为超管通配权限，放行所有接口。admin 角色只需配一条 `('API', '*', '*')` 即可访问全部超管接口，无需为每个接口单独授权。
+- **普通用户**：按接口路径精确授权（最小权限原则）。
+- **超管页面**：路由 `/admin/*` 下，页面组件放 `frontend/src/views/admin/`，import 路径多一级 `../../`。
 
 ## 8. 测试与质量
 

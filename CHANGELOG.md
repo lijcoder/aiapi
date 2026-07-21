@@ -5,6 +5,23 @@
 
 ## [Unreleased]
 
+### 2026-07-21
+
+- 新增超级管理后台（超管视角的全局管理功能）。
+  - **动态菜单**：新增 `menus` / `role_menus` 表，`/manager/self` 返回当前用户菜单树，前端 `Home.vue` 动态渲染侧栏（支持分组容器/直接跳转/纯标题三种形态），不再硬编码菜单。
+  - **超管特权**：`role_permission` 支持 `value='*'` 通配放行所有接口，admin 角色只需一条权限记录即可访问全部超管接口。
+  - **用户管理** `/manager/users/*`：列表（含角色 tag）/ 创建 / 编辑 / 启停 / 重置密码 / 分配角色 / 充值；操作列下拉菜单含「API Key」「充值记录」入口，跳转子页面管理该用户的 Key 和流水。
+  - **提供商管理** `/manager/providers/*`：列表 / 新增 / 编辑 / 查看（headers 键值对格式化展示）/ 启停；禁用前二次确认。
+  - **模型定价管理** `/manager/models/*`：列表（后端按 provider/model 模糊搜索）/ 新增 / 编辑 / 删除。
+  - **全平台充值记录** `/manager/recharge/records/list`：JOIN users 拿用户名和操作人名，支持按用户名/账号/备注模糊搜索。
+  - **全局统计** `/manager/usage/stats` `/manager/usage/filters`：不限定 user_id，支持 `group_by=user` 维度；筛选下拉含用户列表；复用现有图表框架。
+  - **仪表盘** `/manager/dashboard`：8 个指标卡（用户数/Key数/今日请求/今日费用/今日输入Token/今日输出Token/今日总Token/今日缓存命中率）+ 近 7 天趋势图（6 指标切换：费用/请求数/输入Token/输出Token/总Token/缓存命中率）。
+  - **API Key 管理（超管版）** `/manager/apikeys/*`（无 `/self` 后缀）：超管管理指定用户的 Key，不校验归属，额度校验用 Key 归属用户的余额。
+  - **角色列表** `/manager/roles/list`：用于分配角色弹窗。
+  - 数据库变更：新增 `menus` / `role_menus` 表；`roles` 表去掉 `description` 列、新增 `code` 列；`users` 表去掉 `updated_at` 列；`recharge_records` 查询 JOIN users 返回 `user_name` / `operator_name`。
+  - 业务码新增：`CodeAccountExists(1011)` / `CodeProviderExists(1012)` / `CodeProviderNotFound(1013)` / `CodeModelExists(1014)` / `CodeModelNotFound(1015)`。
+  - 新增 `sql/init-data.sql` 独立存放初始数据（角色/权限/菜单/角色菜单），用 `INSERT OR IGNORE` 可重复执行。
+
 ### 2026-07-20
 
 - Token 用量统计增强。

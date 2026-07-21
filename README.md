@@ -168,12 +168,16 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
 
 ### 核心数据表
 
-- `providers`：上游 Provider 配置
+- `providers`：上游提供商配置
 - `api_keys`：调用方 API Key
 - `usage_records`：Token 用量记录
 - `request_logs`：请求日志与错误信息
+- `users` / `roles` / `user_roles` / `role_permission` / `user_sessions`：用户/角色/权限/会话
+- `menus` / `role_menus`：菜单与角色菜单关联
+- `recharge_records`：充值流水
+- `models`：模型定价配置
 
-可通过 `sql/sqlite.sql` 查看完整 DDL。
+可通过 `sql/sqlite.sql` 查看完整 DDL，初始数据参考 `sql/init-data.sql`。
 
 ## 日志与调试
 
@@ -211,11 +215,19 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 采用接口级权限 `(role_id, entity, action, value)`，存于 `role_permission` 表：
 - `entity`：资源类型，如 `API`
 - `action`：操作，如 `*`（通配，暂未启用细粒度，保留字段）
-- `value`：资源标识，即接口路径，如 `/manager/self`
+- `value`：资源标识，即接口路径，如 `/manager/self`；特殊值 `*` 为超管通配，放行所有接口
 - 用户经 `user_roles` 关联多个角色，权限取并集
-- 判定规则：当前请求路径 `c.Path()` 命中某条 `(entity=API, value=path)` 即通过；否则 403
+- 判定规则：当前请求路径 `c.Path()` 命中某条 `(entity=API, value=path)` 即通过；`value='*'` 直接放行所有接口；否则 403
 
-即"某角色被授权某接口路径，就能访问该接口"。`self` / `all` 的区分由**接口本身**承担（如 `/manager/recharge/self` 只作用于自己，`/manager/recharge` 由管理员给任意用户充值）。
+即"某角色被授权某接口路径，就能访问该接口"。admin 角色配一条 `('API', '*', '*')` 即可访问全部超管接口；普通用户按接口路径精确授权（最小权限原则）。`/self` 后缀表示用户自助接口（只操作自己的数据），不加 `/self` 为超管接口。
+
+### 菜单模型
+
+侧栏菜单由后端驱动，存于 `menus` 表，通过 `role_menus` 与角色关联：
+- `/manager/self` 接口返回当前用户的菜单树（按 `parent_id` 组装）
+- 前端 `Home.vue` 动态渲染，不硬编码
+- 菜单形态：有 `children` 为分组容器（点击展开）；无 `children` 且 `path` 非空为直接跳转；`path` 为空为纯标题
+- 登录后默认跳转第一个可导航菜单
 
 ### 接口一览
 
@@ -238,40 +250,56 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/usage/stats/self` | Token 用量统计，body `{mode, start_date, end_date, api_key_id(可选), model(可选), provider(可选), group_by(可选: model/provider/api_key)}`，返回 `{summary:{request_count, input_tokens, output_tokens, cached_tokens, cache_miss_tokens, reasoning_tokens, total_tokens, cache_hit_rate, total_cost, avg_cost}, rows:[{label, ...}]}` | 是 |
 | `POST /manager/usage/filters/self` | 获取筛选选项（用过的 api_key / model / provider 列表）| 是 |
 
+#### 超管接口（需 admin 角色）
+
+| 路径 | 说明 |
+|------|------|
+| `POST /manager/users/list` | 用户列表（含角色），body `{keyword}` 按姓名/账号搜索 |
+| `POST /manager/users/create` | 创建用户，body `{name, account, password, budget, unlimited}` |
+| `POST /manager/users/update` | 编辑用户（账号不可改），body `{id, name, budget, unlimited}` |
+| `POST /manager/users/toggle` | 启停用户，body `{id}` |
+| `POST /manager/users/reset-password` | 重置密码，body `{id, password}` |
+| `POST /manager/users/assign-roles` | 分配角色，body `{id, role_ids}` |
+| `POST /manager/roles/list` | 角色列表 |
+| `POST /manager/providers/list` | 提供商列表 |
+| `POST /manager/providers/create` | 新增提供商，body `{type, domain, headers}` |
+| `POST /manager/providers/update` | 编辑提供商（type 不可改），body `{type, domain, headers}` |
+| `POST /manager/providers/toggle` | 启停提供商，body `{type}` |
+| `POST /manager/models/list` | 模型定价列表，body `{provider, model}` 模糊搜索 |
+| `POST /manager/models/create` | 新增模型定价 |
+| `POST /manager/models/update` | 编辑模型定价（provider+model 不可改） |
+| `POST /manager/models/delete` | 删除模型定价 |
+| `POST /manager/apikeys/list` | 查指定用户的 API Key，body `{user_id}` |
+| `POST /manager/apikeys/toggle` | 启停指定用户的 Key，body `{id}` |
+| `POST /manager/apikeys/delete` | 删除指定用户的 Key，body `{id}` |
+| `POST /manager/apikeys/rename` | 重命名指定用户的 Key，body `{id, name}` |
+| `POST /manager/apikeys/budget` | 修改指定用户 Key 额度，body `{id, budget, unlimited}` |
+| `POST /manager/recharge/records/list` | 全平台充值流水，body `{keyword}` 按用户名/账号/备注搜索 |
+| `POST /manager/usage/stats` | 全局统计，body `{mode, start_date, end_date, user_id(可选), api_key_id(可选), model(可选), provider(可选), group_by(可选: user/model/provider/api_key)}` |
+| `POST /manager/usage/filters` | 全局筛选选项（含用户列表） |
+| `POST /manager/dashboard` | 仪表盘：汇总指标 + 近 7 天趋势 |
+
+> admin 角色配一条 `role_permission('API', '*', '*')` 即可访问全部超管接口。
+
 ### 初始化管理员
 
-执行 `sql/sqlite.sql` 建表后，手动插入角色、权限与初始管理员（`password` 列写 bcrypt 哈希）：
+执行 `sql/sqlite.sql` 建表后，再执行 `sql/init-data.sql` 初始化角色、权限、菜单等种子数据（用 `INSERT OR IGNORE` 可重复执行）：
+
+```bash
+sqlite3 ~/.aiapi/aiapi.db < sql/sqlite.sql
+sqlite3 ~/.aiapi/aiapi.db < sql/init-data.sql
+```
+
+`init-data.sql` 包含：
+- 2 个角色：`admin`（管理员）/ `user`（普通用户）
+- admin 角色一条通配权限 `('API', '*', '*')`，放行所有超管接口
+- user 角色按接口路径精确授权（自助接口）
+- 10 条菜单及角色菜单关联
+
+最后手动创建管理员账号（`password` 列写 bcrypt 哈希）：
 
 ```sql
-INSERT INTO roles (name, description) VALUES ('admin', '管理员');
-INSERT INTO roles (name, description) VALUES ('user',  '普通用户');
--- admin.id=1, user.id=2
-INSERT INTO role_permission (role_id, entity, action, value) VALUES
-  (1, 'API', '*', '/manager/self'),
-  (1, 'API', '*', '/manager/recharge'),
-  (1, 'API', '*', '/manager/recharge/records'),
-  (1, 'API', '*', '/manager/recharge/records/self'),
-  (1, 'API', '*', '/manager/models'),
-  (1, 'API', '*', '/manager/apikeys/list/self'),
-  (1, 'API', '*', '/manager/apikeys/create/self'),
-  (1, 'API', '*', '/manager/apikeys/toggle/self'),
-  (1, 'API', '*', '/manager/apikeys/delete/self'),
-  (1, 'API', '*', '/manager/apikeys/rename/self'),
-  (1, 'API', '*', '/manager/apikeys/budget/self'),
-  (1, 'API', '*', '/manager/usage/stats/self'),
-  (1, 'API', '*', '/manager/usage/filters/self'),
-  (2, 'API', '*', '/manager/self'),
-  (2, 'API', '*', '/manager/recharge/self'),
-  (2, 'API', '*', '/manager/recharge/records/self'),
-  (2, 'API', '*', '/manager/apikeys/list/self'),
-  (2, 'API', '*', '/manager/apikeys/create/self'),
-  (2, 'API', '*', '/manager/apikeys/toggle/self'),
-  (2, 'API', '*', '/manager/apikeys/delete/self'),
-  (2, 'API', '*', '/manager/apikeys/rename/self'),
-  (2, 'API', '*', '/manager/apikeys/budget/self'),
-  (2, 'API', '*', '/manager/usage/stats/self'),
-  (2, 'API', '*', '/manager/usage/filters/self');
-INSERT INTO users (name, account, password, enabled) VALUES ('管理员', 'admin', '<bcrypt-hash>', 1);
+INSERT INTO users (name, account, password, unlimited, enabled) VALUES ('管理员', 'admin', '<bcrypt-hash>', 1, 1);
 INSERT INTO user_roles (user_id, role_id) VALUES ((SELECT id FROM users WHERE account='admin'), 1);
 ```
 
