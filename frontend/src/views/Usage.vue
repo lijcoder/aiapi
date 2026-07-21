@@ -137,7 +137,7 @@ const stats = ref([])
 // 顶部汇总指标
 const summary = ref({ request_count: 0, input_tokens: 0, output_tokens: 0, cached_tokens: 0, cache_miss_tokens: 0, reasoning_tokens: 0, total_tokens: 0, total_cost: 0, avg_cost: 0 })
 
-function fmtNum(n) { return n ? Number(n).toLocaleString() : '-' }
+function fmtNum(n) { return n != null ? Number(n).toLocaleString() : '-' }
 function fNum(n) { return (n || 0).toLocaleString() }
 function fmtCost(n) { return n != null ? '¥' + fix4(n) : '-' }
 
