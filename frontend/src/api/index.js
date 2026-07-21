@@ -107,3 +107,21 @@ export function assignRoles(id, roleIds) {
 export function listRoles() {
   return request('/roles/list')
 }
+
+// ===== 超管：Provider 管理 =====
+
+export function listProviders() {
+  return request('/providers/list')
+}
+
+export function createProvider(type, domain, headers) {
+  return request('/providers/create', { type, domain, headers })
+}
+
+export function updateProvider(type, domain, headers) {
+  return request('/providers/update', { type, domain, headers })
+}
+
+export function toggleProvider(type) {
+  return request('/providers/toggle', { type })
+}

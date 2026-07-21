@@ -45,4 +45,10 @@ func Register(g *echo.Group) {
 	g.POST("/users/reset-password", base.Wrap(handler.ResetPassword))
 	g.POST("/users/assign-roles", base.Wrap(handler.AssignRoles))
 	g.POST("/roles/list", base.Wrap(handler.ListRoles))
+
+	// 超管：Provider 管理
+	g.POST("/providers/list", base.Wrap(handler.ListProviders))
+	g.POST("/providers/create", base.Wrap(handler.CreateProvider))
+	g.POST("/providers/update", base.Wrap(handler.UpdateProvider))
+	g.POST("/providers/toggle", base.Wrap(handler.ToggleProvider))
 }

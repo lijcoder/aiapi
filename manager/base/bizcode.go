@@ -29,6 +29,8 @@ var (
 	CodeApiKeyNotFound = BizCode{1009, 404}
 	CodeBudgetExceeded = BizCode{1010, 400}
 	CodeAccountExists  = BizCode{1011, 400}
+	CodeProviderExists  = BizCode{1012, 400}
+	CodeProviderNotFound = BizCode{1013, 404}
 )
 
 const InternalServerError = "internal server error"
