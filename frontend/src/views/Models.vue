@@ -26,7 +26,7 @@ const loading = ref(false)
 
 async function load() {
   loading.value = true
-  try { models.value = await listModels() } catch {} finally { loading.value = false }
+  try { models.value = (await listModels()) || [] } catch {} finally { loading.value = false }
 }
 
 function formatTime(t) {

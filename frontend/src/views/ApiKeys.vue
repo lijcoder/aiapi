@@ -314,7 +314,7 @@ async function doSaveBudget() {
 
 async function loadKeys() {
   tableLoading.value = true
-  try { keys.value = await listMyApiKeys() } catch (e) {
+  try { keys.value = (await listMyApiKeys()) || [] } catch (e) {
     message.error(e.msg || '加载失败')
   } finally { tableLoading.value = false }
 }

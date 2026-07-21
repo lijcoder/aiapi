@@ -70,7 +70,7 @@ const tableLoading = ref(false)
 
 async function loadRecords() {
   tableLoading.value = true
-  try { records.value = await rechargeSelfRecords() } catch {} finally { tableLoading.value = false }
+  try { records.value = (await rechargeSelfRecords()) || [] } catch {} finally { tableLoading.value = false }
 }
 
 function formatTime(t) {
