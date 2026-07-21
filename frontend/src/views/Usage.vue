@@ -218,6 +218,7 @@ const chartMetric = ref('cost')
 
 useChart(chartEl, [stats, chartMetric], (chart) => {
   const rows = stats.value
+  if (!rows || !rows.length) { chart.clear(); return }
   if (!query.groupBy) {
     chart.setOption(buildTimeTrendOption(rows, chartMetric.value), true)
   } else {
