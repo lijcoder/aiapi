@@ -1,8 +1,8 @@
 <template>
   <div>
-    <n-card title="Provider 管理" size="small">
+    <n-card title="提供商管理" size="small">
       <template #header-extra>
-        <n-button size="small" type="primary" @click="openCreate">新增 Provider</n-button>
+        <n-button size="small" type="primary" @click="openCreate">新增提供商</n-button>
       </template>
       <n-data-table
         :columns="columns"
@@ -16,7 +16,7 @@
     </n-card>
 
     <!-- 新增/编辑弹窗 -->
-    <n-modal v-model:show="showForm" preset="card" :title="formType==='create'?'新增 Provider':'编辑 Provider'" style="width:560px" :mask-closable="false">
+    <n-modal v-model:show="showForm" preset="card" :title="formType==='create'?'新增提供商':'编辑提供商'" style="width:560px" :mask-closable="false">
       <div style="display:flex;flex-direction:column;gap:14px">
         <div>
           <div style="font-size:13px;margin-bottom:6px">标识 type</div>
@@ -47,7 +47,7 @@
     </n-modal>
 
     <!-- 查看弹窗 -->
-    <n-modal v-model:show="showView" preset="card" title="Provider 配置详情" style="width:560px">
+    <n-modal v-model:show="showView" preset="card" title="提供商配置详情" style="width:560px">
       <div v-if="viewItem" style="display:flex;flex-direction:column;gap:16px">
         <div>
           <div style="font-size:13px;color:#909399;margin-bottom:4px">标识</div>
@@ -84,11 +84,12 @@
 
 <script setup>
 import { ref, h, onMounted } from 'vue'
-import { NCard, NDataTable, NModal, NInput, NButton, NSpace, NTag, useMessage } from 'naive-ui'
+import { NCard, NDataTable, NModal, NInput, NButton, NSpace, NTag, useMessage, useDialog } from 'naive-ui'
 import { listProviders, createProvider, updateProvider, toggleProvider } from '../../api'
 import { formatTime } from '../../utils'
 
 const message = useMessage()
+const dialog = useDialog()
 
 const providers = ref([])
 const tableLoading = ref(false)
@@ -188,10 +189,28 @@ async function doSubmit() {
 }
 
 async function onToggle(r) {
+  if (r.enabled) {
+    dialog.warning({
+      title: '确认禁用',
+      content: `确定禁用提供商「${r.type}」吗？禁用后该上游将无法被调用。`,
+      positiveText: '禁用',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        try {
+          await toggleProvider(r.type)
+          await load()
+          message.success('已禁用')
+        } catch (e) {
+          message.error(e.msg || '操作失败')
+        }
+      }
+    })
+    return
+  }
   try {
     await toggleProvider(r.type)
     await load()
-    message.success(r.enabled ? '已禁用' : '已启用')
+    message.success('已启用')
   } catch (e) {
     message.error(e.msg || '操作失败')
   }

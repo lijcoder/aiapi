@@ -296,10 +296,29 @@ async function doEdit() {
 }
 
 async function onToggle(r) {
+  if (r.enabled) {
+    // 禁用前确认
+    dialog.warning({
+      title: '确认禁用',
+      content: `确定禁用用户「${r.name || r.account}」吗？禁用后该用户将无法登录和调用模型。`,
+      positiveText: '禁用',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        try {
+          await toggleUser(r.id)
+          await load()
+          message.success('已禁用')
+        } catch (e) {
+          message.error(e.msg || '操作失败')
+        }
+      }
+    })
+    return
+  }
   try {
     await toggleUser(r.id)
     await load()
-    message.success(r.enabled ? '已禁用' : '已启用')
+    message.success('已启用')
   } catch (e) {
     message.error(e.msg || '操作失败')
   }

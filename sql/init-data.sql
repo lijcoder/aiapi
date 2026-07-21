@@ -31,7 +31,7 @@ INSERT OR IGNORE INTO menus (id, parent_id, name, path, sort_order) VALUES
   (4,  0, '充值中心',     '/recharge',        4),
   (5,  0, '仪表盘',       '/admin/dashboard', 5),
   (6,  0, '用户管理',     '/admin/users',     6),
-  (7,  0, 'Provider管理', '/admin/providers', 7),
+  (7,  0, '提供商管理', '/admin/providers', 7),
   (8,  0, '模型定价',     '/admin/models',    8),
   (9,  0, '全局统计',     '/admin/usage',     9),
   (10, 0, '充值记录',     '/admin/recharge',  10);
