@@ -8,12 +8,27 @@
 ### 2026-07-20
 
 - Token 用量统计增强。
-  - 统计新增字段：缓存命中 Token (`cached_tokens`)、缓存未命中 Token (`cache_miss_tokens`)、推理 Token (`reasoning_tokens`)，表格与顶部指标均已覆盖。
+  - 统计新增字段：缓存命中 Token (`cached_tokens`)、缓存未命中 Token (`cache_miss_tokens`)、推理 Token (`reasoning_tokens`)、缓存命中率 (`cache_hit_rate` = cached_tokens / input_tokens)，表格与顶部指标均已覆盖。
   - 接口响应结构调整：`/usage/stats/self` 改为返回 `{summary, rows}`，顶部汇总由后端计算。
   - 按 api_key 分组时，已删除的 key 名称标记为红色（「已删除」）。
   - 日期查询改为左闭右闭（`00:00:00 ~ 23:59:59`），按天模式含结束日全天数据。
   - 空结果时 `rows` 返回 `[]` 而非 `null`，前端兜底处理。
   - 移除 `/usage/detail/self` 接口相关代码。
+
+- 新增 ECharts 图表功能。
+  - 时间趋势：费用折线图 / 总 Token 多线面积图 + 费用双轴 / 缓存命中面积图 / 缓存命中率百分比折线图。
+  - 按维度（模型/提供商/Key）：环形图展示占比；比率指标用水平柱状图。
+  - 支持 费用/总Token/缓存命中/缓存命中率 四个指标切换。
+  - 图表代码重构为可复用模块：`composables/useChart.js`（生命周期）、`charts.js`（option 构建器）。
+  - 依赖新增 `echarts`。
+
+- 前端统一优化。
+  - 金额格式化统一用 `fix4`（提取到 `utils.js`），时间格式化 `formatTime` 提取到 `utils.js`。
+  - 所有页面 `n-data-table` 风格对齐：`bordered=false`、`size=small`、`scroll-x` 防溢出、时间列 `ellipsis` 防换行。
+  - 充值流水操作人展示 `users.name`（`ListRechargeRecords` LEFT JOIN users）。
+  - 充值/模型/密钥页面空数据 `|| []` 兜底，避免 null 导致页面卡死。
+  - 默认首页改为使用统计，默认按月查询当月数据，修复 UTC 时区导致日期偏差。
+  - 侧栏菜单顺序：使用统计 → API 密钥 → 模型列表 → 充值中心。
 
 - 新增 Token 用量与费用统计功能。
   - 新增管理接口（均需登录 + 接口授权）：

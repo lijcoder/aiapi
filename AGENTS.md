@@ -132,6 +132,23 @@
 4. 侧栏菜单：在 `frontend/src/views/Home.vue` 的 `<nav>` 中加 `<router-link>`。
 5. 发布：`make build-all`，Go 二进制自动嵌入 `frontend/dist/`。
 
+#### 前端公共模块
+
+| 模块 | 路径 | 职责 |
+|------|------|------|
+| 工具函数 | `frontend/src/utils.js` | `fix4`（金额格式化，4 位小数去尾 0）、`formatTime`（时间格式化） |
+| 图表选项 | `frontend/src/charts.js` | ECharts option 构建器、`metricConfig` 指标配置 |
+| 图表生命周期 | `frontend/src/composables/useChart.js` | ECharts init/resize/dispose，`watch` 数据自动重绘 |
+
+#### 表格风格统一
+
+所有页面使用 `n-data-table` 时保持一致：
+- `:bordered="false"` `size="small"` — 无边框紧凑风格
+- 列宽超出容器时加 `:scroll-x="总宽"` 防溢出
+- 金额列统一用 `fix4()` 格式化
+- 时间列统一用 `formatTime()` + `ellipsis: { tooltip: true }` 防换行
+- 空数据兜底 `value = (await xxx()) || []`
+
 ## 8. 测试与质量
 
 - 新增 handler 应配套单元测试，优先覆盖失败路径。

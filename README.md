@@ -235,7 +235,7 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/apikeys/delete/self` | 删除 API Key，body `{id}` | 是 |
 | `POST /manager/apikeys/rename/self` | 重命名 API Key，body `{id, name}` | 是 |
 | `POST /manager/apikeys/budget/self` | 修改 API Key 额度/限额模式，body `{id, budget, unlimited}`，有限额 key 总和不能超过账户余额 | 是 |
-| `POST /manager/usage/stats/self` | Token 用量统计，body `{mode, start_date, end_date, api_key_id(可选), model(可选), provider(可选), group_by(可选: model/provider/api_key)}`，返回 `{summary:{request_count, input_tokens, output_tokens, cached_tokens, cache_miss_tokens, reasoning_tokens, total_tokens, total_cost, avg_cost}, rows:[{label, ...}]}` | 是 |
+| `POST /manager/usage/stats/self` | Token 用量统计，body `{mode, start_date, end_date, api_key_id(可选), model(可选), provider(可选), group_by(可选: model/provider/api_key)}`，返回 `{summary:{request_count, input_tokens, output_tokens, cached_tokens, cache_miss_tokens, reasoning_tokens, total_tokens, cache_hit_rate, total_cost, avg_cost}, rows:[{label, ...}]}` | 是 |
 | `POST /manager/usage/filters/self` | 获取筛选选项（用过的 api_key / model / provider 列表）| 是 |
 
 ### 初始化管理员
@@ -252,9 +252,25 @@ INSERT INTO role_permission (role_id, entity, action, value) VALUES
   (1, 'API', '*', '/manager/recharge/records'),
   (1, 'API', '*', '/manager/recharge/records/self'),
   (1, 'API', '*', '/manager/models'),
+  (1, 'API', '*', '/manager/apikeys/list/self'),
+  (1, 'API', '*', '/manager/apikeys/create/self'),
+  (1, 'API', '*', '/manager/apikeys/toggle/self'),
+  (1, 'API', '*', '/manager/apikeys/delete/self'),
+  (1, 'API', '*', '/manager/apikeys/rename/self'),
+  (1, 'API', '*', '/manager/apikeys/budget/self'),
+  (1, 'API', '*', '/manager/usage/stats/self'),
+  (1, 'API', '*', '/manager/usage/filters/self'),
   (2, 'API', '*', '/manager/self'),
   (2, 'API', '*', '/manager/recharge/self'),
-  (2, 'API', '*', '/manager/recharge/records/self');
+  (2, 'API', '*', '/manager/recharge/records/self'),
+  (2, 'API', '*', '/manager/apikeys/list/self'),
+  (2, 'API', '*', '/manager/apikeys/create/self'),
+  (2, 'API', '*', '/manager/apikeys/toggle/self'),
+  (2, 'API', '*', '/manager/apikeys/delete/self'),
+  (2, 'API', '*', '/manager/apikeys/rename/self'),
+  (2, 'API', '*', '/manager/apikeys/budget/self'),
+  (2, 'API', '*', '/manager/usage/stats/self'),
+  (2, 'API', '*', '/manager/usage/filters/self');
 INSERT INTO users (name, account, password, enabled) VALUES ('管理员', 'admin', '<bcrypt-hash>', 1);
 INSERT INTO user_roles (user_id, role_id) VALUES ((SELECT id FROM users WHERE account='admin'), 1);
 ```
