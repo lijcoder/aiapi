@@ -102,7 +102,7 @@ const message = useMessage()
 const loading = ref(false)
 
 const query = reactive({
-  mode: 'day',
+  mode: 'month',
   startDate: '',
   endDate: '',
   apiKeyId: null,
@@ -121,13 +121,14 @@ function initDefaultDates() {
     query.startDate = fmtDate(start)
     query.endDate = fmtDate(now)
   } else {
-    query.startDate = fmtMonth(now)
+    const start = new Date(now.getFullYear(), now.getMonth(), 1)
+    query.startDate = fmtMonth(start)
     query.endDate = fmtMonth(now)
   }
 }
 
-function fmtDate(d) { return d.toISOString().slice(0, 10) }
-function fmtMonth(d) { return d.toISOString().slice(0, 7) }
+function fmtDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
+function fmtMonth(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') }
 function onModeChange() { initDefaultDates() }
 
 const stats = ref([])
@@ -197,5 +198,6 @@ async function loadFilters() {
 onMounted(() => {
   initDefaultDates()
   loadFilters()
+  doQuery()
 })
 </script>
