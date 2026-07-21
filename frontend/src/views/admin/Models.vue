@@ -2,7 +2,12 @@
   <div>
     <n-card title="模型定价" size="small">
       <template #header-extra>
-        <n-button size="small" type="primary" @click="openCreate">新增模型</n-button>
+        <n-space align="center">
+          <n-input v-model:value="providerKw" placeholder="提供商" size="small" clearable style="width:140px" @keydown.enter="load" @clear="load" />
+          <n-input v-model:value="modelKw" placeholder="模型" size="small" clearable style="width:160px" @keydown.enter="load" @clear="load" />
+          <n-button size="small" @click="load">查询</n-button>
+          <n-button size="small" type="primary" @click="openCreate">新增模型</n-button>
+        </n-space>
       </template>
       <n-data-table
         :columns="columns"
@@ -73,6 +78,8 @@ const dialog = useDialog()
 
 const models = ref([])
 const tableLoading = ref(false)
+const providerKw = ref('')
+const modelKw = ref('')
 
 // 新增/编辑
 const showForm = ref(false)
@@ -119,7 +126,7 @@ function fmtK(n) {
 async function load() {
   tableLoading.value = true
   try {
-    const data = await listModelsAdmin()
+    const data = await listModelsAdmin(providerKw.value, modelKw.value)
     models.value = data?.models || []
   } catch (e) {
     message.error(e.msg || '加载失败')

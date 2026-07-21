@@ -128,8 +128,8 @@ export function toggleProvider(type) {
 
 // ===== 超管：模型定价管理 =====
 
-export function listModelsAdmin() {
-  return request('/models/list')
+export function listModelsAdmin(provider, model) {
+  return request('/models/list', { provider: provider || '', model: model || '' })
 }
 
 export function createModel(data) {

@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/lijcoder/aiapi/store/model"
 )
@@ -33,10 +34,25 @@ func (ms *ModelStore) Get(provider, name string) (*model.Model, error) {
 	return &p, nil
 }
 
-// List 查询全部模型定价配置
-func (ms *ModelStore) List() ([]model.Model, error) {
+// List 查询全部模型定价配置，支持按 provider/model 模糊搜索
+func (ms *ModelStore) List(providerKw, modelKw string) ([]model.Model, error) {
+	q := `SELECT * FROM models`
+	args := map[string]any{}
+	var conds []string
+	if providerKw != "" {
+		conds = append(conds, "provider LIKE :provider_kw")
+		args["provider_kw"] = "%" + providerKw + "%"
+	}
+	if modelKw != "" {
+		conds = append(conds, "model LIKE :model_kw")
+		args["model_kw"] = "%" + modelKw + "%"
+	}
+	if len(conds) > 0 {
+		q += " WHERE " + strings.Join(conds, " AND ")
+	}
+	q += " ORDER BY provider, model"
 	var models []model.Model
-	err := ms.s.Query(`SELECT * FROM models ORDER BY provider, model`, nil).Select(&models)
+	err := ms.s.Query(q, args).Select(&models)
 	if err != nil {
 		return nil, err
 	}
