@@ -31,6 +31,8 @@ var (
 	CodeAccountExists  = BizCode{1011, 400}
 	CodeProviderExists  = BizCode{1012, 400}
 	CodeProviderNotFound = BizCode{1013, 404}
+	CodeModelExists    = BizCode{1014, 400}
+	CodeModelNotFound  = BizCode{1015, 404}
 )
 
 const InternalServerError = "internal server error"

@@ -125,3 +125,21 @@ export function updateProvider(type, domain, headers) {
 export function toggleProvider(type) {
   return request('/providers/toggle', { type })
 }
+
+// ===== 超管：模型定价管理 =====
+
+export function listModelsAdmin() {
+  return request('/models/list')
+}
+
+export function createModel(data) {
+  return request('/models/create', data)
+}
+
+export function updateModel(data) {
+  return request('/models/update', data)
+}
+
+export function deleteModel(id) {
+  return request('/models/delete', { id })
+}

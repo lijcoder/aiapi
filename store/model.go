@@ -42,3 +42,72 @@ func (ms *ModelStore) List() ([]model.Model, error) {
 	}
 	return models, nil
 }
+
+// GetByID 按 ID 查询模型定价
+func (ms *ModelStore) GetByID(id int64) (*model.Model, error) {
+	var m model.Model
+	err := ms.s.Query(
+		`SELECT * FROM models WHERE id = :id`,
+		map[string]any{"id": id},
+	).Get(&m)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// Create 新增模型定价，回填 ID
+func (ms *ModelStore) Create(m *model.Model) error {
+	res, err := ms.s.Query(
+		`INSERT INTO models (provider, model, input_cache_hit_price, input_cache_miss_price, output_price, max_context_tokens, max_completion_tokens)
+		 VALUES (:provider, :model, :input_cache_hit_price, :input_cache_miss_price, :output_price, :max_context_tokens, :max_completion_tokens)`,
+		map[string]any{
+			"provider":               m.Provider,
+			"model":                  m.Model,
+			"input_cache_hit_price":  m.InputCacheHitPrice,
+			"input_cache_miss_price": m.InputCacheMissPrice,
+			"output_price":           m.OutputPrice,
+			"max_context_tokens":     m.MaxContextTokens,
+			"max_completion_tokens":  m.MaxCompletionTokens,
+		},
+	).Exec()
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	m.ID = id
+	return nil
+}
+
+// Update 更新模型定价（provider+model 不可改）
+func (ms *ModelStore) Update(m *model.Model) error {
+	_, err := ms.s.Query(
+		`UPDATE models SET input_cache_hit_price=:input_cache_hit_price, input_cache_miss_price=:input_cache_miss_price,
+		 output_price=:output_price, max_context_tokens=:max_context_tokens, max_completion_tokens=:max_completion_tokens
+		 WHERE id=:id`,
+		map[string]any{
+			"id":                     m.ID,
+			"input_cache_hit_price":  m.InputCacheHitPrice,
+			"input_cache_miss_price": m.InputCacheMissPrice,
+			"output_price":           m.OutputPrice,
+			"max_context_tokens":     m.MaxContextTokens,
+			"max_completion_tokens":  m.MaxCompletionTokens,
+		},
+	).Exec()
+	return err
+}
+
+// Delete 删除模型定价
+func (ms *ModelStore) Delete(id int64) error {
+	_, err := ms.s.Query(
+		`DELETE FROM models WHERE id = :id`,
+		map[string]any{"id": id},
+	).Exec()
+	return err
+}
