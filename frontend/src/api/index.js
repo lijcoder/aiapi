@@ -165,3 +165,9 @@ export function renameUserApiKey(id, name) {
 export function updateUserApiKeyBudget(id, budget, unlimited) {
   return request('/apikeys/budget', { id, budget, unlimited })
 }
+
+// ===== 超管：全平台充值流水 =====
+
+export function listAllRechargeRecords(keyword) {
+  return request('/recharge/records/list', { keyword: keyword || '' })
+}

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"log/slog"
+	"strings"
 
 	"github.com/lijcoder/aiapi/manager/base"
 	"github.com/lijcoder/aiapi/store"
@@ -100,6 +101,21 @@ func RechargeSelfRecords(ctx context.Context) ([]model.RechargeRecord, *base.Biz
 func RechargeRecords(ctx context.Context, req *RecordsReq) ([]model.RechargeRecord, *base.BizError) {
 	recs, err := store.C().Charge().ListRechargeRecords(req.UserID)
 	if err != nil {
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	return recs, nil
+}
+
+// ListRechargeReq 全平台充值流水查询请求
+type ListRechargeReq struct {
+	Keyword string `json:"keyword"` // 按用户名/账号/备注模糊搜索
+}
+
+// ListRechargeRecords 超管查询全平台充值流水
+func ListRechargeRecords(ctx context.Context, req *ListRechargeReq) ([]model.RechargeRecord, *base.BizError) {
+	recs, err := store.C().Charge().ListAllRechargeRecords(strings.TrimSpace(req.Keyword))
+	if err != nil {
+		slog.Error("[Recharge] ListAll failed", "err", err)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
 	return recs, nil

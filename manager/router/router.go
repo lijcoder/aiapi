@@ -64,4 +64,7 @@ func Register(g *echo.Group) {
 	g.POST("/apikeys/delete", base.Wrap(handler.DeleteApiKeyAdmin))
 	g.POST("/apikeys/rename", base.Wrap(handler.RenameApiKeyAdmin))
 	g.POST("/apikeys/budget", base.Wrap(handler.UpdateBudgetApiKeyAdmin))
+
+	// 超管：全平台充值流水
+	g.POST("/recharge/records/list", base.Wrap(handler.ListRechargeRecords))
 }

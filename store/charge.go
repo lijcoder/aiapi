@@ -1,6 +1,8 @@
 package store
 
 import (
+	"strings"
+
 	"github.com/lijcoder/aiapi/store/model"
 )
 
@@ -102,13 +104,20 @@ func (cs *ChargeStore) ListRechargeRecords(userID int64) ([]model.RechargeRecord
 	return recs, nil
 }
 
-// ListAllRechargeRecords 查询全部充值流水（倒序）
-func (cs *ChargeStore) ListAllRechargeRecords() ([]model.RechargeRecord, error) {
+// ListAllRechargeRecords 查询全部充值流水（倒序），支持按用户名/账号/备注模糊搜索
+func (cs *ChargeStore) ListAllRechargeRecords(keyword string) ([]model.RechargeRecord, error) {
+	q := `SELECT r.*, u.name AS operator_name, u2.name AS user_name
+		 FROM recharge_records r
+		 LEFT JOIN users u ON r.operator = u.account
+		 LEFT JOIN users u2 ON r.user_id = u2.id`
+	args := map[string]any{}
+	if kw := strings.TrimSpace(keyword); kw != "" {
+		q += ` WHERE u2.name LIKE :kw OR u2.account LIKE :kw OR r.remark LIKE :kw`
+		args["kw"] = "%" + kw + "%"
+	}
+	q += ` ORDER BY r.id DESC`
 	var recs []model.RechargeRecord
-	err := cs.s.Query(
-		`SELECT * FROM recharge_records ORDER BY id DESC`,
-		nil,
-	).Select(&recs)
+	err := cs.s.Query(q, args).Select(&recs)
 	if err != nil {
 		return nil, err
 	}
