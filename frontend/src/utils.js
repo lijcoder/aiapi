@@ -4,3 +4,9 @@ export function fix4(n) {
   if (n == null) return '-'
   return Number(n).toFixed(4).replace(/\.?0+$/, '')
 }
+
+// formatTime 格式化时间字符串
+export function formatTime(t) {
+  if (!t || t.startsWith('0001')) return '-'
+  return t.replace('T', ' ').substring(0, 19)
+}

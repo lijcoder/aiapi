@@ -150,6 +150,7 @@ type RechargeRecord struct {
 	BalanceBefore float64   `db:"balance_before" json:"balance_before"`
 	BalanceAfter  float64   `db:"balance_after" json:"balance_after"`
 	Operator      string    `db:"operator" json:"operator"`
+	OperatorName  string    `db:"operator_name" json:"operator_name,omitempty"`
 	Remark        string    `db:"remark" json:"remark"`
 	CreatedAt     time.Time `db:"created_at" json:"created_at"`
 }

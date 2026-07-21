@@ -93,7 +93,7 @@ func (cs *ChargeStore) RechargeWithRecord(userID int64, amount float64, operator
 func (cs *ChargeStore) ListRechargeRecords(userID int64) ([]model.RechargeRecord, error) {
 	var recs []model.RechargeRecord
 	err := cs.s.Query(
-		`SELECT * FROM recharge_records WHERE user_id = :user_id ORDER BY id DESC`,
+		`SELECT r.*, u.name AS operator_name FROM recharge_records r LEFT JOIN users u ON r.operator = u.account WHERE r.user_id = :user_id ORDER BY r.id DESC`,
 		map[string]any{"user_id": userID},
 	).Select(&recs)
 	if err != nil {

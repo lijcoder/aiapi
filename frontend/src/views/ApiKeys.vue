@@ -4,7 +4,7 @@
       <template #header-extra>
         <n-button type="primary" size="small" @click="openCreate">创建密钥</n-button>
       </template>
-      <n-data-table :columns="columns" :data="keys" :loading="tableLoading" :bordered="false" size="small" style="width:100%" />
+      <n-data-table :columns="columns" :data="keys" :loading="tableLoading" :bordered="false" size="small" :scroll-x="970" style="width:100%" />
     </n-card>
 
     <!-- 创建弹窗 -->
@@ -96,7 +96,7 @@ import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NAler
 import { CreateOutline } from '@vicons/ionicons5'
 import { listMyApiKeys, createApiKey, toggleApiKey, deleteApiKey, renameApiKey, updateApiKeyBudget } from '../api'
 import { useUser } from '../stores/user'
-import { fix4 } from '../utils'
+import { fix4, formatTime } from '../utils'
 
 const message = useMessage()
 const { user } = useUser()
@@ -165,7 +165,7 @@ const columns = [
   { title: 'Key', key: 'key', width: 200, render(r){ return h('code', { style:'font-size:12px;color:#555' }, r.key) } },
   { title: '额度', key: 'budget', width: 110, render(r){ return r.unlimited ? h(NTag,{size:'small',type:'success'},{default:()=>'无限'}) : '¥ ' + fix4(r.budget) } },
   { title: '状态', key: 'enabled', width: 90, render(r){ return r.enabled ? h(NTag,{size:'small',type:'success'},{default:()=>'启用'}) : h(NTag,{size:'small',type:'error'},{default:()=>'禁用'}) } },
-  { title: '创建时间', key: 'created_at', width: 170 },
+  { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) } },
   {
     title: '操作', key: 'actions', width: 210, fixed: 'right',
     render(r) {

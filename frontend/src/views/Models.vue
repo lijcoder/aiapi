@@ -1,6 +1,6 @@
 <template>
   <n-card title="模型列表" size="small">
-    <n-data-table :columns="columns" :data="models" :loading="loading" :bordered="false" size="small" style="width:100%" />
+    <n-data-table :columns="columns" :data="models" :loading="loading" :bordered="false" size="small" :scroll-x="960" style="width:100%" />
   </n-card>
 </template>
 
@@ -8,17 +8,17 @@
 import { ref, onMounted } from 'vue'
 import { NCard, NDataTable } from 'naive-ui'
 import { listModels } from '../api'
-import { fix4 } from '../utils'
+import { fix4, formatTime } from '../utils'
 
 const columns = [
-  { title: '提供商', key: 'provider', width: 120 },
-  { title: '模型', key: 'model', width: 200 },
-  { title: '缓存命中价（元/百万token）', key: 'input_cache_hit_price', width: 140, render(r) { return fix4(r.input_cache_hit_price) }},
-  { title: '缓存未命中价（元/百万token）', key: 'input_cache_miss_price', width: 150, render(r) { return fix4(r.input_cache_miss_price) }},
-  { title: '输出价（元/百万token）', key: 'output_price', width: 120, render(r) { return fix4(r.output_price) }},
-  { title: '上下文token', key: 'max_context_tokens', width: 90, render(r) { return r.max_context_tokens ? (r.max_context_tokens/1024).toFixed(1).replace(/0+$/,'').replace(/\.$/,'')+'K' : '-' }},
-  { title: '最大输出token', key: 'max_completion_tokens', width: 90, render(r) { return r.max_completion_tokens ? (r.max_completion_tokens/1024).toFixed(1).replace(/0+$/,'').replace(/\.$/,'')+'K' : '-' }},
-  { title: '创建时间', key: 'created_at', width: 170, render(r) { return formatTime(r.created_at) }},
+  { title: '提供商', key: 'provider', width: 110 },
+  { title: '模型', key: 'model', width: 200, ellipsis: { tooltip: true } },
+  { title: '缓存命中价', key: 'input_cache_hit_price', width: 110, render(r) { return '¥' + fix4(r.input_cache_hit_price) }},
+  { title: '缓存未命中价', key: 'input_cache_miss_price', width: 120, render(r) { return '¥' + fix4(r.input_cache_miss_price) }},
+  { title: '输出价', key: 'output_price', width: 100, render(r) { return '¥' + fix4(r.output_price) }},
+  { title: '上下文', key: 'max_context_tokens', width: 80, render(r) { return r.max_context_tokens ? (r.max_context_tokens/1024).toFixed(1).replace(/0+$/,'').replace(/\.$/,'')+'K' : '-' }},
+  { title: '最大输出', key: 'max_completion_tokens', width: 80, render(r) { return r.max_completion_tokens ? (r.max_completion_tokens/1024).toFixed(1).replace(/0+$/,'').replace(/\.$/,'')+'K' : '-' }},
+  { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) }},
 ]
 
 const models = ref([])
@@ -27,11 +27,6 @@ const loading = ref(false)
 async function load() {
   loading.value = true
   try { models.value = (await listModels()) || [] } catch {} finally { loading.value = false }
-}
-
-function formatTime(t) {
-  if (!t || t.startsWith('0001')) return '-'
-  return t.replace('T',' ').substring(0,19)
 }
 
 onMounted(() => load())
