@@ -57,4 +57,11 @@ func Register(g *echo.Group) {
 	g.POST("/models/create", base.Wrap(handler.CreateModel))
 	g.POST("/models/update", base.Wrap(handler.UpdateModel))
 	g.POST("/models/delete", base.Wrap(handler.DeleteModel))
+
+	// 超管：管理指定用户的 API Key
+	g.POST("/apikeys/list", base.Wrap(handler.ListApiKeyAdmin))
+	g.POST("/apikeys/toggle", base.Wrap(handler.ToggleApiKeyAdmin))
+	g.POST("/apikeys/delete", base.Wrap(handler.DeleteApiKeyAdmin))
+	g.POST("/apikeys/rename", base.Wrap(handler.RenameApiKeyAdmin))
+	g.POST("/apikeys/budget", base.Wrap(handler.UpdateBudgetApiKeyAdmin))
 }

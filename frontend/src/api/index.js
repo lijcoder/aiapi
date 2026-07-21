@@ -143,3 +143,25 @@ export function updateModel(data) {
 export function deleteModel(id) {
   return request('/models/delete', { id })
 }
+
+// ===== 超管：管理指定用户的 API Key =====
+
+export function listUserApiKeys(userId) {
+  return request('/apikeys/list', { user_id: userId })
+}
+
+export function toggleUserApiKey(id) {
+  return request('/apikeys/toggle', { id })
+}
+
+export function deleteUserApiKey(id) {
+  return request('/apikeys/delete', { id })
+}
+
+export function renameUserApiKey(id, name) {
+  return request('/apikeys/rename', { id, name })
+}
+
+export function updateUserApiKeyBudget(id, budget, unlimited) {
+  return request('/apikeys/budget', { id, budget, unlimited })
+}

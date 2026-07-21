@@ -140,11 +140,14 @@
 
 <script setup>
 import { ref, h, onMounted } from 'vue'
-import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NTag, NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, useMessage } from 'naive-ui'
+import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NTag, NDropdown, NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, useMessage, useDialog } from 'naive-ui'
+import { useRouter } from 'vue-router'
 import { listUsers, createUser, updateUser, toggleUser, resetPassword as resetPasswordApi, assignRoles, rechargeAdmin, listRoles } from '../../api'
 import { fix4, formatTime } from '../../utils'
 
 const message = useMessage()
+const dialog = useDialog()
+const router = useRouter()
 
 const users = ref([])
 const allRoles = ref([])
@@ -192,13 +195,28 @@ const columns = [
     return r.enabled ? h(NTag, { size:'small', type:'success' }, { default: () => '启用' }) : h(NTag, { size:'small', type:'error' }, { default: () => '禁用' })
   }},
   { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) } },
-  { title: '操作', key: 'actions', width: 360, fixed: 'right', render(r) {
+  { title: '操作', key: 'actions', width: 160, fixed: 'right', render(r) {
+    const moreOptions = [
+      { label: '重置密码', key: 'reset' },
+      { label: '分配角色', key: 'assign' },
+      { label: '充值', key: 'recharge' },
+      { label: 'API Key', key: 'apikeys' },
+    ]
+    function onSelect(key) {
+      if (key === 'reset') openReset(r)
+      else if (key === 'assign') openAssign(r)
+      else if (key === 'recharge') openRecharge(r)
+      else if (key === 'apikeys') goApiKeys(r)
+    }
     return h(NSpace, { size: 6 }, () => [
       h(NButton, { size: 'small', tertiary: true, type: 'info', onClick: () => openEdit(r) }, () => '编辑'),
-      h(NButton, { size: 'small', tertiary: true, type: r.enabled ? 'warning' : 'success', onClick: () => onToggle(r) }, () => r.enabled ? '禁用' : '启用'),
-      h(NButton, { size: 'small', tertiary: true, onClick: () => openReset(r) }, () => '重置密码'),
-      h(NButton, { size: 'small', tertiary: true, type: 'primary', onClick: () => openAssign(r) }, () => '分配角色'),
-      h(NButton, { size: 'small', tertiary: true, type: 'success', onClick: () => openRecharge(r) }, () => '充值'),
+      h(NButton, {
+        size: 'small', tertiary: true, type: r.enabled ? 'warning' : 'success',
+        onClick: () => onToggle(r)
+      }, () => r.enabled ? '禁用' : '启用'),
+      h(NDropdown, { options: moreOptions, trigger: 'click', onSelect: (k) => onSelect(k) }, {
+        default: () => h(NButton, { size: 'small', tertiary: true }, () => '更多')
+      }),
     ])
   }},
 ]
@@ -322,6 +340,10 @@ async function doAssign() {
   } catch (e) {
     message.error(e.msg || '保存失败')
   } finally { submitting.value = false }
+}
+
+function goApiKeys(r) {
+  router.push(`/admin/users/${r.id}/apikeys`)
 }
 
 function openRecharge(r) {

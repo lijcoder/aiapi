@@ -42,6 +42,12 @@ type ApiKeyIdReq struct {
 	ID int64 `json:"id"`
 }
 
+// ApiKeyAdminReq 超管管理指定用户的 API Key 请求
+
+type ApiKeyAdminReq struct {
+	UserID int64 `json:"user_id"`
+}
+
 // RenameApiKeyReq 改名请求
 type RenameApiKeyReq struct {
 	ID   int64  `json:"id"`
@@ -292,6 +298,132 @@ func UpdateBudgetApiKeySelf(ctx context.Context, req *UpdateBudgetApiKeyReq) (*a
 	}
 	// 校验有限额 key 的总额不超过用户余额（排除当前 key 原值）
 	if berr := checkBudgetWithinUserLimit(cur, k.ID, req.Budget, req.Unlimited); berr != nil {
+		return nil, berr
+	}
+	if err := store.C().ApiKey().UpdateBudget(k.ID, req.Budget, req.Unlimited); err != nil {
+		slog.Error("update api key budget failed", "err", err, "id", k.ID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	k.Budget = req.Budget
+	k.Unlimited = req.Unlimited
+	item := toApiKeyItem(*k, true)
+	return &item, nil
+}
+
+// ===== 超管：管理指定用户的 API Key =====
+
+// ListApiKeyAdmin 超管查询指定用户的 API Key 列表（key 脱敏）
+func ListApiKeyAdmin(ctx context.Context, req *ApiKeyAdminReq) ([]apiKeyItem, *base.BizError) {
+	if req.UserID <= 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "user_id is required")
+	}
+	keys, err := store.C().ApiKey().ListByUser(req.UserID)
+	if err != nil {
+		slog.Error("list api keys failed", "err", err, "user_id", req.UserID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	items := make([]apiKeyItem, 0, len(keys))
+	for _, k := range keys {
+		items = append(items, toApiKeyItem(k, true))
+	}
+	return items, nil
+}
+
+// ToggleApiKeyAdmin 超管启用/禁用指定用户的 API Key
+func ToggleApiKeyAdmin(ctx context.Context, req *ApiKeyIdReq) (*apiKeyItem, *base.BizError) {
+	if req.ID <= 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+	}
+	k, err := store.C().ApiKey().GetByID(req.ID)
+	if err != nil {
+		slog.Error("get api key failed", "err", err, "id", req.ID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if k == nil {
+		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+	}
+	if err := store.C().ApiKey().SetEnabled(k.ID, !k.Enabled); err != nil {
+		slog.Error("toggle api key failed", "err", err, "id", k.ID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	k.Enabled = !k.Enabled
+	item := toApiKeyItem(*k, true)
+	return &item, nil
+}
+
+// DeleteApiKeyAdmin 超管删除指定用户的 API Key
+func DeleteApiKeyAdmin(ctx context.Context, req *ApiKeyIdReq) (*struct{}, *base.BizError) {
+	if req.ID <= 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+	}
+	k, err := store.C().ApiKey().GetByID(req.ID)
+	if err != nil {
+		slog.Error("get api key failed", "err", err, "id", req.ID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if k == nil {
+		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+	}
+	if err := store.C().ApiKey().Delete(k.ID); err != nil {
+		slog.Error("delete api key failed", "err", err, "id", k.ID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	return &struct{}{}, nil
+}
+
+// RenameApiKeyAdmin 超管重命名指定用户的 API Key
+func RenameApiKeyAdmin(ctx context.Context, req *RenameApiKeyReq) (*apiKeyItem, *base.BizError) {
+	if req.ID <= 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return nil, base.NewBizError(base.CodeInvalidParams, "name is required")
+	}
+	if len(name) > 64 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "name too long")
+	}
+	k, err := store.C().ApiKey().GetByID(req.ID)
+	if err != nil {
+		slog.Error("get api key failed", "err", err, "id", req.ID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if k == nil {
+		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+	}
+	if err := store.C().ApiKey().UpdateName(k.ID, name); err != nil {
+		slog.Error("rename api key failed", "err", err, "id", k.ID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	k.Name = name
+	item := toApiKeyItem(*k, true)
+	return &item, nil
+}
+
+// UpdateBudgetApiKeyAdmin 超管修改指定用户的 API Key 额度。
+// 按 key 归属的用户余额校验总额。
+func UpdateBudgetApiKeyAdmin(ctx context.Context, req *UpdateBudgetApiKeyReq) (*apiKeyItem, *base.BizError) {
+	if req.ID <= 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+	}
+	if req.Budget < 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "budget must be >= 0")
+	}
+	k, err := store.C().ApiKey().GetByID(req.ID)
+	if err != nil {
+		slog.Error("get api key failed", "err", err, "id", req.ID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if k == nil {
+		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+	}
+	// 用 key 归属用户做额度校验
+	owner, err := store.C().User().GetByIDAny(k.UserID)
+	if err != nil || owner == nil {
+		slog.Error("get key owner failed", "err", err, "user_id", k.UserID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if berr := checkBudgetWithinUserLimit(owner, k.ID, req.Budget, req.Unlimited); berr != nil {
 		return nil, berr
 	}
 	if err := store.C().ApiKey().UpdateBudget(k.ID, req.Budget, req.Unlimited); err != nil {
