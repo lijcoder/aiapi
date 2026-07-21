@@ -71,6 +71,19 @@ func (ks *ApiKeyStore) ListByUser(userID int64) ([]model.ApiKey, error) {
 	return keys, nil
 }
 
+// ListAll 查询全部 API Key（admin 场景）
+func (ks *ApiKeyStore) ListAll() ([]model.ApiKey, error) {
+	var keys []model.ApiKey
+	err := ks.s.Query(
+		`SELECT * FROM api_keys ORDER BY id DESC`,
+		nil,
+	).Select(&keys)
+	if err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
 // Create 创建 API Key，回填 ID
 func (ks *ApiKeyStore) Create(k *model.ApiKey) error {
 	res, err := ks.s.Query(

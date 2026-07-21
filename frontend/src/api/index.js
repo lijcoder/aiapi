@@ -171,3 +171,17 @@ export function updateUserApiKeyBudget(id, budget, unlimited) {
 export function listAllRechargeRecords(keyword) {
   return request('/recharge/records/list', { keyword: keyword || '' })
 }
+
+// ===== 超管：全局统计 =====
+
+export function usageStatsAdmin(mode, startDate, endDate, userId, apiKeyId, model, provider, groupBy) {
+  return request('/usage/stats', {
+    mode, start_date: startDate, end_date: endDate,
+    user_id: userId || 0, api_key_id: apiKeyId || 0,
+    model: model || '', provider: provider || '', group_by: groupBy || ''
+  })
+}
+
+export function usageFiltersAdmin() {
+  return request('/usage/filters')
+}

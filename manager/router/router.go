@@ -67,4 +67,8 @@ func Register(g *echo.Group) {
 
 	// 超管：全平台充值流水
 	g.POST("/recharge/records/list", base.Wrap(handler.ListRechargeRecords))
+
+	// 超管：全局统计
+	g.POST("/usage/stats", base.Wrap(handler.UsageStatsAdmin))
+	g.POST("/usage/filters", base.Wrap(handler.UsageFiltersAdmin))
 }
