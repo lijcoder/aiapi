@@ -2,10 +2,10 @@
   <div class="layout">
     <div class="sidebar">
       <div class="brand">AI API</div>
-      <router-link to="/recharge" class="menu-item">充值中心</router-link>
-      <router-link to="/models" class="menu-item">模型列表</router-link>
-      <router-link to="/apikeys" class="menu-item">API 密钥</router-link>
       <router-link to="/usage" class="menu-item">使用统计</router-link>
+      <router-link to="/apikeys" class="menu-item">API 密钥</router-link>
+      <router-link to="/models" class="menu-item">模型列表</router-link>
+      <router-link to="/recharge" class="menu-item">充值中心</router-link>
     </div>
     <div class="main">
       <div class="topbar">
