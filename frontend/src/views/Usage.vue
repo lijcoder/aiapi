@@ -32,6 +32,10 @@
           <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.reasoning_tokens) }}</div>
         </div>
         <div style="text-align:center">
+          <div style="font-size:12px;color:#909399">缓存命中率</div>
+          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fmtRate(summary.cache_hit_rate) }}</div>
+        </div>
+        <div style="text-align:center">
           <div style="font-size:12px;color:#909399">总费用</div>
           <div style="font-size:15px;font-weight:600;margin-top:2px">¥{{ fix4(summary.total_cost) }}</div>
         </div>
@@ -94,9 +98,10 @@
           <n-radio-button value="cost">费用</n-radio-button>
           <n-radio-button value="total_tokens">总Token</n-radio-button>
           <n-radio-button value="cached_tokens">缓存命中</n-radio-button>
+          <n-radio-button value="cache_hit_rate">缓存命中率</n-radio-button>
         </n-radio-group>
       </div>
-      <n-data-table :columns="cols" :data="stats" :loading="loading" :bordered="false" size="small" style="width:100%" />
+      <n-data-table :columns="cols" :data="stats" :loading="loading" :bordered="false" size="small" :scroll-x="1200" style="width:100%" />
     </n-card>
   </div>
 </template>
@@ -145,11 +150,12 @@ function onModeChange() { initDefaultDates() }
 const stats = ref([])
 
 // 顶部汇总指标
-const summary = ref({ request_count: 0, input_tokens: 0, output_tokens: 0, cached_tokens: 0, cache_miss_tokens: 0, reasoning_tokens: 0, total_tokens: 0, total_cost: 0, avg_cost: 0 })
+const summary = ref({ request_count: 0, input_tokens: 0, output_tokens: 0, cached_tokens: 0, cache_miss_tokens: 0, reasoning_tokens: 0, total_tokens: 0, cache_hit_rate: 0, total_cost: 0, avg_cost: 0 })
 
 function fmtNum(n) { return n != null ? Number(n).toLocaleString() : '-' }
 function fNum(n) { return (n || 0).toLocaleString() }
 function fmtCost(n) { return n != null ? '¥' + fix4(n) : '-' }
+function fmtRate(n) { return n != null ? (n * 100).toFixed(1) + '%' : '-' }
 
 function labelTitle() {
   switch (query.groupBy) {
@@ -161,7 +167,7 @@ function labelTitle() {
 }
 
 const cols = computed(() => [
-  { title: labelTitle(), key: 'label', width: 180, ellipsis: { tooltip: true },
+  { title: labelTitle(), key: 'label', width: 180, ellipsis: { tooltip: true }, fixed: 'left',
     render(r) {
       if (query.groupBy !== 'api_key') return r.label
       const deleted = r.key_exists === false
@@ -178,6 +184,7 @@ const cols = computed(() => [
   { title: '缓存未命中', key: 'cache_miss_tokens', width: 110, render(r) { return fmtNum(r.cache_miss_tokens) }, sorter: (a, b) => a.cache_miss_tokens - b.cache_miss_tokens },
   { title: '推理Token', key: 'reasoning_tokens', width: 110, render(r) { return fmtNum(r.reasoning_tokens) }, sorter: (a, b) => a.reasoning_tokens - b.reasoning_tokens },
   { title: '总Token', key: 'total_tokens', width: 120, render(r) { return fmtNum(r.total_tokens) }, sorter: (a, b) => a.total_tokens - b.total_tokens },
+  { title: '缓存命中率', key: 'cache_hit_rate', width: 110, render(r) { return fmtRate(r.cache_hit_rate) }, sorter: (a, b) => a.cache_hit_rate - b.cache_hit_rate },
   { title: '费用', key: 'cost', width: 130, render(r) { return fmtCost(r.cost) }, sorter: (a, b) => a.cost - b.cost }
 ])
 

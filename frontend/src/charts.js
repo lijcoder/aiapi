@@ -6,7 +6,8 @@ import { fix4 } from './utils'
 export const metricConfig = {
   cost: { label: '费用', prefix: '¥', format: v => fix4(v) },
   total_tokens: { label: '总Token', prefix: '', format: v => Number(v).toLocaleString() },
-  cached_tokens: { label: '缓存命中', prefix: '', format: v => Number(v).toLocaleString() }
+  cached_tokens: { label: '缓存命中', prefix: '', format: v => Number(v).toLocaleString() },
+  cache_hit_rate: { label: '缓存命中率', prefix: '', format: v => (v * 100).toFixed(1) + '%', isRate: true }
 }
 
 // ===== 通用 tooltip formatter =====
@@ -21,7 +22,10 @@ function axisFormatter(ps) {
 }
 
 function pieFormatter(mc) {
-  return p => p.name + '<br/>' + mc.label + ': ' + mc.prefix + mc.format(p.value) + '<br/>占比: ' + p.percent + '%'
+  return p => {
+    const fullName = p.name
+    return fullName + '<br/>' + mc.label + ': ' + mc.prefix + mc.format(p.value) + '<br/>占比: ' + p.percent + '%'
+  }
 }
 
 // ===== 渐变面积样式 =====
@@ -69,6 +73,18 @@ export function buildTimeTrendOption(rows, metric) {
     }
   }
 
+  if (metric === 'cache_hit_rate') {
+    return {
+      tooltip: { trigger: 'axis', formatter: ps => ps[0].axisValue + '<br/>' + ps[0].marker + '缓存命中率: ' + (ps[0].value * 100).toFixed(1) + '%' },
+      grid: { top: 20, left: 64, right: 16, bottom: 28 },
+      xAxis: { type: 'category', data: labels, axisLabel: { fontSize: 11 }, boundaryGap: false },
+      yAxis: { type: 'value', min: 0, max: 1, axisLabel: { fontSize: 11, formatter: v => (v * 100).toFixed(0) + '%' } },
+      series: [
+        { name: '缓存命中率', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, data: rows.map(r => r.cache_hit_rate), lineStyle: { width: 2.5, color: '#73d13d' }, itemStyle: { color: '#73d13d' }, areaStyle: { color: gradientArea(115, 209, 61) } }
+      ]
+    }
+  }
+
   // total_tokens：多线 + 费用双轴
   return {
     tooltip: { trigger: 'axis', formatter: axisFormatter },
@@ -103,6 +119,21 @@ export function buildDimensionOption(rows, metric, summary) {
   const sorted = [...rows].sort((a, b) => (b[metric] || 0) - (a[metric] || 0))
   const total = sorted.reduce((s, r) => s + (Number(r[metric]) || 0), 0)
 
+  // 比率指标用水平柱状图
+  if (mc.isRate) {
+    const labels = sorted.map(r => r.sub_label || r.label)
+    return {
+      tooltip: { trigger: 'axis', formatter: ps => ps[0].axisValue + '<br/>' + ps[0].marker + mc.label + ': ' + mc.format(ps[0].value) },
+      grid: { top: 20, left: 140, right: 16, bottom: 28 },
+      xAxis: { type: 'value', min: 0, max: 1, axisLabel: { fontSize: 11, formatter: v => (v * 100).toFixed(0) + '%' } },
+      yAxis: { type: 'category', data: labels, axisLabel: { fontSize: 11, width: 120, overflow: 'truncate' } },
+      series: [
+        { name: mc.label, type: 'bar', data: sorted.map(r => Number(r[metric]) || 0), itemStyle: { color: '#73d13d', borderRadius: [0, 4, 4, 0] }, label: { show: true, position: 'right', formatter: p => mc.format(p.value), fontSize: 11 } }
+      ]
+    }
+  }
+
+  // 非比率指标用环形图
   return {
     tooltip: { trigger: 'item', formatter: pieFormatter(mc) },
     legend: { top: 0, type: 'scroll' },
@@ -112,7 +143,10 @@ export function buildDimensionOption(rows, metric, summary) {
       center: ['50%', '56%'],
       avoidLabelOverlap: true,
       itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
-      label: { formatter: p => p.name + '\n' + mc.prefix + mc.format(p.value), fontSize: 11 },
+      label: { formatter: p => {
+          const n = p.name.length > 10 ? p.name.slice(0, 10) + '…' : p.name
+          return n + '\n' + mc.prefix + mc.format(p.value)
+        }, fontSize: 11 },
       emphasis: { label: { fontSize: 13, fontWeight: 'bold' } },
       data: sorted.map(r => ({
         name: r.sub_label || r.label,

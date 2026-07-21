@@ -45,6 +45,7 @@ type UsageSummary struct {
 	CacheMissTokens int64   `json:"cache_miss_tokens"`
 	ReasoningTokens int64   `json:"reasoning_tokens"`
 	TotalTokens     int64   `json:"total_tokens"`
+	CacheHitRate    float64 `json:"cache_hit_rate"`
 	TotalCost       float64 `json:"total_cost"`
 	AvgCost         float64 `json:"avg_cost"`
 }
@@ -189,6 +190,9 @@ func UsageStatsSelf(ctx context.Context, req *UsageStatsSelfReq) (*UsageStatsSel
 	}
 	if s.RequestCount > 0 {
 		s.AvgCost = s.TotalCost / float64(s.RequestCount)
+	}
+	if s.InputTokens > 0 {
+		s.CacheHitRate = float64(s.CachedTokens) / float64(s.InputTokens)
 	}
 
 	if rows == nil {

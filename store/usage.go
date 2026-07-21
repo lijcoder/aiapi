@@ -47,6 +47,7 @@ type UsageStatRow struct {
 	CacheMissTokens int64   `db:"cache_miss_tokens" json:"cache_miss_tokens"`
 	ReasoningTokens int64   `db:"reasoning_tokens" json:"reasoning_tokens"`
 	TotalTokens     int64   `db:"total_tokens" json:"total_tokens"`
+	CacheHitRate    float64 `db:"cache_hit_rate" json:"cache_hit_rate"`
 	Cost            float64 `db:"cost" json:"cost"`
 	RequestCount    int64   `db:"request_count" json:"request_count"`
 }
@@ -80,7 +81,7 @@ func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate, apiKey
 	}
 
 	query := fmt.Sprintf(
-		`SELECT %s AS label, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, SUM(cached_tokens) AS cached_tokens, SUM(input_tokens) - SUM(cached_tokens) AS cache_miss_tokens, SUM(reasoning_tokens) AS reasoning_tokens, SUM(total_tokens) AS total_tokens, SUM(cost) AS cost, COUNT(*) AS request_count FROM usage_records %s GROUP BY %s ORDER BY label`,
+		`SELECT %s AS label, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, SUM(cached_tokens) AS cached_tokens, SUM(input_tokens) - SUM(cached_tokens) AS cache_miss_tokens, SUM(reasoning_tokens) AS reasoning_tokens, SUM(total_tokens) AS total_tokens, ROUND(CAST(SUM(cached_tokens) AS REAL) / NULLIF(SUM(input_tokens), 0), 4) AS cache_hit_rate, SUM(cost) AS cost, COUNT(*) AS request_count FROM usage_records %s GROUP BY %s ORDER BY label`,
 		labelExpr, where, groupExpr,
 	)
 
