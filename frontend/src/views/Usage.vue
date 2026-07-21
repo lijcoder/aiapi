@@ -88,6 +88,14 @@
           <n-radio-button value="api_key">按 Key</n-radio-button>
         </n-radio-group>
       </template>
+      <div ref="chartEl" style="width:100%;height:340px;margin-bottom:16px" />
+      <div style="display:flex;justify-content:center;margin-bottom:12px">
+        <n-radio-group v-model:value="chartMetric" size="small">
+          <n-radio-button value="cost">费用</n-radio-button>
+          <n-radio-button value="total_tokens">总Token</n-radio-button>
+          <n-radio-button value="cached_tokens">缓存命中</n-radio-button>
+        </n-radio-group>
+      </div>
       <n-data-table :columns="cols" :data="stats" :loading="loading" :bordered="false" size="small" style="width:100%" />
     </n-card>
   </div>
@@ -98,6 +106,8 @@ import { ref, reactive, computed, onMounted, h } from 'vue'
 import { NCard, NDataTable, NInput, NSelect, NButton, NRadioGroup, NRadio, NRadioButton, useMessage } from 'naive-ui'
 import { usageStats, usageFilters } from '../api'
 import { fix4 } from '../utils'
+import { useChart } from '../composables/useChart'
+import { buildTimeTrendOption, buildDimensionOption, metricConfig } from '../charts'
 
 const message = useMessage()
 const loading = ref(false)
@@ -195,6 +205,18 @@ async function loadFilters() {
     filterOpts.providers = (data.providers || []).map(p => ({ label: p, value: p }))
   } catch { /* ignore */ }
 }
+
+const chartEl = ref(null)
+const chartMetric = ref('cost')
+
+useChart(chartEl, [stats, chartMetric], (chart) => {
+  const rows = stats.value
+  if (!query.groupBy) {
+    chart.setOption(buildTimeTrendOption(rows, chartMetric.value), true)
+  } else {
+    chart.setOption(buildDimensionOption(rows, chartMetric.value, summary.value), true)
+  }
+})
 
 onMounted(() => {
   initDefaultDates()
