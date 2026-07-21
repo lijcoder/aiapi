@@ -179,6 +179,8 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
 --     (1, 'API', '*', '/manager/apikeys/delete/self'),
 --     (1, 'API', '*', '/manager/apikeys/rename/self'),
 --     (1, 'API', '*', '/manager/apikeys/budget/self'),
+--     (1, 'API', '*', '/manager/usage/stats/self'),
+--     (1, 'API', '*', '/manager/usage/filters/self'),
 --     (2, 'API', '*', '/manager/self'),
 --     (2, 'API', '*', '/manager/recharge/self'),
 --     (2, 'API', '*', '/manager/recharge/records/self'),
@@ -187,7 +189,9 @@ CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
 --     (2, 'API', '*', '/manager/apikeys/toggle/self'),
 --     (2, 'API', '*', '/manager/apikeys/delete/self'),
 --     (2, 'API', '*', '/manager/apikeys/rename/self'),
---     (2, 'API', '*', '/manager/apikeys/budget/self');
+--     (2, 'API', '*', '/manager/apikeys/budget/self'),
+--     (2, 'API', '*', '/manager/usage/stats/self'),
+--     (2, 'API', '*', '/manager/usage/filters/self');
 -- 建管理员账号并分配角色（password 用 bcrypt 生成）：
 --   INSERT INTO users (name, account, password, unlimited, enabled) VALUES ('管理员', 'admin', '<bcrypt-hash>', 1, 1);
 --   INSERT INTO user_roles (user_id, role_id) VALUES ((SELECT id FROM users WHERE account='admin'), 1);

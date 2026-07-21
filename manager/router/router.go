@@ -33,4 +33,7 @@ func Register(g *echo.Group) {
 	g.POST("/apikeys/delete/self", base.Wrap(handler.DeleteApiKeySelf))
 	g.POST("/apikeys/rename/self", base.Wrap(handler.RenameApiKeySelf))
 	g.POST("/apikeys/budget/self", base.Wrap(handler.UpdateBudgetApiKeySelf))
+
+	g.POST("/usage/stats/self", base.Wrap(handler.UsageStatsSelf))
+	g.POST("/usage/filters/self", base.Wrap(handler.UsageFiltersSelf))
 }

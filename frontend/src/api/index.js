@@ -69,3 +69,11 @@ export function rechargeRecords(userId) {
   if (userId) return request('/recharge/records', { userId })
   return request('/recharge/records/self')
 }
+
+export function usageStats(mode, startDate, endDate, apiKeyId, model, provider, groupBy) {
+  return request('/usage/stats/self', { mode, start_date: startDate, end_date: endDate, api_key_id: apiKeyId || 0, model: model || '', provider: provider || '', group_by: groupBy || '' })
+}
+
+export function usageFilters() {
+  return request('/usage/filters/self')
+}

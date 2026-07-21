@@ -7,6 +7,23 @@
 
 ### 2026-07-20
 
+- Token 用量统计增强。
+  - 统计新增字段：缓存命中 Token (`cached_tokens`)、缓存未命中 Token (`cache_miss_tokens`)、推理 Token (`reasoning_tokens`)，表格与顶部指标均已覆盖。
+  - 接口响应结构调整：`/usage/stats/self` 改为返回 `{summary, rows}`，顶部汇总由后端计算。
+  - 按 api_key 分组时，已删除的 key 名称标记为红色（「已删除」）。
+  - 日期查询改为左闭右闭（`00:00:00 ~ 23:59:59`），按天模式含结束日全天数据。
+  - 空结果时 `rows` 返回 `[]` 而非 `null`，前端兜底处理。
+  - 移除 `/usage/detail/self` 接口相关代码。
+
+- 新增 Token 用量与费用统计功能。
+  - 新增管理接口（均需登录 + 接口授权）：
+    `POST /manager/usage/stats/self`、`/usage/filters/self`。
+  - 支持按天/月聚合统计（天模式限31天），可按 api_key / 模型 / 提供商组合筛选。
+  - api_key 筛选用 id 而非完整 key（防泄露）。
+  - `store/usage.go` 新增 `StatsByUser` / `DistinctModelsByUser` / `DistinctProvidersByUser`。
+  - 前端新增「使用统计」页面（`frontend/src/views/Usage.vue`）。
+  - `sql/sqlite.sql` 种子权限注释补充 2 条 `/manager/usage/*/self` 路径。
+
 - 新增个人 API Key 管理功能（用户自助）：列表 / 创建 / 启停 / 删除 / 重命名 / 修改额度。
   - 新增管理接口（均需登录 + 接口授权）：
     `POST /manager/apikeys/list/self`、`/apikeys/create/self`、`/apikeys/toggle/self`、`/apikeys/delete/self`、`/apikeys/rename/self`、`/apikeys/budget/self`。
