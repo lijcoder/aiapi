@@ -27,7 +27,7 @@
           <div style="font-size:13px;margin-bottom:6px">额度金额（最多可设 {{ createBudgetMax }}）</div>
           <n-input-number v-model:value="form.budget" :min="0" :step="1" :status="createBudgetOver ? 'error' : undefined" style="width:100%" />
           <div v-if="createBudgetOver" style="font-size:12px;color:#d03050;margin-top:6px">超出剩余可用额度，最多可设 {{ createBudgetMax }}</div>
-          <div v-else style="font-size:12px;color:#909399;margin-top:6px">所有「限制」密钥的额度总和不能超过账户余额 ¥ {{ user?.budget?.toFixed(2) ?? '0.00' }}</div>
+          <div v-else style="font-size:12px;color:#909399;margin-top:6px">所有「限制」密钥的额度总和不能超过账户余额 ¥ {{ fix4(user?.budget) }}</div>
         </div>
       </div>
       <p v-if="createMsg" :style="{color:'#d03050',fontSize:'13px',marginTop:'8px'}">{{ createMsg }}</p>
@@ -77,7 +77,7 @@
           <div style="font-size:13px;margin-bottom:6px">额度金额（最多可设 {{ budgetMax }}）</div>
           <n-input-number v-model:value="budgetVal" :min="0" :step="1" :status="budgetOver ? 'error' : undefined" style="width:100%" />
           <div v-if="budgetOver" style="font-size:12px;color:#d03050;margin-top:6px">超出剩余可用额度，最多可设 {{ budgetMax }}</div>
-          <div v-else style="font-size:12px;color:#909399;margin-top:6px">所有「限制」密钥的额度总和不能超过账户余额 ¥ {{ user?.budget?.toFixed(2) ?? '0.00' }}</div>
+          <div v-else style="font-size:12px;color:#909399;margin-top:6px">所有「限制」密钥的额度总和不能超过账户余额 ¥ {{ fix4(user?.budget) }}</div>
         </div>
       </div>
       <template #footer>

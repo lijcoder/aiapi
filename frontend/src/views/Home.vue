@@ -10,7 +10,7 @@
     <div class="main">
       <div class="topbar">
         <div class="topbar-right">
-          <span class="balance">¥ {{ user?.budget?.toFixed(2) }}</span>
+          <span class="balance">¥ {{ fix4(user?.budget) }}</span>
           <n-tag size="small">{{ user?.name }}</n-tag>
           <n-button text type="error" size="small" @click="handleLogout">退出</n-button>
         </div>
@@ -27,6 +27,7 @@ import { NTag, NButton } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import { useUser } from '../stores/user'
 import { logout } from '../api'
+import { fix4 } from '../utils'
 
 const router = useRouter()
 const { user, fetchUser } = useUser()

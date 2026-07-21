@@ -33,11 +33,11 @@
         </div>
         <div style="text-align:center">
           <div style="font-size:12px;color:#909399">总费用</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">¥{{ summary.total_cost.toFixed(4) }}</div>
+          <div style="font-size:15px;font-weight:600;margin-top:2px">¥{{ fix4(summary.total_cost) }}</div>
         </div>
         <div style="text-align:center">
           <div style="font-size:12px;color:#909399">单请求平均费用</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">¥{{ summary.avg_cost.toFixed(4) }}</div>
+          <div style="font-size:15px;font-weight:600;margin-top:2px">¥{{ fix4(summary.avg_cost) }}</div>
         </div>
       </div>
     </n-card>
@@ -97,6 +97,7 @@
 import { ref, reactive, computed, onMounted, h } from 'vue'
 import { NCard, NDataTable, NInput, NSelect, NButton, NRadioGroup, NRadio, NRadioButton, useMessage } from 'naive-ui'
 import { usageStats, usageFilters } from '../api'
+import { fix4 } from '../utils'
 
 const message = useMessage()
 const loading = ref(false)
@@ -138,7 +139,7 @@ const summary = ref({ request_count: 0, input_tokens: 0, output_tokens: 0, cache
 
 function fmtNum(n) { return n ? Number(n).toLocaleString() : '-' }
 function fNum(n) { return (n || 0).toLocaleString() }
-function fmtCost(n) { return n != null ? '¥' + Number(n).toFixed(4) : '-' }
+function fmtCost(n) { return n != null ? '¥' + fix4(n) : '-' }
 
 function labelTitle() {
   switch (query.groupBy) {
