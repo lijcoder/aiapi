@@ -197,15 +197,17 @@ const columns = [
   { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) } },
   { title: '操作', key: 'actions', width: 160, fixed: 'right', render(r) {
     const moreOptions = [
+      { label: '充值', key: 'recharge' },
+      { label: '充值记录', key: 'recharge_records' },
+      { label: 'API Key', key: 'apikeys' },
       { label: '重置密码', key: 'reset' },
       { label: '分配角色', key: 'assign' },
-      { label: '充值', key: 'recharge' },
-      { label: 'API Key', key: 'apikeys' },
     ]
     function onSelect(key) {
       if (key === 'reset') openReset(r)
       else if (key === 'assign') openAssign(r)
       else if (key === 'recharge') openRecharge(r)
+      else if (key === 'recharge_records') goRechargeRecords(r)
       else if (key === 'apikeys') goApiKeys(r)
     }
     return h(NSpace, { size: 6 }, () => [
@@ -344,6 +346,10 @@ async function doAssign() {
 
 function goApiKeys(r) {
   router.push(`/admin/users/${r.id}/apikeys`)
+}
+
+function goRechargeRecords(r) {
+  router.push(`/admin/users/${r.id}/recharge`)
 }
 
 function openRecharge(r) {

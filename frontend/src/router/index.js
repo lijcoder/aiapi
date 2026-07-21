@@ -10,6 +10,7 @@ import Usage from '../views/Usage.vue'
 import AdminDashboard from '../views/admin/Dashboard.vue'
 import AdminUsers from '../views/admin/Users.vue'
 import AdminUserApiKeys from '../views/admin/UserApiKeys.vue'
+import AdminUserRecharge from '../views/admin/UserRecharge.vue'
 import AdminProviders from '../views/admin/Providers.vue'
 import AdminModels from '../views/admin/Models.vue'
 import AdminUsage from '../views/admin/Usage.vue'
@@ -31,6 +32,7 @@ const routes = [
       { path: 'admin/dashboard', name: 'AdminDashboard', component: AdminDashboard },
       { path: 'admin/users', name: 'AdminUsers', component: AdminUsers },
       { path: 'admin/users/:id/apikeys', name: 'AdminUserApiKeys', component: AdminUserApiKeys, props: true },
+      { path: 'admin/users/:id/recharge', name: 'AdminUserRecharge', component: AdminUserRecharge, props: true },
       { path: 'admin/providers', name: 'AdminProviders', component: AdminProviders },
       { path: 'admin/models', name: 'AdminModels', component: AdminModels },
       { path: 'admin/usage', name: 'AdminUsage', component: AdminUsage },
