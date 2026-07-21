@@ -185,3 +185,9 @@ export function usageStatsAdmin(mode, startDate, endDate, userId, apiKeyId, mode
 export function usageFiltersAdmin() {
   return request('/usage/filters')
 }
+
+// ===== 超管：仪表盘 =====
+
+export function dashboardOverview() {
+  return request('/dashboard')
+}

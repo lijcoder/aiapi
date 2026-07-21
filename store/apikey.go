@@ -84,6 +84,13 @@ func (ks *ApiKeyStore) ListAll() ([]model.ApiKey, error) {
 	return keys, nil
 }
 
+// Count API Key 总数
+func (ks *ApiKeyStore) Count() (int64, error) {
+	var n int64
+	err := ks.s.Query(`SELECT COUNT(*) FROM api_keys`, nil).Get(&n)
+	return n, err
+}
+
 // Create 创建 API Key，回填 ID
 func (ks *ApiKeyStore) Create(k *model.ApiKey) error {
 	res, err := ks.s.Query(

@@ -80,6 +80,13 @@ func (us *UserStore) List() ([]model.User, error) {
 	return users, nil
 }
 
+// Count 用户总数
+func (us *UserStore) Count() (int64, error) {
+	var n int64
+	err := us.s.Query(`SELECT COUNT(*) FROM users`, nil).Get(&n)
+	return n, err
+}
+
 // Create 创建用户，回填 ID。
 func (us *UserStore) Create(u *model.User) error {
 	res, err := us.s.Query(

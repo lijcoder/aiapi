@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/lijcoder/aiapi/store/model"
 )
@@ -244,4 +245,100 @@ func (us *UsageStore) DistinctUsersByAdmin() ([]UsageUserOption, error) {
 		nil,
 	).Select(&users)
 	return users, err
+}
+
+// DashboardTrendRow 仪表盘趋势行
+type DashboardTrendRow struct {
+	Label        string  `db:"label" json:"label"`
+	Cost         float64 `db:"cost" json:"cost"`
+	Count        int64   `db:"request_count" json:"request_count"`
+	InputTokens  int64   `db:"input_tokens" json:"input_tokens"`
+	OutputTokens int64   `db:"output_tokens" json:"output_tokens"`
+	TotalTokens  int64   `db:"total_tokens" json:"total_tokens"`
+	CachedTokens int64   `db:"cached_tokens" json:"cached_tokens"`
+	CacheHitRate float64 `db:"cache_hit_rate" json:"cache_hit_rate"`
+}
+
+// DashboardSummary 仪表盘汇总指标
+type DashboardSummary struct {
+	UserCount     int64   `db:"user_count" json:"user_count"`
+	ApiKeyCount   int64   `db:"api_key_count" json:"api_key_count"`
+	TodayRequests int64   `db:"today_requests" json:"today_requests"`
+	TodayCost     float64 `db:"today_cost" json:"today_cost"`
+	TodayInput    int64   `json:"today_input"`
+	TodayOutput   int64   `json:"today_output"`
+	TodayTotal    int64   `json:"today_total"`
+	TodayCached   int64   `json:"today_cached"`
+	TodayCacheHit float64 `json:"today_cache_hit"`
+}
+
+// Dashboard 仪表盘：用户数/Key数/今日请求/今日费用 + token 指标 + 7 天费用趋势
+func (us *UsageStore) Dashboard() (*DashboardSummary, []DashboardTrendRow, error) {
+	var s DashboardSummary
+	// 今日各项指标
+	today := time.Now().Format("2006-01-02")
+	todayStart := today + " 00:00:00"
+	todayEnd := today + " 23:59:59"
+	type todayRow struct {
+		Requests int64   `db:"request_count"`
+		Cost     float64 `db:"cost"`
+		Input    int64   `db:"input_tokens"`
+		Output   int64   `db:"output_tokens"`
+		Total    int64   `db:"total_tokens"`
+		Cached   int64   `db:"cached_tokens"`
+	}
+	var t todayRow
+	err := us.s.Query(
+		`SELECT COUNT(*) AS request_count, COALESCE(SUM(cost),0) AS cost,
+			 COALESCE(SUM(input_tokens),0) AS input_tokens,
+			 COALESCE(SUM(output_tokens),0) AS output_tokens,
+			 COALESCE(SUM(total_tokens),0) AS total_tokens,
+			 COALESCE(SUM(cached_tokens),0) AS cached_tokens
+		 FROM usage_records WHERE created_at >= :start AND created_at <= :end`,
+		map[string]any{"start": todayStart, "end": todayEnd},
+	).Get(&t)
+	if err != nil {
+		return nil, nil, err
+	}
+	s.TodayRequests = t.Requests
+	s.TodayCost = t.Cost
+	s.TodayInput = t.Input
+	s.TodayOutput = t.Output
+	s.TodayTotal = t.Total
+	s.TodayCached = t.Cached
+	if t.Input > 0 {
+		s.TodayCacheHit = float64(t.Cached) / float64(t.Input)
+	}
+
+	// 用户数、Key 数
+	userCount, err := us.s.User().Count()
+	if err != nil {
+		return nil, nil, err
+	}
+	s.UserCount = userCount
+	apiKeyCount, err := us.s.ApiKey().Count()
+	if err != nil {
+		return nil, nil, err
+	}
+	s.ApiKeyCount = apiKeyCount
+
+	// 近 7 天趋势（含今天）
+	var rows []DashboardTrendRow
+	err = us.s.Query(
+		`SELECT DATE(created_at) AS label, SUM(cost) AS cost, COUNT(*) AS request_count,
+			 COALESCE(SUM(input_tokens),0) AS input_tokens,
+			 COALESCE(SUM(output_tokens),0) AS output_tokens,
+			 COALESCE(SUM(total_tokens),0) AS total_tokens,
+			 COALESCE(SUM(cached_tokens),0) AS cached_tokens,
+			 ROUND(CAST(SUM(cached_tokens) AS REAL) / NULLIF(SUM(input_tokens), 0), 4) AS cache_hit_rate
+		 FROM usage_records
+		 WHERE created_at >= :start
+		 GROUP BY DATE(created_at)
+		 ORDER BY label`,
+		map[string]any{"start": time.Now().AddDate(0, 0, -6).Format("2006-01-02") + " 00:00:00"},
+	).Select(&rows)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &s, rows, err
 }

@@ -71,4 +71,7 @@ func Register(g *echo.Group) {
 	// 超管：全局统计
 	g.POST("/usage/stats", base.Wrap(handler.UsageStatsAdmin))
 	g.POST("/usage/filters", base.Wrap(handler.UsageFiltersAdmin))
+
+	// 超管：仪表盘
+	g.POST("/dashboard", base.Wrap(handler.Dashboard))
 }
