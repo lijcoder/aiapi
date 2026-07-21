@@ -96,6 +96,7 @@ import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NAler
 import { CreateOutline } from '@vicons/ionicons5'
 import { listMyApiKeys, createApiKey, toggleApiKey, deleteApiKey, renameApiKey, updateApiKeyBudget } from '../api'
 import { useUser } from '../stores/user'
+import { fix4 } from '../utils'
 
 const message = useMessage()
 const { user } = useUser()
@@ -162,7 +163,7 @@ const columns = [
     }
   },
   { title: 'Key', key: 'key', width: 200, render(r){ return h('code', { style:'font-size:12px;color:#555' }, r.key) } },
-  { title: '额度', key: 'budget', width: 110, render(r){ return r.unlimited ? h(NTag,{size:'small',type:'success'},{default:()=>'无限'}) : '¥ '+r.budget } },
+  { title: '额度', key: 'budget', width: 110, render(r){ return r.unlimited ? h(NTag,{size:'small',type:'success'},{default:()=>'无限'}) : '¥ ' + fix4(r.budget) } },
   { title: '状态', key: 'enabled', width: 90, render(r){ return r.enabled ? h(NTag,{size:'small',type:'success'},{default:()=>'启用'}) : h(NTag,{size:'small',type:'error'},{default:()=>'禁用'}) } },
   { title: '创建时间', key: 'created_at', width: 170 },
   {
