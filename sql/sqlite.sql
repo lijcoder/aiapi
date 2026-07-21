@@ -162,36 +162,20 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_sessions_token ON user_sessions(token);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
 
--- ===== 初始数据示例（手动执行；password 列写 bcrypt 哈希）=====
--- 建角色：
---   INSERT INTO roles (name, description) VALUES ('admin', '管理员');
---   INSERT INTO roles (name, description) VALUES ('user',  '普通用户');
--- 建权限（假设 admin.id=1, user.id=2；entity='API', action='*'）：
---   INSERT INTO role_permission (role_id, entity, action, value) VALUES
---     (1, 'API', '*', '/manager/self'),
---     (1, 'API', '*', '/manager/recharge'),
---     (1, 'API', '*', '/manager/recharge/records'),
---     (1, 'API', '*', '/manager/recharge/records/self'),
---     (1, 'API', '*', '/manager/models'),
---     (1, 'API', '*', '/manager/apikeys/list/self'),
---     (1, 'API', '*', '/manager/apikeys/create/self'),
---     (1, 'API', '*', '/manager/apikeys/toggle/self'),
---     (1, 'API', '*', '/manager/apikeys/delete/self'),
---     (1, 'API', '*', '/manager/apikeys/rename/self'),
---     (1, 'API', '*', '/manager/apikeys/budget/self'),
---     (1, 'API', '*', '/manager/usage/stats/self'),
---     (1, 'API', '*', '/manager/usage/filters/self'),
---     (2, 'API', '*', '/manager/self'),
---     (2, 'API', '*', '/manager/recharge/self'),
---     (2, 'API', '*', '/manager/recharge/records/self'),
---     (2, 'API', '*', '/manager/apikeys/list/self'),
---     (2, 'API', '*', '/manager/apikeys/create/self'),
---     (2, 'API', '*', '/manager/apikeys/toggle/self'),
---     (2, 'API', '*', '/manager/apikeys/delete/self'),
---     (2, 'API', '*', '/manager/apikeys/rename/self'),
---     (2, 'API', '*', '/manager/apikeys/budget/self'),
---     (2, 'API', '*', '/manager/usage/stats/self'),
---     (2, 'API', '*', '/manager/usage/filters/self');
--- 建管理员账号并分配角色（password 用 bcrypt 生成）：
---   INSERT INTO users (name, account, password, unlimited, enabled) VALUES ('管理员', 'admin', '<bcrypt-hash>', 1, 1);
---   INSERT INTO user_roles (user_id, role_id) VALUES ((SELECT id FROM users WHERE account='admin'), 1);
+CREATE TABLE IF NOT EXISTS menus (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    parent_id  INTEGER DEFAULT 0,
+    name       TEXT NOT NULL,
+    path       TEXT NOT NULL,
+    icon       TEXT DEFAULT '',
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS role_menus (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_id    INTEGER NOT NULL,
+    menu_id    INTEGER NOT NULL,
+    created_at DATETIME DEFAULT (datetime('now', 'localtime')),
+    UNIQUE(role_id, menu_id)
+);

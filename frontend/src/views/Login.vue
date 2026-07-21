@@ -31,8 +31,10 @@ async function handleLogin() {
   loading.value = true
   try {
     await login(account.value, password.value)
+    const { menus } = useUser()
     await fetchUser()
-    router.replace('/')
+    const first = menus.value?.[0]
+    router.replace(first ? first.path : '/')
   } catch (e) {
     error.value = e.msg || '登录失败'
   } finally { loading.value = false }

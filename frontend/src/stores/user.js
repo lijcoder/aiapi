@@ -3,6 +3,7 @@ import { self } from '../api'
 
 const user = ref(null)
 const permissions = ref([])
+const menus = ref([])
 
 export function useUser() {
   const isLoggedIn = computed(() => user.value !== null)
@@ -15,12 +16,14 @@ export function useUser() {
     const data = await self()
     user.value = data.user
     permissions.value = data.permissions
+    menus.value = data.menus || []
   }
 
   function clearUser() {
     user.value = null
     permissions.value = []
+    menus.value = []
   }
 
-  return { user, permissions, isLoggedIn, hasPath, fetchUser, clearUser }
+  return { user, permissions, menus, isLoggedIn, hasPath, fetchUser, clearUser }
 }

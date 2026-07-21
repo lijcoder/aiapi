@@ -47,6 +47,7 @@ type User struct {
 type Role struct {
 	ID          int64     `db:"id" json:"id"`
 	Name        string    `db:"name" json:"name"`
+	Code        string    `db:"code" json:"code,omitempty"`
 	Description string    `db:"description" json:"description"`
 	CreatedAt   time.Time `db:"created_at" json:"created_at"`
 }
@@ -153,4 +154,23 @@ type RechargeRecord struct {
 	OperatorName  string    `db:"operator_name" json:"operator_name,omitempty"`
 	Remark        string    `db:"remark" json:"remark"`
 	CreatedAt     time.Time `db:"created_at" json:"created_at"`
+}
+
+// Menu 菜单
+type Menu struct {
+	ID        int64     `db:"id" json:"id"`
+	ParentID  int64     `db:"parent_id" json:"parent_id"`
+	Name      string    `db:"name" json:"name"`
+	Path      string    `db:"path" json:"path"`
+	Icon      string    `db:"icon" json:"icon,omitempty"`
+	SortOrder int       `db:"sort_order" json:"sort_order"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+}
+
+// RoleMenu 角色-菜单关联
+type RoleMenu struct {
+	ID        int64     `db:"id" json:"id"`
+	RoleID    int64     `db:"role_id" json:"role_id"`
+	MenuID    int64     `db:"menu_id" json:"menu_id"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
