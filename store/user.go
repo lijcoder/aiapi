@@ -52,7 +52,7 @@ func (us *UserStore) GetByAccount(account string) (*model.User, error) {
 // UpdatePassword 更新用户密码哈希
 func (us *UserStore) UpdatePassword(userID int64, passwordHash string) error {
 	_, err := us.s.Query(
-		`UPDATE users SET password = :password, updated_at = datetime('now','localtime') WHERE id = :user_id`,
+		`UPDATE users SET password = :password WHERE id = :user_id`,
 		map[string]any{"user_id": userID, "password": passwordHash},
 	).Exec()
 	return err
@@ -61,8 +61,77 @@ func (us *UserStore) UpdatePassword(userID int64, passwordHash string) error {
 // SetEnabled 启用/禁用用户
 func (us *UserStore) SetEnabled(userID int64, enabled bool) error {
 	_, err := us.s.Query(
-		`UPDATE users SET enabled = :enabled, updated_at = datetime('now','localtime') WHERE id = :user_id`,
+		`UPDATE users SET enabled = :enabled WHERE id = :user_id`,
 		map[string]any{"user_id": userID, "enabled": enabled},
 	).Exec()
 	return err
+}
+
+// List 列出全部用户（按 id 倒序）。
+func (us *UserStore) List() ([]model.User, error) {
+	var users []model.User
+	err := us.s.Query(
+		`SELECT * FROM users ORDER BY id DESC`,
+		nil,
+	).Select(&users)
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+// Create 创建用户，回填 ID。
+func (us *UserStore) Create(u *model.User) error {
+	res, err := us.s.Query(
+		`INSERT INTO users (name, account, password, budget, unlimited, enabled)
+		 VALUES (:name, :account, :password, :budget, :unlimited, :enabled)`,
+		map[string]any{
+			"name":      u.Name,
+			"account":   u.Account,
+			"password":  u.Password,
+			"budget":    u.Budget,
+			"unlimited": u.Unlimited,
+			"enabled":   u.Enabled,
+		},
+	).Exec()
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+	u.ID = id
+	return nil
+}
+
+// UpdateProfile 更新用户基本信息（姓名、额度、限额模式），账号不可改。
+func (us *UserStore) UpdateProfile(u *model.User) error {
+	_, err := us.s.Query(
+		`UPDATE users SET name=:name, budget=:budget, unlimited=:unlimited
+		 WHERE id=:id`,
+		map[string]any{
+			"id":        u.ID,
+			"name":      u.Name,
+			"budget":    u.Budget,
+			"unlimited": u.Unlimited,
+		},
+	).Exec()
+	return err
+}
+
+// GetByIDAny 按 ID 查询用户（不过滤 enabled），管理员场景使用。
+func (us *UserStore) GetByIDAny(id int64) (*model.User, error) {
+	var u model.User
+	err := us.s.Query(
+		`SELECT * FROM users WHERE id = :id`,
+		map[string]any{"id": id},
+	).Get(&u)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
 }

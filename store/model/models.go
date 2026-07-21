@@ -40,16 +40,14 @@ type User struct {
 	Unlimited bool      `db:"unlimited" json:"unlimited"`
 	Enabled   bool      `db:"enabled" json:"enabled"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }
 
 // Role 角色
 type Role struct {
-	ID          int64     `db:"id" json:"id"`
-	Name        string    `db:"name" json:"name"`
-	Code        string    `db:"code" json:"code,omitempty"`
-	Description string    `db:"description" json:"description"`
-	CreatedAt   time.Time `db:"created_at" json:"created_at"`
+	ID        int64     `db:"id" json:"id"`
+	Name      string    `db:"name" json:"name"`
+	Code      string    `db:"code" json:"code,omitempty"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
 // UserRole 用户-角色关联

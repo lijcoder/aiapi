@@ -13,11 +13,15 @@ const EntityAPI = "API"
 var ErrForbidden = errors.New("forbidden")
 
 // CheckPathPermission 接口级权限判定：
-// 用户任一角色拥有 (entity=API, value=path) 即通过。
+// - 用户任一角色拥有 (entity=API, value=path) 即通过；
+// - 用户任一角色拥有 (entity=API, value=*) 则放行所有接口（超管特权）；
 // action 字段暂按通配处理（保留供后续细粒度）。
 func CheckPathPermission(perms []model.RolePermission, path string) error {
 	for _, p := range perms {
-		if p.Entity == EntityAPI && p.Value == path {
+		if p.Entity != EntityAPI {
+			continue
+		}
+		if p.Value == "*" || p.Value == path {
 			return nil
 		}
 	}

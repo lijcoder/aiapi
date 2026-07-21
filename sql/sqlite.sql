@@ -20,12 +20,11 @@ CREATE TABLE IF NOT EXISTS providers (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_providers_type ON providers(type);
 
--- users 扩展：增加 password、updated_at
--- 新建库直接用下方定义；存量库需手动迁移：
---   ALTER TABLE users ADD COLUMN password   TEXT NOT NULL DEFAULT '';
+-- users 扩展：增加 password 列
+-- 新建库直接用上方定义；存量库需手动迁移：
+--   ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT '';
 --   -- 然后逐个设置密码哈希：
 --   -- UPDATE users SET password = '<bcrypt-hash>' WHERE account = 'admin';
---   ALTER TABLE users ADD COLUMN updated_at DATETIME DEFAULT (datetime('now','localtime'));
 CREATE TABLE IF NOT EXISTS users (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT NOT NULL,
@@ -34,8 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
     budget     REAL NOT NULL DEFAULT 0,
     unlimited  INTEGER NOT NULL DEFAULT 0,
     enabled    INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT (datetime('now', 'localtime')),
-    updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
+    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_account ON users(account);
 
@@ -121,8 +119,8 @@ CREATE INDEX IF NOT EXISTS idx_recharge_records_date ON recharge_records(created
 
 CREATE TABLE IF NOT EXISTS roles (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL,
-    description TEXT DEFAULT '',
+    code        TEXT NOT NULL DEFAULT '',
+    name        TEXT NOT NULL DEFAULT '',
     created_at  DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_roles_name ON roles(name);

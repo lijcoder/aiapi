@@ -20,7 +20,7 @@ type RoleStore struct {
 // Create 创建角色，回填 ID
 func (rs *RoleStore) Create(r *model.Role) error {
 	res, err := rs.s.Query(
-		`INSERT INTO roles (name, description) VALUES (:name, :description)`,
+		`INSERT INTO roles (name, code) VALUES (:name, :code)`,
 		r,
 	).Exec()
 	if err != nil {
@@ -108,4 +108,63 @@ func (rs *RoleStore) ListRolesByUser(userID int64) ([]model.Role, error) {
 		return nil, err
 	}
 	return roles, nil
+}
+
+// ListRolesByUserIDs 批量查询多个用户的角色，返回 map[userID][]Role。
+func (rs *RoleStore) ListRolesByUserIDs(userIDs []int64) (map[int64][]model.Role, error) {
+	result := make(map[int64][]model.Role)
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+	type row struct {
+		UserID   int64  `db:"user_id"`
+		RoleID   int64  `db:"id"`
+		RoleName string `db:"name"`
+		Code     string `db:"code"`
+	}
+	ph, args := inList("uid", userIDs)
+	var rows []row
+	err := rs.s.Query(
+		`SELECT ur.user_id, r.id, r.name, r.code
+		 FROM roles r
+		 INNER JOIN user_roles ur ON ur.role_id = r.id
+		 WHERE ur.user_id IN (`+ph+`)
+		 ORDER BY r.id`,
+		args,
+	).Select(&rows)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		result[r.UserID] = append(result[r.UserID], model.Role{
+			ID:   r.RoleID,
+			Name: r.RoleName,
+			Code: r.Code,
+		})
+	}
+	return result, nil
+}
+
+// ReplaceUserRoles 事务替换用户的全部角色关联。
+func (rs *RoleStore) ReplaceUserRoles(userID int64, roleIDs []int64) error {
+	return T(func(s *Session) error {
+		// 先删除旧关联
+		_, err := s.Query(
+			`DELETE FROM user_roles WHERE user_id = :user_id`,
+			map[string]any{"user_id": userID},
+		).Exec()
+		if err != nil {
+			return err
+		}
+		for _, rid := range roleIDs {
+			_, err = s.Query(
+				`INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)`,
+				map[string]any{"user_id": userID, "role_id": rid},
+			).Exec()
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

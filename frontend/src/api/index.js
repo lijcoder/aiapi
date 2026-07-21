@@ -77,3 +77,33 @@ export function usageStats(mode, startDate, endDate, apiKeyId, model, provider, 
 export function usageFilters() {
   return request('/usage/filters/self')
 }
+
+// ===== 超管：用户管理 =====
+
+export function listUsers(keyword) {
+  return request('/users/list', { keyword: keyword || '' })
+}
+
+export function createUser(name, account, password, budget, unlimited) {
+  return request('/users/create', { name, account, password, budget, unlimited })
+}
+
+export function updateUser(id, name, budget, unlimited) {
+  return request('/users/update', { id, name, budget, unlimited })
+}
+
+export function toggleUser(id) {
+  return request('/users/toggle', { id })
+}
+
+export function resetPassword(id, password) {
+  return request('/users/reset-password', { id, password })
+}
+
+export function assignRoles(id, roleIds) {
+  return request('/users/assign-roles', { id, role_ids: roleIds })
+}
+
+export function listRoles() {
+  return request('/roles/list')
+}

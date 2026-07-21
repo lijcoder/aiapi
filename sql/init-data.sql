@@ -2,26 +2,14 @@
 -- 依赖 sqlite.sql 中的表结构，需先执行 DDL
 
 -- 建角色
-INSERT OR IGNORE INTO roles (id, name, description) VALUES (1, 'admin', '管理员');
-INSERT OR IGNORE INTO roles (id, name, description) VALUES (2, 'user',  '普通用户');
+INSERT OR IGNORE INTO roles (id, code, name) VALUES (1, 'admin', '管理员');
+INSERT OR IGNORE INTO roles (id, code, name) VALUES (2, 'user',  '普通用户');
 
 -- 建权限（entity='API', action='*'）
--- admin 角色权限（id=1）
+-- admin 角色（id=1）超管特权：value='*' 放行所有接口
 INSERT OR IGNORE INTO role_permission (role_id, entity, action, value) VALUES
-  (1, 'API', '*', '/manager/self'),
-  (1, 'API', '*', '/manager/recharge'),
-  (1, 'API', '*', '/manager/recharge/records'),
-  (1, 'API', '*', '/manager/recharge/records/self'),
-  (1, 'API', '*', '/manager/models'),
-  (1, 'API', '*', '/manager/apikeys/list/self'),
-  (1, 'API', '*', '/manager/apikeys/create/self'),
-  (1, 'API', '*', '/manager/apikeys/toggle/self'),
-  (1, 'API', '*', '/manager/apikeys/delete/self'),
-  (1, 'API', '*', '/manager/apikeys/rename/self'),
-  (1, 'API', '*', '/manager/apikeys/budget/self'),
-  (1, 'API', '*', '/manager/usage/stats/self'),
-  (1, 'API', '*', '/manager/usage/filters/self');
--- user 角色权限（id=2）
+  (1, 'API', '*', '*');
+-- user 角色权限（id=2）按接口路径精确授权
 INSERT OR IGNORE INTO role_permission (role_id, entity, action, value) VALUES
   (2, 'API', '*', '/manager/self'),
   (2, 'API', '*', '/manager/recharge/self'),
