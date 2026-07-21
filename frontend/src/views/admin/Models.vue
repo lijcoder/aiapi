@@ -64,11 +64,12 @@
 
 <script setup>
 import { ref, h, onMounted } from 'vue'
-import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, useMessage } from 'naive-ui'
+import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, useMessage, useDialog } from 'naive-ui'
 import { listModelsAdmin, createModel, updateModel, deleteModel } from '../../api'
 import { fix4, formatTime } from '../../utils'
 
 const message = useMessage()
+const dialog = useDialog()
 
 const models = ref([])
 const tableLoading = ref(false)
@@ -188,13 +189,19 @@ async function doSubmit() {
 }
 
 function onDelete(r) {
-  const dialog = window.confirm(`确定删除模型「${r.provider}/${r.model}」吗？`)
-  if (!dialog) return
-  deleteModel(r.id).then(() => {
-    message.success('已删除')
-    load()
-  }).catch(e => {
-    message.error(e.msg || '删除失败')
+  dialog.warning({
+    title: '确认删除',
+    content: `确定删除模型「${r.provider}/${r.model}」吗？此操作不可恢复。`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: () => {
+      deleteModel(r.id).then(() => {
+        message.success('已删除')
+        load()
+      }).catch(e => {
+        message.error(e.msg || '删除失败')
+      })
+    }
   })
 }
 

@@ -92,13 +92,14 @@
 
 <script setup>
 import { ref, h, onMounted, computed } from 'vue'
-import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NAlert, NTag, NIcon, NTooltip, NRadioGroup, NRadio, useMessage } from 'naive-ui'
+import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NAlert, NTag, NIcon, NTooltip, NRadioGroup, NRadio, useMessage, useDialog } from 'naive-ui'
 import { CreateOutline } from '@vicons/ionicons5'
 import { listMyApiKeys, createApiKey, toggleApiKey, deleteApiKey, renameApiKey, updateApiKeyBudget } from '../api'
 import { useUser } from '../stores/user'
 import { fix4, formatTime } from '../utils'
 
 const message = useMessage()
+const dialog = useDialog()
 const { user } = useUser()
 
 const keys = ref([])
@@ -238,13 +239,19 @@ async function onToggle(r) {
 }
 
 function onDelete(r) {
-  const dialog = window.confirm(`确定删除密钥「${r.name || r.key}」吗？此操作不可恢复。`)
-  if (!dialog) return
-  deleteApiKey(r.id).then(() => {
-    message.success('已删除')
-    loadKeys()
-  }).catch(e => {
-    message.error(e.msg || '删除失败')
+  dialog.warning({
+    title: '确认删除',
+    content: `确定删除密钥「${r.name || r.key}」吗？此操作不可恢复。`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: () => {
+      deleteApiKey(r.id).then(() => {
+        message.success('已删除')
+        loadKeys()
+      }).catch(e => {
+        message.error(e.msg || '删除失败')
+      })
+    }
   })
 }
 
