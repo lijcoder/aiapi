@@ -74,4 +74,7 @@ func Register(g *echo.Group) {
 
 	// 超管：仪表盘
 	g.POST("/dashboard", base.Wrap(handler.Dashboard))
+
+	// 超管：日志查询
+	g.POST("/logs", base.Wrap(handler.Logs))
 }

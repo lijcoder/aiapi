@@ -64,11 +64,10 @@ func initStore() {
 }
 
 func initLogger() {
-	logDir := constant.LogDir()
-	os.MkdirAll(logDir, 0755)
+	os.MkdirAll(constant.LogDir(), 0755)
 
 	fileWriter := &lumberjack.Logger{
-		Filename:   logDir + "/app.log",
+		Filename:   constant.LogFilePath(),
 		MaxSize:    100,  // MB
 		MaxAge:     30,   // 天
 		MaxBackups: 10,   // 最多保留 10 个旧文件

@@ -15,6 +15,7 @@ import AdminProviders from '../views/admin/Providers.vue'
 import AdminModels from '../views/admin/Models.vue'
 import AdminUsage from '../views/admin/Usage.vue'
 import AdminRecharge from '../views/admin/Recharge.vue'
+import AdminLogs from '../views/admin/Logs.vue'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login },
@@ -37,6 +38,7 @@ const routes = [
       { path: 'admin/models', name: 'AdminModels', component: AdminModels },
       { path: 'admin/usage', name: 'AdminUsage', component: AdminUsage },
       { path: 'admin/recharge', name: 'AdminRecharge', component: AdminRecharge },
+      { path: 'admin/logs', name: 'AdminLogs', component: AdminLogs },
       // 兜底：/home 不渲染内容，仅触发 Home.vue 的菜单跳转逻辑
       { path: 'home', name: 'HomePlaceholder', component: { render: () => null } }
     ]

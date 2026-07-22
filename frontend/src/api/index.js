@@ -186,6 +186,12 @@ export function usageFiltersAdmin() {
   return request('/usage/filters')
 }
 
+// ===== 超管：日志查询 =====
+
+export function fetchLogs() {
+  return request('/logs')
+}
+
 // ===== 超管：仪表盘 =====
 
 export function dashboardOverview() {

@@ -40,3 +40,8 @@ func DBFilePath() string {
 func LogDir() string {
 	return filepath.Join(DataDir, "logs")
 }
+
+// LogFilePath 返回日志文件完整路径
+func LogFilePath() string {
+	return filepath.Join(LogDir(), "app.log")
+}
