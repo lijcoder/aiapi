@@ -1,5 +1,11 @@
 <template>
   <div>
+    <n-card size="small" :bordered="false" style="background:#fff;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:12px;font-size:14px">
+        <span style="color:#666">当前余额</span>
+        <span style="font-size:22px;font-weight:700;color:#18a058">¥ {{ fix4(balance) }}</span>
+      </div>
+    </n-card>
     <n-card title="充值流水" size="small">
       <template #header-extra>
         <n-button type="primary" size="small" @click="openDialog">充值</n-button>
@@ -30,7 +36,9 @@ import { useUser } from '../stores/user'
 import { rechargeSelf, rechargeSelfRecords } from '../api'
 import { fix4, formatTime } from '../utils'
 
-const { fetchUser } = useUser()
+const { user, fetchUser } = useUser()
+
+const balance = ref(0)
 
 const columns = [
   { title: '金额', key: 'amount', width: 120, render(r) { return h('span', {style:'color:#18a058;font-weight:600'}, '¥ ' + fix4(r.amount)) }},
@@ -70,7 +78,11 @@ const tableLoading = ref(false)
 
 async function loadRecords() {
   tableLoading.value = true
-  try { records.value = (await rechargeSelfRecords()) || [] } catch {} finally { tableLoading.value = false }
+  try {
+    records.value = (await rechargeSelfRecords()) || []
+    await fetchUser()
+    balance.value = user.value?.budget || 0
+  } catch {} finally { tableLoading.value = false }
 }
 
 onMounted(() => loadRecords())
