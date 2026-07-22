@@ -29,7 +29,7 @@
         <div v-else-if="logs.length === 0" style="padding:40px;text-align:center;color:#999;font-size:14px">暂无日志</div>
         <div v-else style="padding:8px 0">
           <div v-for="(line, idx) in logs" :key="idx" style="display:flex;align-items:flex-start;padding:1px 12px;transition:background 0.1s" :style="idx % 2 === 0 ? { background: '#fafafa' } : { background: '#f5f5f5' }">
-            <span style="min-width:36px;color:#b0b0b0;text-align:right;margin-right:12px;user-select:none;flex-shrink:0">{{ logs.length - idx }}</span>
+            <span style="min-width:36px;color:#b0b0b0;text-align:right;margin-right:12px;user-select:none;flex-shrink:0">{{ idx + 1 }}</span>
             <span style="color:#333;word-break:break-all;white-space:pre-wrap">{{ line }}</span>
           </div>
         </div>
