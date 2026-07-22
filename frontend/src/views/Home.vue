@@ -159,17 +159,21 @@ if (!user.value) {
 </script>
 
 <style>
+:root {
+  --bg-page: #f9f8f7;
+  --border-color: #e0e0e0;
+}
 .layout { display: flex; height: 100vh; margin: 0; }
 
 /* ===== 侧栏 ===== */
 .sidebar {
   width: 220px;
-  background: #f5f7fa;
+  background: var(--bg-page);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   overflow-y: auto;
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid var(--border-color);
   transition: width 0.2s ease;
 }
 .sidebar.collapsed { width: 60px; }
@@ -181,7 +185,7 @@ if (!user.value) {
   text-align: center;
   padding: 20px 0 18px;
   letter-spacing: 3px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-color);
   overflow: hidden;
   white-space: nowrap;
 }
@@ -269,7 +273,7 @@ if (!user.value) {
 
 /* 底部：用户信息 + 操作 */
 .sidebar-footer {
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-color);
 }
 .collapsed .sidebar-footer { padding: 8px; }
 
@@ -289,10 +293,10 @@ if (!user.value) {
   justify-content: center;
   gap: 6px;
   padding: 6px 0 8px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-color);
 }
 .collapsed .collapse-row { border-top: none; flex-direction: column; gap: 6px; }
-.sep-line { width: 20px; height: 1px; background: #e0e0e0; }
+.sep-line { width: 20px; height: 1px; background: var(--border-color); }
 .collapsed-balance { font-size: 10px; font-weight: 700; color: #e53935; }
 
 .collapse-btn, .logout-btn {
@@ -312,5 +316,5 @@ if (!user.value) {
 
 /* ===== 主区域 ===== */
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.content { flex: 1; padding: 20px; background: #f5f7fa; overflow-y: auto; }
+.content { flex: 1; padding: 20px; background: var(--bg-page); overflow-y: auto; }
 </style>
