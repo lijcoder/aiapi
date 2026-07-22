@@ -50,7 +50,7 @@ func (ms *ModelStore) List(providerKw, modelKw string) ([]model.Model, error) {
 	if len(conds) > 0 {
 		q += " WHERE " + strings.Join(conds, " AND ")
 	}
-	q += " ORDER BY provider, model"
+	q += " ORDER BY id DESC"
 	var models []model.Model
 	err := ms.s.Query(q, args).Select(&models)
 	if err != nil {
