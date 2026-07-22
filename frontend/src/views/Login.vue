@@ -42,8 +42,8 @@ async function handleLogin() {
 </script>
 
 <style>
-.login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-.login-card { width: 400px; border-radius: 12px !important; }
+.login-page { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 50%, #d6d6d6 100%); }
+.login-card { width: 400px; border-radius: 12px !important; box-shadow: 0 2px 16px rgba(0,0,0,0.08); }
 .login-card .n-card-header { text-align: center; }
 .card-title { font-size: 20px; font-weight: 600; color: #333; }
 .error { color: #d03050; font-size: 13px; text-align: center; margin: 12px 0 0; }
