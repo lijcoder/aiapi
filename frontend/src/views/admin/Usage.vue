@@ -2,46 +2,34 @@
   <div style="display:flex;flex-direction:column;gap:16px">
     <!-- 顶部指标 -->
     <n-card size="small">
-      <div style="display:flex;align-items:flex-start;gap:28px;flex-wrap:wrap">
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">总请求</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ summary.request_count }}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px 28px">
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">总请求</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">{{ summary.request_count }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">总Token</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.total_tokens) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">总Token</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">{{ fNum(summary.total_tokens) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">输入Token</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.input_tokens) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">总费用</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">¥{{ fix4(summary.total_cost) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">输出Token</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.output_tokens) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">平均费用</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">¥{{ fix4(summary.avg_cost) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">缓存命中</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.cached_tokens) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">输入Token</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">{{ fNum(summary.input_tokens) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">缓存未命中</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.cache_miss_tokens) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">输出Token</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">{{ fNum(summary.output_tokens) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">推理Token</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.reasoning_tokens) }}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">缓存命中率</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fmtRate(summary.cache_hit_rate) }}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">总费用</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">¥{{ fix4(summary.total_cost) }}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">单请求平均费用</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">¥{{ fix4(summary.avg_cost) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">缓存命中率</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">{{ fmtRate(summary.cache_hit_rate) }}</div>
         </div>
       </div>
     </n-card>
@@ -52,17 +40,19 @@
         <div>
           <div style="font-size:13px;margin-bottom:4px">统计粒度</div>
           <n-radio-group v-model:value="query.mode" @update:value="onModeChange">
-            <n-radio value="day">按天</n-radio>
-            <n-radio value="month">按月</n-radio>
+            <n-radio-button value="day">天</n-radio-button>
+            <n-radio-button value="month">月</n-radio-button>
           </n-radio-group>
         </div>
         <div>
-          <div style="font-size:13px;margin-bottom:4px">起始</div>
-          <n-input v-model:value="query.startDate" :type="query.mode==='month' ? 'month' : 'date'" style="width:150px" />
-        </div>
-        <div>
-          <div style="font-size:13px;margin-bottom:4px">结束</div>
-          <n-input v-model:value="query.endDate" :type="query.mode==='month' ? 'month' : 'date'" style="width:150px" />
+          <div style="font-size:13px;margin-bottom:4px">时间范围</div>
+          <n-date-picker
+            v-model:value="dateRange"
+            :type="query.mode === 'month' ? 'monthrange' : 'daterange'"
+            placement="bottom-start"
+            :style="{width:'250px'}"
+            clearable
+          />
         </div>
         <div>
           <div style="font-size:13px;margin-bottom:4px">用户</div>
@@ -113,7 +103,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, h } from 'vue'
-import { NCard, NDataTable, NInput, NSelect, NButton, NRadioGroup, NRadio, NRadioButton, useMessage } from 'naive-ui'
+import { NCard, NDataTable, NInput, NSelect, NButton, NRadioGroup, NRadioButton, NDatePicker, useMessage } from 'naive-ui'
 import { usageStatsAdmin, usageFiltersAdmin } from '../../api'
 import { fix4 } from '../../utils'
 import { useChart } from '../../composables/useChart'
@@ -122,10 +112,10 @@ import { buildTimeTrendOption, buildDimensionOption } from '../../charts'
 const message = useMessage()
 const loading = ref(false)
 
+const dateRange = ref(null)
+
 const query = reactive({
   mode: 'month',
-  startDate: '',
-  endDate: '',
   userId: null,
   apiKeyId: null,
   model: null,
@@ -140,17 +130,21 @@ function initDefaultDates() {
   if (query.mode === 'day') {
     const start = new Date(now)
     start.setDate(start.getDate() - 7)
-    query.startDate = fmtDate(start)
-    query.endDate = fmtDate(now)
+    dateRange.value = [start.getTime(), now.getTime()]
   } else {
     const start = new Date(now.getFullYear(), now.getMonth(), 1)
-    query.startDate = fmtMonth(start)
-    query.endDate = fmtMonth(now)
+    dateRange.value = [start.getTime(), now.getTime()]
   }
 }
 
-function fmtDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
-function fmtMonth(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') }
+function fmtTS(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  if (query.mode === 'month') {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+  }
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+}
 function onModeChange() { initDefaultDates() }
 
 const stats = ref([])
@@ -194,10 +188,14 @@ const cols = computed(() => [
 ])
 
 async function doQuery() {
+  if (!dateRange.value || dateRange.value.length < 2) {
+    message.warning('请选择时间范围')
+    return
+  }
   loading.value = true
   try {
     const data = await usageStatsAdmin(
-      query.mode, query.startDate, query.endDate,
+      query.mode, fmtTS(dateRange.value[0]), fmtTS(dateRange.value[1]),
       query.userId, query.apiKeyId, query.model, query.provider, query.groupBy
     )
     summary.value = data.summary || {}
