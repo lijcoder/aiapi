@@ -14,6 +14,7 @@ type userInfo struct {
 	ID      int64   `json:"id"`
 	Name    string  `json:"name"`
 	Account string  `json:"account"`
+	Email   string  `json:"email"`
 	Budget  float64 `json:"budget"`
 }
 
@@ -68,6 +69,7 @@ func Self(ctx context.Context) (*SelfResp, *base.BizError) {
 			ID:      user.ID,
 			Name:    user.Name,
 			Account: user.Account,
+			Email:   user.Email,
 			Budget:  user.Budget,
 		},
 		Menus:      buildMenuTree(menus),

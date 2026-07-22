@@ -78,6 +78,16 @@ export function usageFilters() {
   return request('/usage/filters/self')
 }
 
+// ===== 个人设置 =====
+
+export function updateProfileSelf(name, email) {
+  return request('/profile/update/self', { name, email })
+}
+
+export function updatePasswordSelf(oldPassword, newPassword) {
+  return request('/profile/password/self', { old_password: oldPassword, new_password: newPassword })
+}
+
 // ===== 超管：用户管理 =====
 
 export function listUsers(keyword) {

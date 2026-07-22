@@ -22,6 +22,8 @@ INSERT OR IGNORE INTO role_permission (role_id, entity, action, value) VALUES
   (2, 'API', '*', '/manager/apikeys/budget/self'),
   (2, 'API', '*', '/manager/apikeys/models/get/self'),
   (2, 'API', '*', '/manager/apikeys/models/set/self'),
+  (2, 'API', '*', '/manager/profile/update/self'),
+  (2, 'API', '*', '/manager/profile/password/self'),
   (2, 'API', '*', '/manager/usage/stats/self'),
   (2, 'API', '*', '/manager/usage/filters/self');
 
@@ -37,6 +39,8 @@ INSERT OR IGNORE INTO menus (id, parent_id, name, path, sort_order) VALUES
   (8,  0, '模型管理',     '/admin/models',    8),
   (9,  0, '全局统计',     '/admin/usage',     9),
   (10, 0, '充值记录',     '/admin/recharge',  10);
+INSERT OR IGNORE INTO menus (id, parent_id, name, path, sort_order) VALUES
+  (11, 0, '个人设置',     '/profile',          11);
 
 -- 存量库菜单名升级（原「模型定价」改名为「模型管理」）：
 --   UPDATE menus SET name='模型管理' WHERE id=8;
@@ -44,10 +48,10 @@ INSERT OR IGNORE INTO menus (id, parent_id, name, path, sort_order) VALUES
 -- 分配菜单给角色
 -- admin 角色（id=1）→ 全部菜单
 INSERT OR IGNORE INTO role_menus (role_id, menu_id) VALUES
-  (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10);
+  (1, 1), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (1, 7), (1, 8), (1, 9), (1, 10), (1, 11);
 -- user 角色（id=2）→ 自助菜单
 INSERT OR IGNORE INTO role_menus (role_id, menu_id) VALUES
-  (2, 1), (2, 2), (2, 3), (2, 4);
+  (2, 1), (2, 2), (2, 3), (2, 4), (2, 11);
 
 -- 建管理员账号并分配角色（password 用 bcrypt 生成，替换 <bcrypt-hash>）
 -- INSERT INTO users (name, account, password, unlimited, enabled) VALUES ('管理员', 'admin', '<bcrypt-hash>', 1, 1);

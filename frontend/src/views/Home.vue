@@ -91,6 +91,7 @@ import {
   ServerOutline,
   GridOutline,
   DocumentTextOutline,
+  PersonOutline,
   ChevronDownOutline,
   ChevronBackOutline,
   ChevronForwardOutline,
@@ -114,6 +115,7 @@ const iconMap = {
   '/admin/usage':     markRaw(AnalyticsOutline),
   '/admin/recharge':  markRaw(CashOutline),
   '/admin/logs':      markRaw(DocumentTextOutline),
+  '/profile':         markRaw(PersonOutline),
 }
 
 function getIcon(path) {

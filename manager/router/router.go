@@ -39,6 +39,10 @@ func Register(g *echo.Group) {
 	g.POST("/usage/stats/self", base.Wrap(handler.UsageStatsSelf))
 	g.POST("/usage/filters/self", base.Wrap(handler.UsageFiltersSelf))
 
+	// 个人设置
+	g.POST("/profile/update/self", base.Wrap(handler.UpdateProfileSelf))
+	g.POST("/profile/password/self", base.Wrap(handler.UpdatePasswordSelf))
+
 	// 超管：用户管理
 	g.POST("/users/list", base.Wrap(handler.ListUsers))
 	g.POST("/users/create", base.Wrap(handler.CreateUser))

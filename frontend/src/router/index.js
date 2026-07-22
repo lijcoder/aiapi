@@ -5,6 +5,8 @@ import Recharge from '../views/Recharge.vue'
 import Models from '../views/Models.vue'
 import ApiKeys from '../views/ApiKeys.vue'
 import Usage from '../views/Usage.vue'
+import Profile from '../views/Profile.vue'
+import ChangePassword from '../views/ChangePassword.vue'
 
 // Admin pages
 import AdminDashboard from '../views/admin/Dashboard.vue'
@@ -29,6 +31,8 @@ const routes = [
       { path: 'apikeys', name: 'ApiKeys', component: ApiKeys },
       { path: 'models', name: 'Models', component: Models },
       { path: 'recharge', name: 'Recharge', component: Recharge },
+      { path: 'profile', name: 'Profile', component: Profile },
+      { path: 'profile/password', name: 'ChangePassword', component: ChangePassword },
       // 管理后台页面
       { path: 'admin/dashboard', name: 'AdminDashboard', component: AdminDashboard },
       { path: 'admin/users', name: 'AdminUsers', component: AdminUsers },

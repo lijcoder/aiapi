@@ -7,6 +7,14 @@
 
 ### 2026-07-22
 
+- 新增个人设置功能（修改姓名/邮箱/密码）。
+  - `users` 表新增 `email` 字段（可空、不唯一）。
+  - 新增 2 个自助接口：`/manager/profile/update/self`（改姓名+邮箱）、`/manager/profile/password/self`（改密码，需校验旧密码）。
+  - 修改密码后前端提示并跳转登录页，强制重新登录。
+  - 新增「个人设置」菜单项（id=11，所有角色可见），`/profile` 页面包含基本资料与修改密码两个区块。
+  - `/manager/self` 返回的 user 信息补充 `email` 字段。
+  - 存量库迁移：`ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT '';` + `INSERT OR IGNORE INTO menus ...` / `role_menus ...`。
+
 - 新增 API Key 级模型访问控制。
   - `api_keys` 表新增 `model_policy` 字段（默认 `'all'`），`all`=全量放行，`whitelist`=按白名单。
   - 新增 `apikey_model_items` 表存储白名单明细（model_policy=`whitelist` 时生效）。

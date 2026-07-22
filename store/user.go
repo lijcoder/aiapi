@@ -127,6 +127,15 @@ func (us *UserStore) UpdateProfile(u *model.User) error {
 	return err
 }
 
+// UpdateProfileSelf 用户自助更新姓名和邮箱（不动额度/限额/账号/密码）
+func (us *UserStore) UpdateProfileSelf(userID int64, name, email string) error {
+	_, err := us.s.Query(
+		`UPDATE users SET name=:name, email=:email WHERE id=:id`,
+		map[string]any{"id": userID, "name": name, "email": email},
+	).Exec()
+	return err
+}
+
 // GetByIDAny 按 ID 查询用户（不过滤 enabled），管理员场景使用。
 func (us *UserStore) GetByIDAny(id int64) (*model.User, error) {
 	var u model.User
