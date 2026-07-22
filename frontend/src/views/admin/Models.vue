@@ -1,6 +1,6 @@
 <template>
   <div>
-    <n-card title="模型定价" size="small">
+    <n-card title="模型管理" size="small">
       <template #header-extra>
         <n-space align="center">
           <n-input v-model:value="providerKw" placeholder="提供商" size="small" clearable style="width:140px" @keydown.enter="load" @clear="load" />
@@ -15,7 +15,7 @@
         :loading="tableLoading"
         :bordered="false"
         size="small"
-        :scroll-x="1000"
+                :scroll-x="1140"
         style="width:100%"
       />
     </n-card>
@@ -55,6 +55,16 @@
             <n-input-number v-model:value="form.max_completion_tokens" :min="0" :step="1024" style="width:100%" />
           </div>
         </div>
+        <div>
+          <div style="font-size:13px;margin-bottom:6px">支持模态</div>
+          <n-checkbox-group v-model:value="modalFlags">
+            <n-space>
+              <n-checkbox value="text" label="文本" />
+              <n-checkbox value="image" label="图像" />
+              <n-checkbox value="video" label="视频" />
+            </n-space>
+          </n-checkbox-group>
+        </div>
       </div>
       <p v-if="formMsg" style="color:#d03050;font-size:13px;margin-top:8px">{{ formMsg }}</p>
       <template #footer>
@@ -69,7 +79,7 @@
 
 <script setup>
 import { ref, h, onMounted } from 'vue'
-import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, useMessage, useDialog } from 'naive-ui'
+import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NCheckbox, NCheckboxGroup, NTag, useMessage, useDialog } from 'naive-ui'
 import { listModelsAdmin, createModel, updateModel, deleteModel } from '../../api'
 import { fix4, formatTime } from '../../utils'
 
@@ -87,6 +97,7 @@ const formType = ref('create')
 const form = ref(emptyForm())
 const formMsg = ref('')
 const submitting = ref(false)
+const modalFlags = ref(['text'])
 
 function emptyForm() {
   return {
@@ -101,6 +112,30 @@ function emptyForm() {
   }
 }
 
+function modalToFlags(m) {
+  const f = []
+  if (m.supports_text) f.push('text')
+  if (m.supports_image) f.push('image')
+  if (m.supports_video) f.push('video')
+  return f
+}
+
+function flagsToModal(arr) {
+  return {
+    supports_text: arr.includes('text'),
+    supports_image: arr.includes('image'),
+    supports_video: arr.includes('video'),
+  }
+}
+
+function renderModal(r) {
+  const tags = []
+  if (r.supports_text) tags.push(h(NTag, { size: 'small', type: 'info', bordered: false }, () => '文本'))
+  if (r.supports_image) tags.push(h(NTag, { size: 'small', type: 'success', bordered: false }, () => '图像'))
+  if (r.supports_video) tags.push(h(NTag, { size: 'small', type: 'warning', bordered: false }, () => '视频'))
+  return tags.length ? h('div', { style: 'display:flex;gap:4px;flex-wrap:wrap' }, tags) : '-'
+}
+
 const columns = [
   { title: '提供商', key: 'provider', width: 110 },
   { title: '模型', key: 'model', width: 200, ellipsis: { tooltip: true } },
@@ -109,9 +144,10 @@ const columns = [
   { title: '输出价', key: 'output_price', width: 100, render(r) { return '¥' + fix4(r.output_price) } },
   { title: '上下文', key: 'max_context_tokens', width: 90, render(r) { return fmtK(r.max_context_tokens) } },
   { title: '最大输出', key: 'max_completion_tokens', width: 90, render(r) { return fmtK(r.max_completion_tokens) } },
+  { title: '能力', key: 'modal', width: 140, render: renderModal },
   { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) } },
-  { title: '操作', key: 'actions', width: 160, fixed: 'right', render(r) {
-    return h(NSpace, { size: 6 }, () => [
+  { title: '操作', key: 'actions', width: 120, fixed: 'right', render(r) {
+    return h(NSpace, { size: 4 }, () => [
       h(NButton, { size: 'small', tertiary: true, type: 'info', onClick: () => openEdit(r) }, () => '编辑'),
       h(NButton, { size: 'small', tertiary: true, type: 'error', onClick: () => onDelete(r) }, () => '删除'),
     ])
@@ -136,6 +172,7 @@ async function load() {
 function openCreate() {
   formType.value = 'create'
   form.value = emptyForm()
+  modalFlags.value = ['text']
   formMsg.value = ''
   showForm.value = true
 }
@@ -152,6 +189,7 @@ function openEdit(r) {
     max_context_tokens: r.max_context_tokens,
     max_completion_tokens: r.max_completion_tokens,
   }
+  modalFlags.value = modalToFlags(r)
   formMsg.value = ''
   showForm.value = true
 }
@@ -175,6 +213,7 @@ async function doSubmit() {
         output_price: form.value.output_price || 0,
         max_context_tokens: form.value.max_context_tokens || 0,
         max_completion_tokens: form.value.max_completion_tokens || 0,
+        ...flagsToModal(modalFlags.value),
       })
       message.success('创建成功')
     } else {
@@ -185,6 +224,7 @@ async function doSubmit() {
         output_price: form.value.output_price || 0,
         max_context_tokens: form.value.max_context_tokens || 0,
         max_completion_tokens: form.value.max_completion_tokens || 0,
+        ...flagsToModal(modalFlags.value),
       })
       message.success('已保存')
     }

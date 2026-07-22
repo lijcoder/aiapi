@@ -52,7 +52,7 @@ func Register(g *echo.Group) {
 	g.POST("/providers/update", base.Wrap(handler.UpdateProvider))
 	g.POST("/providers/toggle", base.Wrap(handler.ToggleProvider))
 
-	// 超管：模型定价管理
+	// 超管：模型管理
 	g.POST("/models/list", base.Wrap(handler.ListModelsAdmin))
 	g.POST("/models/create", base.Wrap(handler.CreateModel))
 	g.POST("/models/update", base.Wrap(handler.UpdateModel))

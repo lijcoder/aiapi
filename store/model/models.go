@@ -99,6 +99,9 @@ type Model struct {
 	OutputPrice         float64   `db:"output_price" json:"output_price"`
 	MaxContextTokens    int       `db:"max_context_tokens" json:"max_context_tokens"`
 	MaxCompletionTokens int       `db:"max_completion_tokens" json:"max_completion_tokens"`
+	SupportsText        bool      `db:"supports_text" json:"supports_text"`
+	SupportsImage       bool      `db:"supports_image" json:"supports_image"`
+	SupportsVideo       bool      `db:"supports_video" json:"supports_video"`
 	CreatedAt           time.Time `db:"created_at" json:"created_at"`
 }
 

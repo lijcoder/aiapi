@@ -22,6 +22,9 @@ type modelItem struct {
 	OutputPrice         float64   `json:"output_price"`
 	MaxContextTokens    int       `json:"max_context_tokens"`
 	MaxCompletionTokens int       `json:"max_completion_tokens"`
+	SupportsText        bool      `json:"supports_text"`
+	SupportsImage       bool      `json:"supports_image"`
+	SupportsVideo       bool      `json:"supports_video"`
 	CreatedAt           time.Time `json:"created_at"`
 }
 
@@ -42,6 +45,9 @@ type CreateModelReq struct {
 	OutputPrice         float64 `json:"output_price"`
 	MaxContextTokens    int     `json:"max_context_tokens"`
 	MaxCompletionTokens int     `json:"max_completion_tokens"`
+	SupportsText        bool    `json:"supports_text"`
+	SupportsImage       bool    `json:"supports_image"`
+	SupportsVideo       bool    `json:"supports_video"`
 }
 
 type UpdateModelReq struct {
@@ -51,6 +57,9 @@ type UpdateModelReq struct {
 	OutputPrice         float64 `json:"output_price"`
 	MaxContextTokens    int     `json:"max_context_tokens"`
 	MaxCompletionTokens int     `json:"max_completion_tokens"`
+	SupportsText        bool    `json:"supports_text"`
+	SupportsImage       bool    `json:"supports_image"`
+	SupportsVideo       bool    `json:"supports_video"`
 }
 
 type ModelIdReq struct {
@@ -68,7 +77,7 @@ func ListModels(ctx context.Context) ([]model.Model, *base.BizError) {
 	return models, nil
 }
 
-// ListModelsAdmin 管理员查询全部模型定价，支持按 provider/model 模糊搜索
+// ListModelsAdmin 管理员查询全部模型，支持按 provider/model 模糊搜索
 func ListModelsAdmin(ctx context.Context, req *ListModelsAdminReq) (*ListModelsAdminResp, *base.BizError) {
 	list, err := store.C().Model().List(strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model))
 	if err != nil {
@@ -82,7 +91,7 @@ func ListModelsAdmin(ctx context.Context, req *ListModelsAdminReq) (*ListModelsA
 	return &ListModelsAdminResp{Models: items}, nil
 }
 
-// CreateModel 管理员新增模型定价
+// CreateModel 管理员新增模型
 func CreateModel(ctx context.Context, req *CreateModelReq) (*modelItem, *base.BizError) {
 	if req.Provider == "" || req.Model == "" {
 		return nil, base.NewBizError(base.CodeInvalidParams, "provider and model are required")
@@ -105,6 +114,9 @@ func CreateModel(ctx context.Context, req *CreateModelReq) (*modelItem, *base.Bi
 		OutputPrice:         req.OutputPrice,
 		MaxContextTokens:    req.MaxContextTokens,
 		MaxCompletionTokens: req.MaxCompletionTokens,
+		SupportsText:        req.SupportsText,
+		SupportsImage:       req.SupportsImage,
+		SupportsVideo:       req.SupportsVideo,
 	}
 	if err := store.C().Model().Create(m); err != nil {
 		if store.IsUniqueConstraintErr(err) {
@@ -117,7 +129,7 @@ func CreateModel(ctx context.Context, req *CreateModelReq) (*modelItem, *base.Bi
 	return &item, nil
 }
 
-// UpdateModel 管理员编辑模型定价（provider+model 不可改）
+// UpdateModel 管理员编辑模型（provider+model 不可改）
 func UpdateModel(ctx context.Context, req *UpdateModelReq) (*modelItem, *base.BizError) {
 	if req.ID <= 0 {
 		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
@@ -136,6 +148,9 @@ func UpdateModel(ctx context.Context, req *UpdateModelReq) (*modelItem, *base.Bi
 	m.OutputPrice = req.OutputPrice
 	m.MaxContextTokens = req.MaxContextTokens
 	m.MaxCompletionTokens = req.MaxCompletionTokens
+	m.SupportsText = req.SupportsText
+	m.SupportsImage = req.SupportsImage
+	m.SupportsVideo = req.SupportsVideo
 	if err := store.C().Model().Update(m); err != nil {
 		slog.Error("[Model] Update failed", "err", err, "id", req.ID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
@@ -144,7 +159,7 @@ func UpdateModel(ctx context.Context, req *UpdateModelReq) (*modelItem, *base.Bi
 	return &item, nil
 }
 
-// DeleteModel 管理员删除模型定价
+// DeleteModel 管理员删除模型
 func DeleteModel(ctx context.Context, req *ModelIdReq) (*struct{}, *base.BizError) {
 	if req.ID <= 0 {
 		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
@@ -176,6 +191,9 @@ func toModelItem(m model.Model) modelItem {
 		OutputPrice:         m.OutputPrice,
 		MaxContextTokens:    m.MaxContextTokens,
 		MaxCompletionTokens: m.MaxCompletionTokens,
+		SupportsText:        m.SupportsText,
+		SupportsImage:       m.SupportsImage,
+		SupportsVideo:       m.SupportsVideo,
 		CreatedAt:           m.CreatedAt,
 	}
 }

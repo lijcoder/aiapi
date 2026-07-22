@@ -98,9 +98,18 @@ CREATE TABLE IF NOT EXISTS models (
     output_price           REAL NOT NULL DEFAULT 0,
     max_context_tokens    INTEGER DEFAULT 0,
     max_completion_tokens INTEGER DEFAULT 0,
+    supports_text         INTEGER NOT NULL DEFAULT 1,
+    supports_image        INTEGER NOT NULL DEFAULT 0,
+    supports_video        INTEGER NOT NULL DEFAULT 0,
     created_at            DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_models_provider_model ON models(provider, model);
+
+-- models 扩展：增加多模态能力列（文本/图像/视频）
+-- 新建库直接用上方定义；存量库需手动迁移：
+--   ALTER TABLE models ADD COLUMN supports_text  INTEGER NOT NULL DEFAULT 1;
+--   ALTER TABLE models ADD COLUMN supports_image INTEGER NOT NULL DEFAULT 0;
+--   ALTER TABLE models ADD COLUMN supports_video INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS recharge_records (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -8,17 +8,17 @@ import (
 	"github.com/lijcoder/aiapi/store/model"
 )
 
-// Model 返回模型定价相关操作的命名空间。
+// Model 返回模型相关操作的命名空间。
 func (s *Session) Model() *ModelStore {
 	return &ModelStore{s: s}
 }
 
-// ModelStore 是模型定价相关操作的命名空间。
+// ModelStore 是模型相关操作的命名空间。
 type ModelStore struct {
 	s *Session
 }
 
-// Get 按 provider+model 查询模型定价配置
+// Get 按 provider+model 查询模型配置
 func (ms *ModelStore) Get(provider, name string) (*model.Model, error) {
 	var p model.Model
 	err := ms.s.Query(
@@ -34,7 +34,7 @@ func (ms *ModelStore) Get(provider, name string) (*model.Model, error) {
 	return &p, nil
 }
 
-// List 查询全部模型定价配置，支持按 provider/model 模糊搜索
+// List 查询全部模型配置，支持按 provider/model 模糊搜索
 func (ms *ModelStore) List(providerKw, modelKw string) ([]model.Model, error) {
 	q := `SELECT * FROM models`
 	args := map[string]any{}
@@ -59,7 +59,7 @@ func (ms *ModelStore) List(providerKw, modelKw string) ([]model.Model, error) {
 	return models, nil
 }
 
-// GetByID 按 ID 查询模型定价
+// GetByID 按 ID 查询模型
 func (ms *ModelStore) GetByID(id int64) (*model.Model, error) {
 	var m model.Model
 	err := ms.s.Query(
@@ -75,11 +75,11 @@ func (ms *ModelStore) GetByID(id int64) (*model.Model, error) {
 	return &m, nil
 }
 
-// Create 新增模型定价，回填 ID
+// Create 新增模型，回填 ID
 func (ms *ModelStore) Create(m *model.Model) error {
 	res, err := ms.s.Query(
-		`INSERT INTO models (provider, model, input_cache_hit_price, input_cache_miss_price, output_price, max_context_tokens, max_completion_tokens)
-		 VALUES (:provider, :model, :input_cache_hit_price, :input_cache_miss_price, :output_price, :max_context_tokens, :max_completion_tokens)`,
+		`INSERT INTO models (provider, model, input_cache_hit_price, input_cache_miss_price, output_price, max_context_tokens, max_completion_tokens, supports_text, supports_image, supports_video)
+		 VALUES (:provider, :model, :input_cache_hit_price, :input_cache_miss_price, :output_price, :max_context_tokens, :max_completion_tokens, :supports_text, :supports_image, :supports_video)`,
 		map[string]any{
 			"provider":               m.Provider,
 			"model":                  m.Model,
@@ -88,6 +88,9 @@ func (ms *ModelStore) Create(m *model.Model) error {
 			"output_price":           m.OutputPrice,
 			"max_context_tokens":     m.MaxContextTokens,
 			"max_completion_tokens":  m.MaxCompletionTokens,
+			"supports_text":          m.SupportsText,
+			"supports_image":         m.SupportsImage,
+			"supports_video":         m.SupportsVideo,
 		},
 	).Exec()
 	if err != nil {
@@ -101,11 +104,12 @@ func (ms *ModelStore) Create(m *model.Model) error {
 	return nil
 }
 
-// Update 更新模型定价（provider+model 不可改）
+// Update 更新模型（provider+model 不可改）
 func (ms *ModelStore) Update(m *model.Model) error {
 	_, err := ms.s.Query(
 		`UPDATE models SET input_cache_hit_price=:input_cache_hit_price, input_cache_miss_price=:input_cache_miss_price,
-		 output_price=:output_price, max_context_tokens=:max_context_tokens, max_completion_tokens=:max_completion_tokens
+		 output_price=:output_price, max_context_tokens=:max_context_tokens, max_completion_tokens=:max_completion_tokens,
+		 supports_text=:supports_text, supports_image=:supports_image, supports_video=:supports_video
 		 WHERE id=:id`,
 		map[string]any{
 			"id":                     m.ID,
@@ -114,12 +118,15 @@ func (ms *ModelStore) Update(m *model.Model) error {
 			"output_price":           m.OutputPrice,
 			"max_context_tokens":     m.MaxContextTokens,
 			"max_completion_tokens":  m.MaxCompletionTokens,
+			"supports_text":          m.SupportsText,
+			"supports_image":         m.SupportsImage,
+			"supports_video":         m.SupportsVideo,
 		},
 	).Exec()
 	return err
 }
 
-// Delete 删除模型定价
+// Delete 删除模型
 func (ms *ModelStore) Delete(id int64) error {
 	_, err := ms.s.Query(
 		`DELETE FROM models WHERE id = :id`,

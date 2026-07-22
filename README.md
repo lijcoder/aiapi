@@ -175,7 +175,7 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
 - `users` / `roles` / `user_roles` / `role_permission` / `user_sessions`：用户/角色/权限/会话
 - `menus` / `role_menus`：菜单与角色菜单关联
 - `recharge_records`：充值流水
-- `models`：模型定价配置
+- `models`：模型配置
 
 可通过 `sql/sqlite.sql` 查看完整 DDL，初始数据参考 `sql/init-data.sql`。
 
@@ -240,7 +240,7 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/recharge` | 管理员充值，body `{userId, amount, remark}` | 是 |
 | `POST /manager/recharge/records` | 管理员查指定用户充值流水，body `{userId}` | 是 |
 | `POST /manager/recharge/records/self` | 查自己的充值流水 | 是 |
-| `POST /manager/models` | 模型定价列表 | 是 |
+| `POST /manager/models` | 模型列表 | 是 |
 | `POST /manager/apikeys/list/self` | 查自己的 API Key 列表（key 脱敏） | 是 |
 | `POST /manager/apikeys/create/self` | 创建 API Key，body `{name, budget, unlimited}`，明文 key 仅本次返回 | 是 |
 | `POST /manager/apikeys/toggle/self` | 启用/禁用 API Key，body `{id}` | 是 |
@@ -265,10 +265,10 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/providers/create` | 新增提供商，body `{type, domain, headers}` |
 | `POST /manager/providers/update` | 编辑提供商（type 不可改），body `{type, domain, headers}` |
 | `POST /manager/providers/toggle` | 启停提供商，body `{type}` |
-| `POST /manager/models/list` | 模型定价列表，body `{provider, model}` 模糊搜索 |
-| `POST /manager/models/create` | 新增模型定价 |
-| `POST /manager/models/update` | 编辑模型定价（provider+model 不可改） |
-| `POST /manager/models/delete` | 删除模型定价 |
+| `POST /manager/models/list` | 模型列表，body `{provider, model}` 模糊搜索，返回项含 `supports_text/supports_image/supports_video` |
+| `POST /manager/models/create` | 新增模型，body `{provider, model, input_cache_hit_price, input_cache_miss_price, output_price, max_context_tokens, max_completion_tokens, supports_text, supports_image, supports_video}` |
+| `POST /manager/models/update` | 编辑模型（provider+model 不可改），字段同 create（无 provider/model，多 id）|
+| `POST /manager/models/delete` | 删除模型 |
 | `POST /manager/apikeys/list` | 查指定用户的 API Key，body `{user_id}` |
 | `POST /manager/apikeys/toggle` | 启停指定用户的 Key，body `{id}` |
 | `POST /manager/apikeys/delete` | 删除指定用户的 Key，body `{id}` |

@@ -126,7 +126,7 @@ export function toggleProvider(type) {
   return request('/providers/toggle', { type })
 }
 
-// ===== 超管：模型定价管理 =====
+// ===== 超管：模型管理 =====
 
 export function listModelsAdmin(provider, model) {
   return request('/models/list', { provider: provider || '', model: model || '' })
