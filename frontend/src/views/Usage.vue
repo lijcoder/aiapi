@@ -4,6 +4,10 @@
     <n-card size="small">
       <div style="display:flex;align-items:flex-start;gap:28px;flex-wrap:wrap">
         <div style="text-align:center">
+          <div style="font-size:12px;color:#909399">余额</div>
+          <div style="font-size:15px;font-weight:600;margin-top:2px;color:#e53935">¥{{ fix4(balance) }}</div>
+        </div>
+        <div style="text-align:center">
           <div style="font-size:12px;color:#909399">总请求</div>
           <div style="font-size:15px;font-weight:600;margin-top:2px">{{ summary.request_count }}</div>
         </div>
@@ -110,11 +114,15 @@
 import { ref, reactive, computed, onMounted, h } from 'vue'
 import { NCard, NDataTable, NInput, NSelect, NButton, NRadioGroup, NRadio, NRadioButton, useMessage } from 'naive-ui'
 import { usageStats, usageFilters } from '../api'
+import { useUser } from '../stores/user'
 import { fix4 } from '../utils'
 import { useChart } from '../composables/useChart'
 import { buildTimeTrendOption, buildDimensionOption, metricConfig } from '../charts'
 
 const message = useMessage()
+const { user, fetchUser } = useUser()
+
+const balance = ref(0)
 const loading = ref(false)
 
 const query = reactive({
@@ -197,6 +205,8 @@ async function doQuery() {
     )
     summary.value = data.summary || {}
     stats.value = data.rows || []
+    await fetchUser()
+    balance.value = user.value?.budget || 0
   } catch (e) {
     message.error(e.msg || '查询失败')
   } finally {

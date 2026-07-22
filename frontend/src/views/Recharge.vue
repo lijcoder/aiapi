@@ -3,7 +3,7 @@
     <n-card size="small" :bordered="false" style="background:#fff;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:12px;font-size:14px">
         <span style="color:#666">当前余额</span>
-        <span style="font-size:22px;font-weight:700;color:#18a058">¥ {{ fix4(balance) }}</span>
+        <span style="font-size:22px;font-weight:700;color:#e53935">¥ {{ fix4(balance) }}</span>
       </div>
     </n-card>
     <n-card title="充值流水" size="small">
