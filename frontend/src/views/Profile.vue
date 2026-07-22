@@ -1,25 +1,24 @@
 <template>
-  <div style="display:flex;flex-direction:column;gap:16px;max-width:560px">
+  <div style="display:flex;flex-direction:column;gap:16px;max-width:600px">
     <!-- 基本资料 -->
     <n-card title="基本资料" size="small">
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <div>
-          <div style="font-size:13px;margin-bottom:6px">账号</div>
+      <n-form label-placement="left" :label-width="80" size="medium" style="margin-top:8px">
+        <n-form-item label="账号">
           <n-input :value="user?.account" disabled />
-        </div>
-        <div>
-          <div style="font-size:13px;margin-bottom:6px">姓名</div>
-          <n-input v-model:value="profileForm.name" placeholder="姓名" maxlength="64" />
-        </div>
-        <div>
-          <div style="font-size:13px;margin-bottom:6px">邮箱（选填）</div>
-          <n-input v-model:value="profileForm.email" placeholder="name@example.com" maxlength="128" />
-        </div>
-        <p v-if="profileMsg" style="color:#d03050;font-size:13px;margin:0">{{ profileMsg }}</p>
-        <div style="display:flex;gap:10px">
-          <n-button type="primary" :loading="savingProfile" @click="saveProfile">保存资料</n-button>
-          <n-button type="error" @click="router.push('/profile/password')">修改密码</n-button>
-        </div>
+        </n-form-item>
+        <n-form-item label="姓名">
+          <n-input v-model:value="profileForm.name" placeholder="请输入姓名" maxlength="64" />
+        </n-form-item>
+        <n-form-item label="邮箱">
+          <n-input v-model:value="profileForm.email" placeholder="name@example.com（选填）" maxlength="128" />
+        </n-form-item>
+      </n-form>
+
+      <p v-if="profileMsg" style="color:#d03050;font-size:13px;margin:0 0 8px">{{ profileMsg }}</p>
+
+      <div style="display:flex;padding-left:80px">
+        <n-button type="primary" :loading="savingProfile" @click="saveProfile">保存资料</n-button>
+        <n-button type="error" style="margin-left:auto" @click="router.push('/profile/password')">修改密码</n-button>
       </div>
     </n-card>
   </div>
@@ -28,7 +27,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { NCard, NInput, NButton, useMessage } from 'naive-ui'
+import { NCard, NInput, NButton, NForm, NFormItem, useMessage } from 'naive-ui'
 import { updateProfileSelf } from '../api'
 import { useUser } from '../stores/user'
 
