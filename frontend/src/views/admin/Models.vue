@@ -120,7 +120,7 @@ const columns = [
 
 function fmtK(n) {
   if (!n) return '-'
-  return (n / 1024).toFixed(1).replace(/0+$/, '').replace(/\.$/, '') + 'K'
+  return (n / 1000).toFixed(1).replace(/0+$/, '').replace(/\.$/, '') + 'K'
 }
 
 async function load() {

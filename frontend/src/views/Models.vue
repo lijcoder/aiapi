@@ -16,8 +16,8 @@ const columns = [
   { title: '缓存命中价', key: 'input_cache_hit_price', width: 110, render(r) { return '¥' + fix4(r.input_cache_hit_price) }},
   { title: '缓存未命中价', key: 'input_cache_miss_price', width: 120, render(r) { return '¥' + fix4(r.input_cache_miss_price) }},
   { title: '输出价', key: 'output_price', width: 100, render(r) { return '¥' + fix4(r.output_price) }},
-  { title: '上下文', key: 'max_context_tokens', width: 80, render(r) { return r.max_context_tokens ? (r.max_context_tokens/1024).toFixed(1).replace(/0+$/,'').replace(/\.$/,'')+'K' : '-' }},
-  { title: '最大输出', key: 'max_completion_tokens', width: 80, render(r) { return r.max_completion_tokens ? (r.max_completion_tokens/1024).toFixed(1).replace(/0+$/,'').replace(/\.$/,'')+'K' : '-' }},
+  { title: '上下文', key: 'max_context_tokens', width: 80, render(r) { return r.max_context_tokens ? (r.max_context_tokens/1000).toFixed(1).replace(/0+$/,'').replace(/\.$/,'')+'K' : '-' }},
+  { title: '最大输出', key: 'max_completion_tokens', width: 80, render(r) { return r.max_completion_tokens ? (r.max_completion_tokens/1000).toFixed(1).replace(/0+$/,'').replace(/\.$/,'')+'K' : '-' }},
   { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) }},
 ]
 
