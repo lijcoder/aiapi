@@ -2,50 +2,38 @@
   <div style="display:flex;flex-direction:column;gap:16px">
     <!-- 顶部指标 -->
     <n-card size="small">
-      <div style="display:flex;align-items:flex-start;gap:28px;flex-wrap:wrap">
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">余额</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px;color:#e53935">¥{{ fix4(balance) }}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px 28px">
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">余额</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px;color:#e53935">¥{{ fix4(balance) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">总请求</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ summary.request_count }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">总请求</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">{{ fNum(summary.request_count) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">总Token</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.total_tokens) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">总Token</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">{{ fNum(summary.total_tokens) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">输入Token</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.input_tokens) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">总费用</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">¥{{ fix4(summary.total_cost) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">输出Token</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.output_tokens) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">平均费用</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">¥{{ fix4(summary.avg_cost) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">缓存命中</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.cached_tokens) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">输入Token</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">{{ fNum(summary.input_tokens) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">缓存未命中</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.cache_miss_tokens) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">输出Token</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">{{ fNum(summary.output_tokens) }}</div>
         </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">推理Token</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fNum(summary.reasoning_tokens) }}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">缓存命中率</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">{{ fmtRate(summary.cache_hit_rate) }}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">总费用</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">¥{{ fix4(summary.total_cost) }}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:12px;color:#909399">单请求平均费用</div>
-          <div style="font-size:15px;font-weight:600;margin-top:2px">¥{{ fix4(summary.avg_cost) }}</div>
+        <div style="text-align:center;min-width:80px">
+          <div style="font-size:12px;color:#666">缓存命中率</div>
+          <div style="font-size:14px;font-weight:600;margin-top:2px">{{ fmtRate(summary.cache_hit_rate) }}</div>
         </div>
       </div>
     </n-card>
