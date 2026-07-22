@@ -43,6 +43,7 @@ func Auth(ctx *types.Context) {
 		return
 	}
 	ctx.UserID = user.ID
+	ctx.ApiKeyID = key.ID
 
 	// 校验模型定价配置是否存在
 	pvd, err := store.C().Model().Get(ctx.ProviderType, ctx.Model)
@@ -59,4 +60,21 @@ func Auth(ctx *types.Context) {
 		return
 	}
 	ctx.ModelInfo = pvd
+
+	// 校验该 API Key 是否有权访问此模型
+	// 策略为 all（或未配置）时放行；为 whitelist 时按 apikey_model_access 白名单判定
+	allowed, err := store.C().Model().IsModelAllowedByApiKey(ctx.ApiKeyID, pvd.ID)
+	if err != nil {
+		ctx.Err = log.WithStack(err)
+		ctx.ErrorMessage = types.InternalServerError
+		ctx.Code = types.CodeUnknown
+		return
+	}
+	if !allowed {
+		ctx.Err = log.WithStack(fmt.Errorf("model not allowed for api key: key_id=%d model_id=%d", ctx.ApiKeyID, pvd.ID))
+		// 对外表现为「模型不存在」，不暴露权限细节
+		ctx.ErrorMessage = fmt.Sprintf("model %s/%s is not available", ctx.ProviderType, ctx.Model)
+		ctx.Code = types.CodeModelNotFound
+		return
+	}
 }

@@ -40,6 +40,7 @@ type Context struct {
 	OrigHeaders                        map[string][]string
 	StartTime                          time.Time
 	UserID                             int64
+	ApiKeyID                           int64
 	UserUnlimited                      bool
 	KeyUnlimited                       bool
 

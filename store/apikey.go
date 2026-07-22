@@ -150,13 +150,21 @@ func (ks *ApiKeyStore) SumLimitedBudgetByUser(userID int64) (float64, error) {
 	return sum, nil
 }
 
-// Delete 删除 API Key
+// Delete 删除 API Key（同时清理模型白名单）
 func (ks *ApiKeyStore) Delete(id int64) error {
-	_, err := ks.s.Query(
-		`DELETE FROM api_keys WHERE id = :id`,
-		map[string]any{"id": id},
-	).Exec()
-	return err
+	return T(func(s *Session) error {
+		if _, err := s.Query(
+			`DELETE FROM apikey_model_access WHERE api_key_id = :id`,
+			map[string]any{"id": id},
+		).Exec(); err != nil {
+			return err
+		}
+		_, err := s.Query(
+			`DELETE FROM api_keys WHERE id = :id`,
+			map[string]any{"id": id},
+		).Exec()
+		return err
+	})
 }
 
 // IsUniqueConstraintErr 判断是否为唯一约束冲突错误。

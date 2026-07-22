@@ -79,14 +79,15 @@ type UserSession struct {
 
 // ApiKey API 密钥
 type ApiKey struct {
-	ID        int64     `db:"id" json:"id"`
-	UserID    int64     `db:"user_id" json:"user_id"`
-	Key       string    `db:"key" json:"key"`
-	Name      string    `db:"name" json:"name"`
-	Budget    float64   `db:"budget" json:"budget"`
-	Unlimited bool      `db:"unlimited" json:"unlimited"`
-	Enabled   bool      `db:"enabled" json:"enabled"`
-	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	ID          int64     `db:"id" json:"id"`
+	UserID      int64     `db:"user_id" json:"user_id"`
+	Key         string    `db:"key" json:"key"`
+	Name        string    `db:"name" json:"name"`
+	Budget      float64   `db:"budget" json:"budget"`
+	Unlimited   bool      `db:"unlimited" json:"unlimited"`
+	Enabled     bool      `db:"enabled" json:"enabled"`
+	ModelPolicy string    `db:"model_policy" json:"model_policy"`
+	CreatedAt   time.Time `db:"created_at" json:"created_at"`
 }
 
 // Model 模型价格配置
@@ -174,5 +175,13 @@ type RoleMenu struct {
 	ID        int64     `db:"id" json:"id"`
 	RoleID    int64     `db:"role_id" json:"role_id"`
 	MenuID    int64     `db:"menu_id" json:"menu_id"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
+}
+
+// ApiKeyModelAccess API Key 模型白名单明细（model_policy='whitelist' 时生效）
+type ApiKeyModelAccess struct {
+	ID        int64     `db:"id" json:"id"`
+	ApiKeyID  int64     `db:"api_key_id" json:"api_key_id"`
+	ModelID   int64     `db:"model_id" json:"model_id"`
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }

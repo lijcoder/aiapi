@@ -10,7 +10,7 @@
       <template #header-extra>
         <n-button size="small" @click="goBack">返回</n-button>
       </template>
-      <n-data-table :columns="columns" :data="keys" :loading="tableLoading" :bordered="false" size="small" :scroll-x="970" style="width:100%" />
+      <n-data-table :columns="columns" :data="keys" :loading="tableLoading" :bordered="false" size="small" :scroll-x="960" style="width:100%" />
     </n-card>
 
     <!-- 改名弹窗 -->
@@ -47,15 +47,25 @@
         </n-space>
       </template>
     </n-modal>
+    <!-- 模型权限弹窗 -->
+    <ModelAccessDialog
+      v-model:visible="showModelAccess"
+      :api-key-id="modelAccessKeyId"
+      :admin="true"
+      :models="allModels"
+      title="模型访问权限"
+      @saved="loadKeys"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, h, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NTag, NIcon, NTooltip, NRadioGroup, NRadio, NBreadcrumb, NBreadcrumbItem, useMessage, useDialog } from 'naive-ui'
+import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NTag, NIcon, NTooltip, NDropdown, NRadioGroup, NRadio, NBreadcrumb, NBreadcrumbItem, useMessage, useDialog } from 'naive-ui'
 import { CreateOutline } from '@vicons/ionicons5'
-import { listUserApiKeys, toggleUserApiKey, deleteUserApiKey, renameUserApiKey, updateUserApiKeyBudget, listUsers } from '../../api'
+import { listUserApiKeys, toggleUserApiKey, deleteUserApiKey, renameUserApiKey, updateUserApiKeyBudget, listUsers, listModelsAdmin } from '../../api'
+import ModelAccessDialog from '../../components/ModelAccessDialog.vue'
 import { fix4, formatTime } from '../../utils'
 
 const route = useRoute()
@@ -81,6 +91,11 @@ const budgetMode = ref('limited')
 const budgetVal = ref(0)
 const budgetMax = ref(0)
 const savingBudget = ref(false)
+
+// 模型权限弹窗
+const showModelAccess = ref(false)
+const modelAccessKeyId = ref(0)
+const allModels = ref([])
 
 const budgetOver = computed(() => {
   if (budgetMode.value !== 'limited') return false
@@ -108,15 +123,27 @@ const columns = [
   { title: '状态', key: 'enabled', width: 90, render(r){ return r.enabled ? h(NTag,{size:'small',type:'success'},{default:()=>'启用'}) : h(NTag,{size:'small',type:'error'},{default:()=>'禁用'}) } },
   { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) } },
   {
-    title: '操作', key: 'actions', width: 210, fixed: 'right',
+    title: '操作', key: 'actions', width: 150, fixed: 'right',
     render(r) {
-      return h(NSpace, { size: 8 }, () => [
-        h(NButton, { size: 'small', tertiary: true, type: 'info', onClick: () => openBudget(r) }, () => '修改额度'),
+      const moreOptions = [
+        { label: '模型权限', key: 'model_access' },
+        { label: '修改额度', key: 'budget' },
+        { type: 'divider', key: 'd1' },
+        { label: '删除', key: 'delete' },
+      ]
+      function onSelect(key) {
+        if (key === 'model_access') openModelAccess(r)
+        else if (key === 'budget') openBudget(r)
+        else if (key === 'delete') onDelete(r)
+      }
+      return h(NSpace, { size: 6 }, () => [
         h(NButton, {
           size: 'small', tertiary: true, type: r.enabled ? 'warning' : 'success',
           onClick: () => onToggle(r)
         }, () => r.enabled ? '禁用' : '启用'),
-        h(NButton, { size: 'small', tertiary: true, type: 'error', onClick: () => onDelete(r) }, () => '删除'),
+        h(NDropdown, { options: moreOptions, trigger: 'click', onSelect: (k) => onSelect(k) }, {
+          default: () => h(NButton, { size: 'small', tertiary: true }, () => '更多')
+        }),
       ])
     }
   }
@@ -206,6 +233,18 @@ function openBudget(r) {
   showBudget.value = true
 }
 
+function openModelAccess(r) {
+  modelAccessKeyId.value = r.id
+  showModelAccess.value = true
+}
+
+async function loadModels() {
+  try {
+    const data = await listModelsAdmin('', '')
+    allModels.value = data?.models || []
+  } catch {}
+}
+
 async function doSaveBudget() {
   if (budgetMode.value === 'limited' && (budgetVal.value == null || budgetVal.value < 0)) {
     message.warning('金额不能小于 0')
@@ -235,5 +274,6 @@ async function doSaveBudget() {
 onMounted(() => {
   loadUserInfo()
   loadKeys()
+  loadModels()
 })
 </script>

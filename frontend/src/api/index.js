@@ -166,6 +166,24 @@ export function updateUserApiKeyBudget(id, budget, unlimited) {
   return request('/apikeys/budget', { id, budget, unlimited })
 }
 
+// ===== API Key 模型访问策略 =====
+
+export function getApiKeyModelAccess(apiKeyId) {
+  return request('/apikeys/models/get', { api_key_id: apiKeyId })
+}
+
+export function setApiKeyModelAccess(apiKeyId, modelPolicy, modelIds) {
+  return request('/apikeys/models/set', { api_key_id: apiKeyId, model_policy: modelPolicy, model_ids: modelIds })
+}
+
+export function getApiKeyModelAccessSelf(apiKeyId) {
+  return request('/apikeys/models/get/self', { api_key_id: apiKeyId })
+}
+
+export function setApiKeyModelAccessSelf(apiKeyId, modelPolicy, modelIds) {
+  return request('/apikeys/models/set/self', { api_key_id: apiKeyId, model_policy: modelPolicy, model_ids: modelIds })
+}
+
 // ===== 超管：全平台充值流水 =====
 
 export function listAllRechargeRecords(keyword) {

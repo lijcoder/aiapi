@@ -435,3 +435,135 @@ func UpdateBudgetApiKeyAdmin(ctx context.Context, req *UpdateBudgetApiKeyReq) (*
 	item := toApiKeyItem(*k, true)
 	return &item, nil
 }
+
+// ===== API Key 模型访问策略 =====
+
+// ApiKeyModelAccessReq 查询 Key 模型策略的请求
+ type ApiKeyModelAccessReq struct {
+	ApiKeyID int64 `json:"api_key_id"`
+}
+
+// SetApiKeyModelAccessReq 设置 Key 模型策略的请求
+ type SetApiKeyModelAccessReq struct {
+	ApiKeyID    int64   `json:"api_key_id"`
+	ModelPolicy string  `json:"model_policy"` // all | whitelist
+	ModelIDs    []int64 `json:"model_ids"`    // whitelist 策略下生效
+}
+
+// ApiKeyModelAccessResp Key 模型策略响应
+ type ApiKeyModelAccessResp struct {
+	ModelPolicy string  `json:"model_policy"`
+	ModelIDs    []int64 `json:"model_ids"`
+}
+
+// validateModelPolicy 校验策略值
+func validateModelPolicy(p string) *base.BizError {
+	if p != store.ModelPolicyAll && p != store.ModelPolicyWhitelist {
+		return base.NewBizError(base.CodeInvalidParams, "model_policy must be 'all' or 'whitelist'")
+	}
+	return nil
+}
+
+// GetApiKeyModelAccessSelf 普通用户查询自己 Key 的模型策略
+func GetApiKeyModelAccessSelf(ctx context.Context, req *ApiKeyModelAccessReq) (*ApiKeyModelAccessResp, *base.BizError) {
+	cur := base.CurrentUser(ctx)
+	if req.ApiKeyID <= 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "api_key_id is required")
+	}
+	k, err := store.C().ApiKey().GetByID(req.ApiKeyID)
+	if err != nil {
+		slog.Error("get api key failed", "err", err, "id", req.ApiKeyID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if k == nil || k.UserID != cur.ID {
+		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+	}
+	policy, modelIDs, err := store.C().Model().GetApiKeyModelAccess(req.ApiKeyID)
+	if err != nil {
+		slog.Error("get api key model access failed", "err", err, "id", req.ApiKeyID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if modelIDs == nil {
+		modelIDs = []int64{}
+	}
+	return &ApiKeyModelAccessResp{ModelPolicy: policy, ModelIDs: modelIDs}, nil
+}
+
+// SetApiKeyModelAccessSelf 普通用户设置自己 Key 的模型策略
+func SetApiKeyModelAccessSelf(ctx context.Context, req *SetApiKeyModelAccessReq) (*ApiKeyModelAccessResp, *base.BizError) {
+	cur := base.CurrentUser(ctx)
+	if req.ApiKeyID <= 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "api_key_id is required")
+	}
+	if berr := validateModelPolicy(req.ModelPolicy); berr != nil {
+		return nil, berr
+	}
+	k, err := store.C().ApiKey().GetByID(req.ApiKeyID)
+	if err != nil {
+		slog.Error("get api key failed", "err", err, "id", req.ApiKeyID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if k == nil || k.UserID != cur.ID {
+		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+	}
+	modelIDs := req.ModelIDs
+	if modelIDs == nil {
+		modelIDs = []int64{}
+	}
+	if err := store.C().Model().SetApiKeyModelAccess(req.ApiKeyID, req.ModelPolicy, modelIDs); err != nil {
+		slog.Error("set api key model access failed", "err", err, "id", req.ApiKeyID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	return &ApiKeyModelAccessResp{ModelPolicy: req.ModelPolicy, ModelIDs: modelIDs}, nil
+}
+
+// GetApiKeyModelAccessAdmin 超管查询指定 Key 的模型策略
+func GetApiKeyModelAccessAdmin(ctx context.Context, req *ApiKeyModelAccessReq) (*ApiKeyModelAccessResp, *base.BizError) {
+	if req.ApiKeyID <= 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "api_key_id is required")
+	}
+	k, err := store.C().ApiKey().GetByID(req.ApiKeyID)
+	if err != nil {
+		slog.Error("get api key failed", "err", err, "id", req.ApiKeyID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if k == nil {
+		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+	}
+	policy, modelIDs, err := store.C().Model().GetApiKeyModelAccess(req.ApiKeyID)
+	if err != nil {
+		slog.Error("get api key model access failed", "err", err, "id", req.ApiKeyID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if modelIDs == nil {
+		modelIDs = []int64{}
+	}
+	return &ApiKeyModelAccessResp{ModelPolicy: policy, ModelIDs: modelIDs}, nil
+}
+
+// SetApiKeyModelAccessAdmin 超管设置指定 Key 的模型策略
+func SetApiKeyModelAccessAdmin(ctx context.Context, req *SetApiKeyModelAccessReq) (*ApiKeyModelAccessResp, *base.BizError) {
+	if req.ApiKeyID <= 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "api_key_id is required")
+	}
+	if berr := validateModelPolicy(req.ModelPolicy); berr != nil {
+		return nil, berr
+	}
+	k, err := store.C().ApiKey().GetByID(req.ApiKeyID)
+	if err != nil {
+		slog.Error("get api key failed", "err", err, "id", req.ApiKeyID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	if k == nil {
+		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+	}
+	modelIDs := req.ModelIDs
+	if modelIDs == nil {
+		modelIDs = []int64{}
+	}
+	if err := store.C().Model().SetApiKeyModelAccess(req.ApiKeyID, req.ModelPolicy, modelIDs); err != nil {
+		slog.Error("set api key model access failed", "err", err, "id", req.ApiKeyID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	return &ApiKeyModelAccessResp{ModelPolicy: req.ModelPolicy, ModelIDs: modelIDs}, nil
+}

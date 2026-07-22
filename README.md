@@ -247,6 +247,8 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/apikeys/delete/self` | 删除 API Key，body `{id}` | 是 |
 | `POST /manager/apikeys/rename/self` | 重命名 API Key，body `{id, name}` | 是 |
 | `POST /manager/apikeys/budget/self` | 修改 API Key 额度/限额模式，body `{id, budget, unlimited}`，有限额 key 总和不能超过账户余额 | 是 |
+| `POST /manager/apikeys/models/get/self` | 查自己的 Key 的模型访问策略，body `{api_key_id}`，返回 `{model_policy, model_ids}` | 是 |
+| `POST /manager/apikeys/models/set/self` | 设置自己的 Key 的模型访问策略，body `{api_key_id, model_policy(all\|whitelist), model_ids}` | 是 |
 | `POST /manager/usage/stats/self` | Token 用量统计，body `{mode, start_date, end_date, api_key_id(可选), model(可选), provider(可选), group_by(可选: model/provider/api_key)}`，返回 `{summary:{request_count, input_tokens, output_tokens, cached_tokens, cache_miss_tokens, reasoning_tokens, total_tokens, cache_hit_rate, total_cost, avg_cost}, rows:[{label, ...}]}` | 是 |
 | `POST /manager/usage/filters/self` | 获取筛选选项（用过的 api_key / model / provider 列表）| 是 |
 
@@ -274,6 +276,8 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/apikeys/delete` | 删除指定用户的 Key，body `{id}` |
 | `POST /manager/apikeys/rename` | 重命名指定用户的 Key，body `{id, name}` |
 | `POST /manager/apikeys/budget` | 修改指定用户 Key 额度，body `{id, budget, unlimited}` |
+| `POST /manager/apikeys/models/get` | 查指定 Key 的模型访问策略，body `{api_key_id}`，返回 `{model_policy, model_ids}` |
+| `POST /manager/apikeys/models/set` | 设置指定 Key 的模型访问策略，body `{api_key_id, model_policy(all\|whitelist), model_ids}` |
 | `POST /manager/recharge/records/list` | 全平台充值流水，body `{keyword}` 按用户名/账号/备注搜索 |
 | `POST /manager/usage/stats` | 全局统计，body `{mode, start_date, end_date, user_id(可选), api_key_id(可选), model(可选), provider(可选), group_by(可选: user/model/provider/api_key)}` |
 | `POST /manager/usage/filters` | 全局筛选选项（含用户列表） |

@@ -20,6 +20,8 @@ INSERT OR IGNORE INTO role_permission (role_id, entity, action, value) VALUES
   (2, 'API', '*', '/manager/apikeys/delete/self'),
   (2, 'API', '*', '/manager/apikeys/rename/self'),
   (2, 'API', '*', '/manager/apikeys/budget/self'),
+  (2, 'API', '*', '/manager/apikeys/models/get/self'),
+  (2, 'API', '*', '/manager/apikeys/models/set/self'),
   (2, 'API', '*', '/manager/usage/stats/self'),
   (2, 'API', '*', '/manager/usage/filters/self');
 

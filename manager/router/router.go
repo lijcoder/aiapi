@@ -33,6 +33,8 @@ func Register(g *echo.Group) {
 	g.POST("/apikeys/delete/self", base.Wrap(handler.DeleteApiKeySelf))
 	g.POST("/apikeys/rename/self", base.Wrap(handler.RenameApiKeySelf))
 	g.POST("/apikeys/budget/self", base.Wrap(handler.UpdateBudgetApiKeySelf))
+	g.POST("/apikeys/models/get/self", base.Wrap(handler.GetApiKeyModelAccessSelf))
+	g.POST("/apikeys/models/set/self", base.Wrap(handler.SetApiKeyModelAccessSelf))
 
 	g.POST("/usage/stats/self", base.Wrap(handler.UsageStatsSelf))
 	g.POST("/usage/filters/self", base.Wrap(handler.UsageFiltersSelf))
@@ -64,6 +66,8 @@ func Register(g *echo.Group) {
 	g.POST("/apikeys/delete", base.Wrap(handler.DeleteApiKeyAdmin))
 	g.POST("/apikeys/rename", base.Wrap(handler.RenameApiKeyAdmin))
 	g.POST("/apikeys/budget", base.Wrap(handler.UpdateBudgetApiKeyAdmin))
+	g.POST("/apikeys/models/get", base.Wrap(handler.GetApiKeyModelAccessAdmin))
+	g.POST("/apikeys/models/set", base.Wrap(handler.SetApiKeyModelAccessAdmin))
 
 	// 超管：全平台充值流水
 	g.POST("/recharge/records/list", base.Wrap(handler.ListRechargeRecords))

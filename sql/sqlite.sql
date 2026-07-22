@@ -45,9 +45,23 @@ CREATE TABLE IF NOT EXISTS api_keys (
     budget     REAL NOT NULL DEFAULT 0,
     unlimited  INTEGER NOT NULL DEFAULT 0,
     enabled    INTEGER DEFAULT 1,
+    model_policy TEXT NOT NULL DEFAULT 'all',  -- 'all'=全量放行 | 'whitelist'=按 apikey_model_access 白名单
     created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_key ON api_keys(key);
+
+-- api_keys 扩展：增加 model_policy 列（模型访问策略）
+-- 新建库直接用上方定义；存量库需手动迁移：
+--   ALTER TABLE api_keys ADD COLUMN model_policy TEXT NOT NULL DEFAULT 'all';
+
+-- API Key 模型白名单明细（model_policy='whitelist' 时生效）
+CREATE TABLE IF NOT EXISTS apikey_model_access (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    api_key_id  INTEGER NOT NULL,
+    model_id    INTEGER NOT NULL,
+    created_at  DATETIME DEFAULT (datetime('now', 'localtime')),
+    UNIQUE(api_key_id, model_id)
+);
 
 CREATE TABLE IF NOT EXISTS usage_records (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -7,6 +7,15 @@
 
 ### 2026-07-22
 
+- 新增 API Key 级模型访问控制。
+  - `api_keys` 表新增 `model_policy` 字段（默认 `'all'`），`all`=全量放行，`whitelist`=按白名单。
+  - 新增 `apikey_model_items` 表存储白名单明细（model_policy=`whitelist` 时生效）。
+  - Proxy Pipeline 在 Auth handler 内追加模型权限校验（紧跟模型配置校验之后），按 Key 策略判定是否可访问请求模型，不通过时返回 404（对外不暴露权限细节）。
+  - 管理端新增 4 个接口：超管版 `/manager/apikeys/models/get`、`/set`；普通用户自助版 `/apikeys/models/get/self`、`/set/self`（自助版校验 Key 归属）。
+  - 前端新增可复用 `ModelAccessDialog` 组件，超管与普通用户的 Key 管理页操作列均加「模型权限」按钮，支持全量/白名单切换，白名单按 provider 分组多选。
+  - 删除 API Key 时事务内级联清理白名单明细。
+  - 存量库迁移：`ALTER TABLE api_keys ADD COLUMN model_policy TEXT NOT NULL DEFAULT 'all';` + 建 `apikey_model_items` 表。
+
 - 修复全局统计「按 Key」分组时表格不显示 Key 名称的问题。admin 版原先因「跨用户 key 名不唯一」而不填充名称，导致主行只显示「-」；现改为查全部 Key 构建 key→name 映射并填充，同时优化前端渲染：有名称时显示「名称 + 脱敏 Key」双行，无名称（已删除/未命名）时直接显示脱敏 Key 单行。普通用户统计页同步优化。
 
 - 超管侧栏菜单「模型定价」改名为「模型管理」，相关页面卡片标题与代码注释同步统一。存量库需执行 `UPDATE menus SET name='模型管理' WHERE id=8;`。
