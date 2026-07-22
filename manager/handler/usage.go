@@ -313,11 +313,25 @@ func UsageStatsAdmin(ctx context.Context, req *UsageStatsAdminReq) (*UsageStatsA
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
 
-	// 按 api_key 分组：脱敏（admin 版不填充名称，因为跨用户 key 不唯一名称）
+	// 按 api_key 分组：填充名称 + 脱敏 + 标记是否已删除
 	if req.GroupBy == "api_key" {
+		allKeys, err := store.C().ApiKey().ListAll()
+		if err != nil {
+			slog.Error("list all api keys for stats failed", "err", err)
+			return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		}
+		keyNameMap := make(map[string]string, len(allKeys))
+		for _, k := range allKeys {
+			keyNameMap[k.Key] = k.Name
+		}
 		for i := range rows {
-			rows[i].SubLabel = ""
-			rows[i].KeyExists = ptrBool(true)
+			if name, ok := keyNameMap[rows[i].Label]; ok {
+				rows[i].SubLabel = name
+				rows[i].KeyExists = ptrBool(true)
+			} else {
+				rows[i].SubLabel = ""
+				rows[i].KeyExists = ptrBool(false)
+			}
 			rows[i].Label = maskApiKey(rows[i].Label)
 		}
 	}

@@ -173,8 +173,11 @@ const cols = computed(() => [
     render(r) {
       if (query.groupBy !== 'api_key') return r.label
       const deleted = r.key_exists === false
+      if (!r.sub_label) {
+        return h('div', { style: deleted ? 'color:#d03050' : '' }, r.label)
+      }
       return h('div', [
-        h('div', { style: deleted ? 'color:#d03050;font-weight:500' : 'font-weight:500' }, r.sub_label || '-'),
+        h('div', { style: deleted ? 'color:#d03050;font-weight:500' : 'font-weight:500' }, r.sub_label),
         h('div', { style: 'font-size:12px;color:#909399' }, r.label)
       ])
     }
