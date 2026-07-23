@@ -81,9 +81,14 @@ func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate, apiKey
 		groupExpr = labelExpr // 时间表达式本身
 	}
 
+	// 时间趋势按 label 升序（旧→新，折线图正序）；维度分组按 label 降序（值大在前）
+	orderDir := "ASC"
+	if groupBy != "" {
+		orderDir = "DESC"
+	}
 	query := fmt.Sprintf(
-		`SELECT %s AS label, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, SUM(cached_tokens) AS cached_tokens, SUM(input_tokens) - SUM(cached_tokens) AS cache_miss_tokens, SUM(reasoning_tokens) AS reasoning_tokens, SUM(total_tokens) AS total_tokens, ROUND(CAST(SUM(cached_tokens) AS REAL) / NULLIF(SUM(input_tokens), 0), 4) AS cache_hit_rate, SUM(cost) AS cost, COUNT(*) AS request_count FROM usage_records %s GROUP BY %s ORDER BY label DESC`,
-		labelExpr, where, groupExpr,
+		`SELECT %s AS label, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, SUM(cached_tokens) AS cached_tokens, SUM(input_tokens) - SUM(cached_tokens) AS cache_miss_tokens, SUM(reasoning_tokens) AS reasoning_tokens, SUM(total_tokens) AS total_tokens, ROUND(CAST(SUM(cached_tokens) AS REAL) / NULLIF(SUM(input_tokens), 0), 4) AS cache_hit_rate, SUM(cost) AS cost, COUNT(*) AS request_count FROM usage_records %s GROUP BY %s ORDER BY label %s`,
+		labelExpr, where, groupExpr, orderDir,
 	)
 
 	var rows []UsageStatRow
@@ -165,9 +170,14 @@ func (us *UsageStore) StatsByAdmin(userID int64, mode, startDate, endDate, apiKe
 
 	where, params := buildUsageAdminWhere(userID, startDate, endDate, apiKey, mdl, provider)
 
+	// 时间趋势按 label 升序（旧→新，折线图正序）；维度分组按 label 降序（值大在前）
+	orderDir := "ASC"
+	if groupBy != "" {
+		orderDir = "DESC"
+	}
 	query := fmt.Sprintf(
-		`SELECT %s AS label, SUM(u.input_tokens) AS input_tokens, SUM(u.output_tokens) AS output_tokens, SUM(u.cached_tokens) AS cached_tokens, SUM(u.input_tokens) - SUM(u.cached_tokens) AS cache_miss_tokens, SUM(u.reasoning_tokens) AS reasoning_tokens, SUM(u.total_tokens) AS total_tokens, ROUND(CAST(SUM(u.cached_tokens) AS REAL) / NULLIF(SUM(u.input_tokens), 0), 4) AS cache_hit_rate, SUM(u.cost) AS cost, COUNT(*) AS request_count FROM usage_records u %s %s GROUP BY %s ORDER BY label DESC`,
-		labelExpr, join, where, groupExpr,
+		`SELECT %s AS label, SUM(u.input_tokens) AS input_tokens, SUM(u.output_tokens) AS output_tokens, SUM(u.cached_tokens) AS cached_tokens, SUM(u.input_tokens) - SUM(u.cached_tokens) AS cache_miss_tokens, SUM(u.reasoning_tokens) AS reasoning_tokens, SUM(u.total_tokens) AS total_tokens, ROUND(CAST(SUM(u.cached_tokens) AS REAL) / NULLIF(SUM(u.input_tokens), 0), 4) AS cache_hit_rate, SUM(u.cost) AS cost, COUNT(*) AS request_count FROM usage_records u %s %s GROUP BY %s ORDER BY label %s`,
+		labelExpr, join, where, groupExpr, orderDir,
 	)
 
 	var rows []UsageStatRow
@@ -334,7 +344,7 @@ func (us *UsageStore) Dashboard() (*DashboardSummary, []DashboardTrendRow, error
 		 FROM usage_records
 		 WHERE created_at >= :start
 		 GROUP BY DATE(created_at)
-		 ORDER BY label DESC`,
+		 ORDER BY label ASC`,
 		map[string]any{"start": time.Now().AddDate(0, 0, -6).Format("2006-01-02") + " 00:00:00"},
 	).Select(&rows)
 	if err != nil {
