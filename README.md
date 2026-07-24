@@ -233,6 +233,15 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 - 改密 / 禁用用户 / 重置密码后吊销该用户所有会话，即时失效。
 - 账号不存在 / 禁用 / 密码错统一返回相同文案，防账号枚举。
 - access JWT 签名密钥由环境变量 `AIAPI_JWT_SECRET`（≥32 字节）提供，启动校验。
+- **HTTPS 反代部署**：refresh cookie 的 `Secure` 标记由后端根据请求 scheme 动态判定。若用 nginx 终止 TLS、HTTP 反代到后端，需转发 `X-Forwarded-Proto` 头（或 `X-Forwarded-Protocol` / `X-Forwarded-Ssl: on` / `X-Url-Scheme` 任一），后端据此识别为 HTTPS 并设置 `Secure`，否则会被误判为 HTTP：
+  ```nginx
+  location / {
+      proxy_pass http://127.0.0.1:8887;
+      proxy_set_header Host $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;   # 必须转发，否则 Secure cookie 识别失败
+  }
+  ```
 
 ### 权限模型
 
