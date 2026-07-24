@@ -27,7 +27,7 @@ type loginReq struct {
 // 安全要点：
 //   - 账号不存在/密码错/账号禁用统一返回相同文案，防账号枚举
 //   - access JWT 短期（15min）放响应体，前端存内存
-//   - refresh token 长期（滑动7天/绝对30天）放 HttpOnly Secure cookie，JS 不可读
+//   - refresh token 长期（滑动7天/绝对30天）放 HttpOnly cookie（HTTPS 下带 Secure 标记），JS 不可读
 func Login(c echo.Context) error {
 	var req loginReq
 	if err := base.BindJSON(c, &req); err != nil {
@@ -111,8 +111,10 @@ func Logout(c echo.Context) error {
 
 // ===== 辅助函数 =====
 
-// setRefreshCookie 写 refresh token 到 HttpOnly Secure cookie。
+// setRefreshCookie 写 refresh token 到 HttpOnly cookie。
 // Path 限定 /manager，SameSite=Lax 防 CSRF。
+// Secure 跟随当前请求是否 HTTPS：HTTPS 部署下开启，HTTP（如本地开发）下关闭，
+// 否则浏览器会拒绝存储/发送 Secure cookie，导致 refresh 失败、登录态丢失。
 func setRefreshCookie(c echo.Context, token string, expires time.Time) {
 	c.SetCookie(&http.Cookie{
 		Name:     base.CookieName,
@@ -121,7 +123,7 @@ func setRefreshCookie(c echo.Context, token string, expires time.Time) {
 		Expires:  expires,
 		MaxAge:   int(time.Until(expires).Seconds()),
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   c.Scheme() == "https",
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -133,7 +135,7 @@ func clearRefreshCookie(c echo.Context) {
 		Path:     base.CookiePath,
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   c.Scheme() == "https",
 		SameSite: http.SameSiteLaxMode,
 	})
 }

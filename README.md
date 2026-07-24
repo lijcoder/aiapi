@@ -224,7 +224,7 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | token | 载体 | 有效期 | 状态 |
 |-------|------|--------|------|
 | access JWT | 响应体返回，前端存内存，请求经 `Authorization: Bearer` 头携带 | 15 分钟 | 无状态（HS256 自实现，不落库） |
-| refresh token | HttpOnly Secure cookie `refresh_token`（Path=`/manager`，SameSite=Lax） | 滑动 7 天 / 绝对 30 天 | 落库（仅存 SHA-256 哈希） |
+| refresh token | HttpOnly cookie `refresh_token`（Path=`/manager`，SameSite=Lax，HTTPS 下带 Secure 标记） | 滑动 7 天 / 绝对 30 天 | 落库（仅存 SHA-256 哈希） |
 
 要点：
 - access JWT 过期（HTTP 401 + 业务码 1016）后前端自动调 `POST /manager/refresh` 续期并重试原请求，并发请求只触发一次刷新。

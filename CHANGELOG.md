@@ -7,6 +7,7 @@
 
 ### 2026-07-24
 
+- 修复重启服务后登录态丢失问题：refresh cookie 的 `Secure` 标记原硬编码为 `true`，导致 HTTP（非 HTTPS）部署下浏览器拒绝存储/发送该 cookie，重启后 access JWT 失效触发 refresh 时拿不到 cookie，被迫重登。现改为跟随当前请求是否 HTTPS 动态判定（`c.Scheme()=="https"`）：HTTPS 直连或反代透传 `X-Forwarded-Proto` 时开启 `Secure`，HTTP 下关闭，本地开发与纯 HTTP 部署不再丢登录态。
 - 新增双 token 登录机制（access JWT + refresh 轮换 + 重用检测），替换原单 token 方案，适配公网部署。
   - **access JWT**：HS256 自实现，15min 有效期，无状态不落库，经 `Authorization: Bearer` 头传递，前端存内存（不放 localStorage 防 XSS）。
   - **refresh token**：随机串哈希后存 `user_sessions` 表（明文不落库），HttpOnly Secure cookie `refresh_token` 传递（Path=`/manager`，SameSite=Lax），滑动 7 天 / 绝对 30 天。
