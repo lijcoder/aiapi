@@ -24,6 +24,7 @@
 | 业务处理层 | 单一职责的 handler，完成具体业务逻辑 | `proxy/handler/*.go` |
 | 协议解析层 | 不同厂商的请求/响应解析与 Key 提取 | `parser/*.go` |
 | 后台管理层 | 登录/权限/充值等管理 API | `manager/handler/*.go` |
+| 后台业务服务层 | 登录会话等跨 handler 复用、不依赖 echo 的业务逻辑 | `manager/service/*.go` |
 | 数据持久层 | 数据库访问、模型定义、查询构造 | `store/*.go` |
 | 通用工具层 | 常量、日志格式化、SSE 包装等 | `constant/`、`log/`、`proxy/sse/` |
 
@@ -34,6 +35,7 @@
 - `proxy/handler/` 是业务逻辑唯一入口，每个 handler 应尽量独立、可测试。
 - `store/` 只负责数据读写，不处理 HTTP 或协议细节。
 - `parser/` 只负责协议相关的解析与提取，不直接操作数据库或写响应。
+- `manager/service/` 封装登录会话等需跨 handler 复用、且不依赖 echo 的业务逻辑；`manager/handler/` 与 `manager/middleware/` 只做 HTTP 适配，复杂业务下沉到 service。
 
 ## 3. 代码组织规则
 
@@ -181,6 +183,8 @@
 - API Key 只在认证阶段使用，禁止在日志、错误信息或响应中泄露完整 Key。
 - 请求体中的敏感内容应谨慎记录，必要时提供脱敏开关。
 - 管理接口应考虑访问控制，避免任意用户修改 Provider 配置。
-- `manager/` 下所有需登录态的接口必须经过 `manager/middleware.Auth` 中间件（登录校验 + 接口级权限 `role_permission(entity=API, value=path)` 判定 + 注入登录态），业务函数由 `base.Wrap` 做参数包装与响应输出。
-- 登录态只走 Cookie + 服务端 `user_sessions` 表，不使用 `Authorization` 头、不复用 proxy 的 header 鉴权字段。
+- `manager/` 下所有需登录态的接口必须经过 `manager/middleware.Auth` 中间件（access JWT 校验 + 接口级权限 `role_permission(entity=API, value=path)` 判定 + 注入登录态），业务函数由 `base.Wrap` 做参数包装与响应输出。
+- 登录态采用双 token 机制：access JWT（HS256 自实现，15min 无状态，经 `Authorization: Bearer` 头传递，前端存内存）+ refresh token（随机串哈希存 `user_sessions` 表，HttpOnly Secure cookie `refresh_token` 传递，滑动 7 天 / 绝对 30 天，带轮换与重用检测）。`/manager/login`、`/manager/refresh` 不挂 Auth 中间件（login 无需登录态；refresh 靠 refresh cookie 续期，不依赖 access JWT）。
+- access JWT 签名密钥走环境变量 `AIAPI_JWT_SECRET`（≥32 字节），启动时由 `base.LoadJWTSecret` 校验；登录会话业务封装在 `manager/service` 的 `SessionService`，改密 / 禁用用户 / 重置密码后吊销该用户所有会话。
+- 登录态不复用 proxy 的 header 鉴权字段；账号不存在 / 禁用 / 密码错统一返回相同文案防枚举。
 - `manager` 自有业务码定义在 `manager/base/bizcode.go`，与 `proxy/types/bizcode.go` 解耦，两套独立编号。

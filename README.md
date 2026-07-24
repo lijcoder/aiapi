@@ -12,7 +12,7 @@
 - **Provider 管理**：内置 CRUD 接口动态管理上游配置
 - **API Key 管理**：校验调用方身份，支持启用/禁用
 - **pprof 调试**：可选启用 Go 性能分析接口
-- **管理台**：内置 Web 管理界面，支持登录、充值、流水查询
+- **管理台**：内置 Web 管理界面，支持双 token 安全登录、充值、流水查询
 
 ## 架构概览
 
@@ -57,7 +57,12 @@ go build -o aiapi .
 
 ### 启动
 
+双 token 登录机制需要通过环境变量 `AIAPI_JWT_SECRET` 提供 access JWT 签名密钥（≥32 字节），缺失或过短启动会失败。
+
 ```bash
+# 设置 JWT 密钥（示例，生产请用强随机串）
+export AIAPI_JWT_SECRET="your-super-secret-at-least-32-bytes-long"
+
 # 默认端口 8888，数据目录 ~/.aiapi
 ./aiapi
 
@@ -162,9 +167,11 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
   }'
 ```
 
-## 数据存储
+### 数据存储
 
 默认使用 SQLite，数据库文件位于 `~/.aiapi/aiapi.db`。
+
+> 双 token 登录机制上线后，存量库需迁移 `user_sessions` 表（加 `family_id` / `absolute_expires_at` / `ua` / `ip` 列、建 family 索引、清空旧 session），详见 `sql/sqlite.sql` 内注释。同时需设置环境变量 `AIAPI_JWT_SECRET`（≥32 字节）才能启动。
 
 ### 核心数据表
 
@@ -208,7 +215,24 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 
 ## 后台管理 API
 
-`/manager` 下提供账号密码登录、权限与充值管理。**所有接口均为 POST，参数放在 JSON body**；登录态通过 HttpOnly Cookie（`token`）传递。
+`/manager` 下提供账号密码登录、权限与充值管理。**所有接口均为 POST，参数放在 JSON body**。
+
+### 双 token 登录机制
+
+为适配公网部署，登录态采用 access JWT + refresh token 双 token 方案：
+
+| token | 载体 | 有效期 | 状态 |
+|-------|------|--------|------|
+| access JWT | 响应体返回，前端存内存，请求经 `Authorization: Bearer` 头携带 | 15 分钟 | 无状态（HS256 自实现，不落库） |
+| refresh token | HttpOnly Secure cookie `refresh_token`（Path=`/manager`，SameSite=Lax） | 滑动 7 天 / 绝对 30 天 | 落库（仅存 SHA-256 哈希） |
+
+要点：
+- access JWT 过期（HTTP 401 + 业务码 1016）后前端自动调 `POST /manager/refresh` 续期并重试原请求，并发请求只触发一次刷新。
+- refresh token 轮换：每次刷新删旧发新（同 family）。
+- 重用检测：旧 refresh token 再次被使用时吊销整个 family，强制重登。
+- 改密 / 禁用用户 / 重置密码后吊销该用户所有会话，即时失效。
+- 账号不存在 / 禁用 / 密码错统一返回相同文案，防账号枚举。
+- access JWT 签名密钥由环境变量 `AIAPI_JWT_SECRET`（≥32 字节）提供，启动校验。
 
 ### 权限模型
 
@@ -233,8 +257,9 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 
 | 路径 | 说明 | 需登录 |
 |------|------|--------|
-| `POST /manager/login` | 登录，body `{account, password}` | 否 |
-| `POST /manager/logout` | 登出 | 是 |
+| `POST /manager/login` | 登录，body `{account, password}`，返回 `{access_token, expires_in}` 并写 refresh cookie | 否 |
+| `POST /manager/refresh` | 刷新 access JWT + 轮换 refresh token（靠 cookie，不走 access JWT） | 否 |
+| `POST /manager/logout` | 登出，吊销当前登录链并清 cookie | 是 |
 | `POST /manager/self` | 当前用户基本信息 | 是 |
 | `POST /manager/recharge/self` | 给自己充值，body `{amount, remark}` | 是 |
 | `POST /manager/recharge` | 管理员充值，body `{userId, amount, remark}` | 是 |
@@ -312,13 +337,18 @@ INSERT INTO user_roles (user_id, role_id) VALUES ((SELECT id FROM users WHERE ac
 ### 调用示例
 
 ```bash
-# 登录（cookie 保存到 jar）
+# 登录（access token 返回体，refresh token 写 cookie.jar）
 curl -c cookie.jar -X POST http://localhost:8888/manager/login \
   -H 'Content-Type: application/json' \
   -d '{"account":"admin","password":"你的密码"}'
+# 返回示例：{"code":0,"data":{"access_token":"eyJ...","expires_in":900}}
 
-# 管理员给 userId=2 充值 10
-curl -b cookie.jar -X POST http://localhost:8888/manager/recharge \
+# 刷新 access（带 refresh cookie，无需 access token）
+curl -b cookie.jar -X POST http://localhost:8888/manager/refresh
+
+# 后续业务请求需带 access token（cookie 仅用于 refresh）
+curl -b cookie.jar -H "Authorization: Bearer <access_token>" \
+  -X POST http://localhost:8888/manager/recharge \
   -H 'Content-Type: application/json' \
   -d '{"userId":2,"amount":10,"remark":"月度充值"}'
 ```

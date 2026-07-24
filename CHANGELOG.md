@@ -5,7 +5,29 @@
 
 ## [Unreleased]
 
+### 2026-07-24
+
+- 新增双 token 登录机制（access JWT + refresh 轮换 + 重用检测），替换原单 token 方案，适配公网部署。
+  - **access JWT**：HS256 自实现，15min 有效期，无状态不落库，经 `Authorization: Bearer` 头传递，前端存内存（不放 localStorage 防 XSS）。
+  - **refresh token**：随机串哈希后存 `user_sessions` 表（明文不落库），HttpOnly Secure cookie `refresh_token` 传递（Path=`/manager`，SameSite=Lax），滑动 7 天 / 绝对 30 天。
+  - **轮换**：每次 `/manager/refresh` 删旧发新（同 family），滑动续期顺延但不超绝对上限。
+  - **重用检测**：旧 refresh token 再次被使用时吊销整个 family，强制重登（业务码 1017）。
+  - 改密 / 禁用用户 / 重置密码后吊销该用户所有会话，即时失效。
+  - 账号不存在 / 禁用 / 密码错统一返回相同文案，防账号枚举。
+  - 新增 `manager/service` 包封装登录业务（`SessionService`），handler/middleware 仅做 HTTP 适配。
+  - 新增接口 `POST /manager/refresh`（不挂 Auth 中间件，靠 refresh cookie）；`/manager/login` 返回体改为 `{access_token, expires_in}`。
+  - access JWT 签名密钥走环境变量 `AIAPI_JWT_SECRET`（≥32 字节），启动时由 `base.LoadJWTSecret` 校验，缺失或过短启动失败。
+  - 业务码新增 `CodeTokenExpired`(1016) / `CodeSessionReuse`(1017)。
+  - 数据库变更：`user_sessions` 表新增 `family_id` / `absolute_expires_at` / `ua` / `ip` 列，新增 `idx_user_sessions_family` 索引。**存量库迁移**：执行 `ALTER TABLE user_sessions ADD COLUMN ...` 四条 + 建索引 + `DELETE FROM user_sessions;`（旧 token 格式不兼容，用户需重登一次）。
+- 前端适配双 token 登录机制：access JWT 存内存；401 且业务码为 1016 时自动调 `/manager/refresh` 续期并重试原请求；并发请求合并（多个 401 只触发一次刷新）；页面刷新后靠 refresh cookie 静默恢复会话；`/login` 已登录则跳首页，登出 / 改密后清 access token。
+
+### 2026-07-23
+
+- 修复统计页 / 全局统计 / 仪表盘时间趋势折线倒序问题：时间维度由 `label DESC` 改为 `ASC`（从旧到新正序），维度分组（模型 / 提供商 / Key / 用户）保持 DESC 不变。
+
 ### 2026-07-22
+
+- 个人设置页改用 `n-form` 左对齐布局：`Profile` / `ChangePassword` 表单 label 左对齐，按钮区与输入框左边缘对齐；修改密码页顶部加浅红色提示「修改密码后需要重新登录」。
 
 - 新增个人设置功能（修改姓名/邮箱/密码）。
   - `users` 表新增 `email` 字段（可空、不唯一）。
