@@ -2,36 +2,36 @@
   <div style="display:flex;flex-direction:column;gap:16px">
     <!-- 指标卡 -->
     <n-card size="small">
-      <div style="display:flex;align-items:flex-start;gap:24px;flex-wrap:wrap">
-        <div style="text-align:center;min-width:100px">
+      <div style="display:flex;align-items:flex-start;gap:0;flex-wrap:wrap">
+        <div style="text-align:center;min-width:100px;flex:1">
           <div style="font-size:12px;color:#909399">用户数</div>
           <div style="font-size:22px;font-weight:600;margin-top:4px;color:#1677ff">{{ summary.user_count }}</div>
         </div>
-        <div style="text-align:center;min-width:100px">
+        <div style="text-align:center;min-width:100px;flex:1">
           <div style="font-size:12px;color:#909399">API Key 数</div>
           <div style="font-size:22px;font-weight:600;margin-top:4px;color:#1677ff">{{ summary.api_key_count }}</div>
         </div>
-        <div style="text-align:center;min-width:100px">
+        <div style="text-align:center;min-width:100px;flex:1">
           <div style="font-size:12px;color:#909399">今日请求</div>
           <div style="font-size:22px;font-weight:600;margin-top:4px;color:#18a058">{{ summary.today_requests }}</div>
         </div>
-        <div style="text-align:center;min-width:100px">
+        <div style="text-align:center;min-width:100px;flex:1">
           <div style="font-size:12px;color:#909399">今日费用</div>
           <div style="font-size:22px;font-weight:600;margin-top:4px;color:#18a058">¥{{ fix4(summary.today_cost) }}</div>
         </div>
-        <div style="text-align:center;min-width:100px">
+        <div style="text-align:center;min-width:100px;flex:1">
           <div style="font-size:12px;color:#909399">今日输入Token</div>
           <div style="font-size:22px;font-weight:600;margin-top:4px">{{ fNum(summary.today_input) }}</div>
         </div>
-        <div style="text-align:center;min-width:100px">
+        <div style="text-align:center;min-width:100px;flex:1">
           <div style="font-size:12px;color:#909399">今日输出Token</div>
           <div style="font-size:22px;font-weight:600;margin-top:4px">{{ fNum(summary.today_output) }}</div>
         </div>
-        <div style="text-align:center;min-width:100px">
+        <div style="text-align:center;min-width:100px;flex:1">
           <div style="font-size:12px;color:#909399">今日总Token</div>
           <div style="font-size:22px;font-weight:600;margin-top:4px">{{ fNum(summary.today_total) }}</div>
         </div>
-        <div style="text-align:center;min-width:100px">
+        <div style="text-align:center;min-width:100px;flex:1">
           <div style="font-size:12px;color:#909399">今日缓存命中率</div>
           <div style="font-size:22px;font-weight:600;margin-top:4px">{{ fmtRate(summary.today_cache_hit) }}</div>
         </div>
