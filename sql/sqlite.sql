@@ -178,15 +178,35 @@ CREATE TABLE IF NOT EXISTS role_permission (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_role_permission ON role_permission(role_id, entity, action, value);
 
+-- user_sessions 存储登录会话（refresh token），access JWT 不落库。
+-- 字段说明：
+--   token               refresh token 的 SHA-256 哈希（hex），明文不落库
+--   family_id           登录链标识，重用检测用（同一次登录的多次刷新共享同一 family）
+--   expires_at          滑动过期时间，每次刷新顺延
+--   absolute_expires_at 绝对过期上限，登录时设定不随刷新顺延
+--   ua/ip               User-Agent 摘要与登录 IP，仅展示用
+--
+-- 存量库迁移（双 token 机制上线时执行）：
+--   ALTER TABLE user_sessions ADD COLUMN family_id TEXT NOT NULL DEFAULT '';
+--   ALTER TABLE user_sessions ADD COLUMN absolute_expires_at DATETIME;
+--   ALTER TABLE user_sessions ADD COLUMN ua TEXT NOT NULL DEFAULT '';
+--   ALTER TABLE user_sessions ADD COLUMN ip TEXT NOT NULL DEFAULT '';
+--   CREATE INDEX IF NOT EXISTS idx_user_sessions_family ON user_sessions(family_id);
+--   DELETE FROM user_sessions;  -- 清空旧 session，老 token 格式不兼容，用户需重登一次
 CREATE TABLE IF NOT EXISTS user_sessions (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    token      TEXT NOT NULL,
-    user_id    INTEGER NOT NULL,
-    expires_at DATETIME NOT NULL,
-    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    token               TEXT NOT NULL,
+    family_id           TEXT NOT NULL DEFAULT '',
+    user_id             INTEGER NOT NULL,
+    expires_at          DATETIME NOT NULL,
+    absolute_expires_at DATETIME NOT NULL,
+    ua                  TEXT NOT NULL DEFAULT '',
+    ip                  TEXT NOT NULL DEFAULT '',
+    created_at          DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_sessions_token ON user_sessions(token);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_family ON user_sessions(family_id);
 
 CREATE TABLE IF NOT EXISTS menus (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,

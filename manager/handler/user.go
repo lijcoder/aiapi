@@ -256,9 +256,16 @@ func ToggleUser(ctx context.Context, req *UserIdReq) (*struct{}, *base.BizError)
 	if u == nil {
 		return nil, base.NewBizError(base.CodeUserNotFound, "user not found")
 	}
-	if err := store.C().User().SetEnabled(req.ID, !u.Enabled); err != nil {
+	newEnabled := !u.Enabled
+	if err := store.C().User().SetEnabled(req.ID, newEnabled); err != nil {
 		slog.Error("[User] SetEnabled failed", "err", err, "id", req.ID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	// 禁用用户时吊销其所有登录会话，强制立即下线
+	if !newEnabled {
+		if err := sessionService.RevokeByUser(req.ID); err != nil {
+			slog.Error("[User] revoke sessions failed", "err", err, "id", req.ID)
+		}
 	}
 	return &struct{}{}, nil
 }
@@ -287,6 +294,10 @@ func ResetPassword(ctx context.Context, req *ResetPasswordReq) (*struct{}, *base
 	if err := store.C().User().UpdatePassword(req.ID, string(hash)); err != nil {
 		slog.Error("[User] UpdatePassword failed", "err", err, "id", req.ID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	// 重置密码后吊销该用户所有登录会话，必须用新密码重登
+	if err := sessionService.RevokeByUser(req.ID); err != nil {
+		slog.Error("[User] revoke sessions failed", "err", err, "id", req.ID)
 	}
 	return &struct{}{}, nil
 }

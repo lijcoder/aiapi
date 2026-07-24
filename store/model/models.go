@@ -69,13 +69,17 @@ type RolePermission struct {
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
-// UserSession 用户登录会话
+// UserSession 用户登录会话（refresh token 存储）
 type UserSession struct {
-	ID        int64     `db:"id" json:"id"`
-	Token     string    `db:"token" json:"-"`
-	UserID    int64     `db:"user_id" json:"user_id"`
-	ExpiresAt time.Time `db:"expires_at" json:"expires_at"`
-	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	ID                int64     `db:"id" json:"id"`
+	Token             string    `db:"token" json:"-"`              // refresh token 的 SHA-256 哈希
+	FamilyID          string    `db:"family_id" json:"-"`         // 登录链标识，重用检测用
+	UserID            int64     `db:"user_id" json:"user_id"`
+	ExpiresAt         time.Time `db:"expires_at" json:"expires_at"`          // 滑动过期时间
+	AbsoluteExpiresAt time.Time `db:"absolute_expires_at" json:"absolute_expires_at"` // 绝对过期上限
+	UA                string    `db:"ua" json:"ua"`                // User-Agent 摘要
+	IP                string    `db:"ip" json:"ip"`                // 登录 IP
+	CreatedAt         time.Time `db:"created_at" json:"created_at"`
 }
 
 // ApiKey API 密钥

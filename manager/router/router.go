@@ -9,11 +9,12 @@ import (
 
 // Register 在已建好的 /manager group 上注册后台管理子路由。
 // 所有接口均为 POST，参数走 JSON body。
-//   - login 不挂中间件
+//   - login / refresh 不挂中间件（login 无需登录态；refresh 靠 refresh cookie，不走 access JWT）
 //   - logout 挂 Auth（需登录态），不挂 Require（无需接口授权）
 //   - 其余挂 Auth + Require（需登录态 + 接口授权）
 func Register(g *echo.Group) {
 	g.POST("/login", handler.Login)
+	g.POST("/refresh", handler.Refresh)
 
 	g.Use(middleware.Auth)
 	g.POST("/logout", handler.Logout)

@@ -33,6 +33,8 @@ var (
 	CodeProviderNotFound = BizCode{1013, 404}
 	CodeModelExists    = BizCode{1014, 400}
 	CodeModelNotFound  = BizCode{1015, 404}
+	CodeTokenExpired   = BizCode{1016, 401} // access JWT 过期，前端据此触发 refresh
+	CodeSessionReuse   = BizCode{1017, 401} // refresh token 被重用，强制重登
 )
 
 const InternalServerError = "internal server error"

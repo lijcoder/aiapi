@@ -12,6 +12,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/lijcoder/aiapi/constant"
 	"github.com/lijcoder/aiapi/framework"
+	"github.com/lijcoder/aiapi/manager/base"
 	aiapiLog "github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/driver"
@@ -21,8 +22,17 @@ import (
 func main() {
 	constant.ParseArgs()
 	initLogger()
+	if err := base.LoadJWTSecret(); err != nil {
+		slog.Error("jwt secret load failed", "err", err)
+		panic(err)
+	}
 	initStore()
 	defer store.Close()
+
+	// 清理过期登录会话
+	if err := store.C().UserSession().DeleteExpired(); err != nil {
+		slog.Warn("cleanup expired sessions failed", "err", err)
+	}
 
 	slog.Info("server starting",
 		"port", constant.PORT,

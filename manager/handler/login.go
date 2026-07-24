@@ -1,24 +1,33 @@
 package handler
 
 import (
-	"crypto/rand"
-	"encoding/hex"
+	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/lijcoder/aiapi/manager/base"
+	"github.com/lijcoder/aiapi/manager/service"
 	"github.com/lijcoder/aiapi/store"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// sessionService 登录会话业务（签发/刷新/吊销）。进程内单例，无状态。
+var sessionService = service.NewSessionService()
 
 type loginReq struct {
 	Account  string `json:"account"`
 	Password string `json:"password"`
 }
 
-// Login 账号密码登录，成功签发 session 并写入 cookie
+// Login 账号密码登录，成功签发 access JWT + refresh token（cookie）。
+//
+// 安全要点：
+//   - 账号不存在/密码错/账号禁用统一返回相同文案，防账号枚举
+//   - access JWT 短期（15min）放响应体，前端存内存
+//   - refresh token 长期（滑动7天/绝对30天）放 HttpOnly Secure cookie，JS 不可读
 func Login(c echo.Context) error {
 	var req loginReq
 	if err := base.BindJSON(c, &req); err != nil {
@@ -30,61 +39,110 @@ func Login(c echo.Context) error {
 
 	user, err := store.C().User().GetByAccount(req.Account)
 	if err != nil {
+		slog.Error("login get user failed", "err", err)
 		return base.Fail(c, base.CodeUnknown, base.InternalServerError)
 	}
-	if user == nil {
+	// 统一错误文案：账号不存在/密码错/账号禁用均返回 "account or password incorrect"
+	// 防止攻击者通过差异响应枚举有效账号
+	if user == nil || !user.Enabled {
 		return base.Fail(c, base.CodeWrongPassword, "account or password incorrect")
-	}
-	if !user.Enabled {
-		return base.Fail(c, base.CodeUserDisabled, "user disabled")
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
 		return base.Fail(c, base.CodeWrongPassword, "account or password incorrect")
 	}
 
-	token, err := newToken()
+	// 签发 token 对
+	pair, err := sessionService.Issue(user.ID, summarizeUA(c.Request().UserAgent()), c.RealIP())
 	if err != nil {
-		return base.Fail(c, base.CodeUnknown, base.InternalServerError)
-	}
-	expiresAt := time.Now().Add(base.SessionTTL)
-	if err := store.C().UserSession().Create(token, user.ID, expiresAt); err != nil {
+		slog.Error("issue tokens failed", "err", err, "user_id", user.ID)
 		return base.Fail(c, base.CodeUnknown, base.InternalServerError)
 	}
 
+	setRefreshCookie(c, pair.RefreshToken, pair.RefreshExp)
+
+	return base.Ok(c, map[string]any{
+		"access_token": pair.AccessToken,
+		"expires_in":   int(base.AccessTTL.Seconds()),
+	})
+}
+
+// Refresh 刷新 access JWT + 轮换 refresh token，含重用检测。
+// 从 cookie 读 refresh token，不依赖 Authorization 头，因此不挂 Auth 中间件。
+func Refresh(c echo.Context) error {
+	cookie, err := c.Cookie(base.CookieName)
+	if err != nil || cookie.Value == "" {
+		return base.Fail(c, base.CodeUnauthorized, "no refresh token")
+	}
+
+	pair, err := sessionService.Refresh(cookie.Value)
+	if err != nil {
+		// 重用攻击 / 用户被禁用 → 清 cookie，强制重登
+		if errors.Is(err, service.ErrSessionReuse) || errors.Is(err, service.ErrUserDisabled) {
+			clearRefreshCookie(c)
+			return base.Fail(c, base.CodeSessionReuse, "session reused, please login again")
+		}
+		// token 过期/不存在 → 清 cookie
+		if errors.Is(err, service.ErrSessionExpired) || errors.Is(err, service.ErrSessionNotFound) {
+			clearRefreshCookie(c)
+			return base.Fail(c, base.CodeSessionExpired, "session expired")
+		}
+		slog.Error("refresh tokens failed", "err", err)
+		return base.Fail(c, base.CodeUnknown, base.InternalServerError)
+	}
+
+	setRefreshCookie(c, pair.RefreshToken, pair.RefreshExp)
+
+	return base.Ok(c, map[string]any{
+		"access_token": pair.AccessToken,
+		"expires_in":   int(base.AccessTTL.Seconds()),
+	})
+}
+
+// Logout 登出：吊销当前登录链（family）并清 cookie。
+func Logout(c echo.Context) error {
+	if cookie, err := c.Cookie(base.CookieName); err == nil && cookie.Value != "" {
+		if err := sessionService.RevokeByRefreshToken(cookie.Value); err != nil {
+			slog.Error("logout revoke session failed", "err", err)
+		}
+	}
+	clearRefreshCookie(c)
+	return base.Ok(c, nil)
+}
+
+// ===== 辅助函数 =====
+
+// setRefreshCookie 写 refresh token 到 HttpOnly Secure cookie。
+// Path 限定 /manager，SameSite=Lax 防 CSRF。
+func setRefreshCookie(c echo.Context, token string, expires time.Time) {
 	c.SetCookie(&http.Cookie{
 		Name:     base.CookieName,
 		Value:    token,
 		Path:     base.CookiePath,
-		Expires:  expiresAt,
+		Expires:  expires,
+		MaxAge:   int(time.Until(expires).Seconds()),
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
-
-	return base.Ok(c, nil)
 }
 
-// Logout 登出，删除 session 并清 cookie
-func Logout(c echo.Context) error {
-	if cookie, err := c.Cookie(base.CookieName); err == nil && cookie.Value != "" {
-		if err := store.C().UserSession().Delete(cookie.Value); err != nil {
-			slog.Error("logout delete session failed", "err", err)
-		}
-	}
+func clearRefreshCookie(c echo.Context) {
 	c.SetCookie(&http.Cookie{
 		Name:     base.CookieName,
 		Value:    "",
 		Path:     base.CookiePath,
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	return base.Ok(c, nil)
 }
 
-func newToken() (string, error) {
-	b := make([]byte, base.TokenBytes)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
+// summarizeUA 截断 User-Agent，防止过长字符串入库。
+func summarizeUA(ua string) string {
+	ua = strings.TrimSpace(ua)
+	if len(ua) > 200 {
+		return ua[:200]
 	}
-	return hex.EncodeToString(b), nil
+	return ua
 }

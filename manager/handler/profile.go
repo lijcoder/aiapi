@@ -87,5 +87,9 @@ func UpdatePasswordSelf(ctx context.Context, req *UpdatePasswordSelfReq) (*struc
 		slog.Error("[Profile] UpdatePassword failed", "err", err, "user_id", cur.ID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
+	// 改密后吊销该用户所有登录会话（含当前），强制用新密码重登
+	if err := sessionService.RevokeByUser(cur.ID); err != nil {
+		slog.Error("[Profile] revoke sessions failed", "err", err, "user_id", cur.ID)
+	}
 	return &struct{}{}, nil
 }
