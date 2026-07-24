@@ -98,7 +98,7 @@ import {
 } from '@vicons/ionicons5'
 
 const router = useRouter()
-const { user, menus, fetchUser } = useUser()
+const { user, menus, fetchUser, clearUser } = useUser()
 
 const collapsed = ref(false)
 const expandedGroups = reactive({})
@@ -128,6 +128,7 @@ function toggleCollapse() {
 
 async function handleLogout() {
   try { await logout() } catch {}
+  clearUser()
   router.replace('/login')
 }
 

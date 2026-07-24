@@ -38,7 +38,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NCard, NBreadcrumb, NBreadcrumbItem, NInput, NButton, NForm, NFormItem, NAlert, useMessage } from 'naive-ui'
-import { updatePasswordSelf } from '../api'
+import { updatePasswordSelf, clearAccessToken } from '../api'
 
 const message = useMessage()
 const router = useRouter()
@@ -60,6 +60,7 @@ async function savePassword() {
   savingPwd.value = true
   try {
     await updatePasswordSelf(pwdForm.value.old, pwdForm.value.new)
+    clearAccessToken()
     message.success('密码已修改，请重新登录')
     setTimeout(() => {
       router.replace('/login')

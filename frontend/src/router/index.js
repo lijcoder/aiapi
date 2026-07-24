@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { tryRestoreSession, getAccessToken } from '../api'
 import Login from '../views/Login.vue'
 import Home from '../views/Home.vue'
 import Recharge from '../views/Recharge.vue'
@@ -52,6 +53,21 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// 全局前置守卫：页面刷新后 access token 丢失，靠 refresh cookie 静默恢复
+// /login 探测 refresh cookie：有效则跳首页（已登录），无效则显示登录页
+router.beforeEach(async (to) => {
+  if (to.path === '/login') {
+    const ok = await tryRestoreSession()
+    return ok ? '/' : true
+  }
+  // 其它页面：确保有 access token，没有就尝试恢复
+  if (!getAccessToken()) {
+    const ok = await tryRestoreSession()
+    if (!ok) return '/login'
+  }
+  return true
 })
 
 export default router

@@ -1,11 +1,60 @@
 const BASE = '/manager'
 
+// ===== access token 内存存储 + 自动 refresh =====
+// access JWT 仅存内存，刷新页面会丢失，靠 silent refresh（带 refresh cookie）恢复
+let accessToken = ''
+let refreshPromise = null // 并发请求合并：多个请求同时 401 时只触发一次 /refresh
+
+// 业务码：access 过期，前端触发 /refresh 续期
+const CODE_TOKEN_EXPIRED = 1016
+
+function isAuthPath(path) {
+  return path === '/login' || path === '/refresh'
+}
+
+// 静默刷新：带 refresh cookie，不带 access
+function doRefresh() {
+  if (refreshPromise) return refreshPromise
+  refreshPromise = fetch(`${BASE}/refresh`, {
+    method: 'POST',
+    credentials: 'include'
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (d.code) throw d
+      accessToken = d.data.access_token
+      return accessToken
+    })
+    .finally(() => { refreshPromise = null })
+  return refreshPromise
+}
+
 async function request(path, body) {
+  const headers = { 'Content-Type': 'application/json' }
+  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
+
   const resp = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: body ? JSON.stringify(body) : '{}'
   })
+
+  // 401 且非鉴权接口本身 → 尝试 refresh 后重试一次
+  if (resp.status === 401 && !isAuthPath(path)) {
+    const data = await resp.json().catch(() => ({}))
+    if (data.code === CODE_TOKEN_EXPIRED) {
+      try {
+        await doRefresh()
+        return request(path, body) // 重试原请求
+      } catch {
+        accessToken = ''
+        throw { code: data.code, msg: '登录已过期，请重新登录', status: 401 }
+      }
+    }
+    accessToken = ''
+    throw { code: data.code, msg: data.msg || '未登录', status: 401 }
+  }
+
   const data = await resp.json()
   if (data.code) {
     throw { code: data.code, msg: data.msg, status: resp.status }
@@ -13,12 +62,39 @@ async function request(path, body) {
   return data.data
 }
 
+// ===== 鉴权接口 =====
+
 export function login(account, password) {
-  return request('/login', { account, password })
+  return request('/login', { account, password }).then(data => {
+    accessToken = data.access_token
+    return data
+  })
 }
 
 export function logout() {
-  return request('/logout')
+  return request('/logout', {}).finally(() => {
+    accessToken = ''
+  })
+}
+
+// 页面刷新后恢复会话：尝试 silent refresh，成功返回 true
+export async function tryRestoreSession() {
+  try {
+    await doRefresh()
+    return true
+  } catch {
+    return false
+  }
+}
+
+// 读取当前 access token（路由守卫用，判断内存是否已有）
+export function getAccessToken() {
+  return accessToken
+}
+
+// 清除内存中的 access token（改密/登出后调用，后端 session 已被吊销）
+export function clearAccessToken() {
+  accessToken = ''
 }
 
 export function self() {
