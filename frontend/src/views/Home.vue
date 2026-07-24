@@ -45,17 +45,25 @@
         </template>
       </nav>
       <div class="sidebar-footer">
-        <div class="user-row" v-if="!collapsed">
-          <span class="user-name">{{ user?.name }}</span>
-          <span class="user-balance" :style="{marginLeft:'auto'}">¥ {{ fix4(user?.budget) }}</span>
-          <div class="logout-btn" @click="handleLogout" title="退出登录">
-            <svg viewBox="0 0 512 512" width="16" height="16">
-              <path d="M304 336v40a40 40 0 01-40 40H104a40 40 0 01-40-40V136a40 40 0 0140-40h152c22.09 0 48 17.91 48 40v40" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32"/>
-              <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M368 336l80-80-80-80"/>
-              <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M176 256h256"/>
-            </svg>
+        <n-dropdown
+          placement="top-end"
+          trigger="click"
+          :options="userMenuOptions"
+          :menu-props="userMenuProps"
+          @select="onUserMenuSelect"
+        >
+          <div class="user-row" v-if="!collapsed">
+            <n-icon class="user-avatar"><PersonOutline /></n-icon>
+            <div class="user-meta">
+              <span class="user-name">{{ user?.name }}</span>
+              <span class="user-balance">¥ {{ fix4(user?.budget) }}</span>
+            </div>
+            <n-icon class="user-caret"><ChevronUpOutline /></n-icon>
           </div>
-        </div>
+          <div class="user-avatar-collapsed" v-else :title="user?.name">
+            <n-icon><PersonOutline /></n-icon>
+          </div>
+        </n-dropdown>
         <div class="collapse-row">
           <span v-if="collapsed" class="collapsed-balance" :title="'余额 ¥ ' + fix4(user?.budget)">{{ fix4(user?.budget) }}</span>
           <div v-if="collapsed" class="sep-line"></div>
@@ -75,8 +83,9 @@
 </template>
 
 <script setup>
-import { reactive, ref, markRaw } from 'vue'
+import { reactive, ref, markRaw, h, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { NDropdown, NIcon } from 'naive-ui'
 import { useUser } from '../stores/user'
 import { logout } from '../api'
 import { fix4 } from '../utils'
@@ -92,9 +101,12 @@ import {
   GridOutline,
   DocumentTextOutline,
   PersonOutline,
+  ChevronUpOutline,
   ChevronDownOutline,
   ChevronBackOutline,
   ChevronForwardOutline,
+  LockClosedOutline,
+  LogOutOutline,
 } from '@vicons/ionicons5'
 
 const router = useRouter()
@@ -124,6 +136,31 @@ function getIcon(path) {
 
 function toggleCollapse() {
   collapsed.value = !collapsed.value
+}
+
+function renderIcon(icon) {
+  return () => h(NIcon, null, { default: () => h(icon) })
+}
+
+const userMenuOptions = computed(() => [
+  { label: '个人资料', key: 'profile', icon: renderIcon(PersonOutline) },
+  { label: '修改密码', key: 'password', icon: renderIcon(LockClosedOutline) },
+  { type: 'divider', key: 'd1' },
+  { label: '退出登录', key: 'logout', icon: renderIcon(LogOutOutline) },
+])
+
+function userMenuProps() {
+  return { style: { minWidth: '180px' } }
+}
+
+function onUserMenuSelect(key) {
+  if (key === 'profile') {
+    router.push('/profile')
+  } else if (key === 'password') {
+    router.push('/profile/password')
+  } else if (key === 'logout') {
+    handleLogout()
+  }
 }
 
 async function handleLogout() {
@@ -288,9 +325,45 @@ if (!user.value) {
   gap: 8px;
   padding: 10px 16px;
   font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 4px;
+  margin: 4px 8px;
 }
-.user-name { font-weight: 600; color: #333; white-space: nowrap; }
-.user-balance { font-weight: 700; color: #e53935; white-space: nowrap; }
+.user-row:hover { background: #eef0f1; }
+.user-avatar {
+  width: 26px; height: 26px;
+  flex-shrink: 0;
+  color: #fff;
+  background: #18a058;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  display: flex;
+  font-size: 15px;
+}
+.user-avatar-collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  margin: 4px auto;
+  color: #fff;
+  background: #18a058;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+}
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  flex: 1;
+}
+.user-name { font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-balance { font-weight: 700; color: #e53935; white-space: nowrap; font-size: 12px; }
+.user-caret { color: #999; flex-shrink: 0; margin-left: auto; }
 
 .collapse-row {
   display: flex;
@@ -304,7 +377,7 @@ if (!user.value) {
 .sep-line { width: 20px; height: 1px; background: var(--border-color); }
 .collapsed-balance { font-size: 10px; font-weight: 700; color: #e53935; }
 
-.collapse-btn, .logout-btn {
+.collapse-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -315,9 +388,8 @@ if (!user.value) {
   border-radius: 4px;
 }
 .collapse-btn:hover { color: #18a058; background: #e8f5e9; }
-.logout-btn:hover { color: #e53935; background: #fce4ec; }
 
-.collapse-btn svg, .logout-btn svg { width: 16px; height: 16px; }
+.collapse-btn svg { width: 16px; height: 16px; }
 
 /* ===== 主区域 ===== */
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
