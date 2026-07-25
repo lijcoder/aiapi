@@ -23,8 +23,9 @@
 | 业务编排层 | 组装并执行请求处理 Pipeline | `proxy/direct.go` |
 | 业务处理层 | 单一职责的 handler，完成具体业务逻辑 | `proxy/handler/*.go` |
 | 协议解析层 | 不同厂商的请求/响应解析与 Key 提取 | `parser/*.go` |
-| 后台管理层 | 登录/权限/充值等管理 API | `manager/handler/*.go` |
-| 后台业务服务层 | 登录会话等跨 handler 复用、不依赖 echo 的业务逻辑 | `manager/service/*.go` |
+| 后台管理层 | 后端给前端的接口入口，只做 HTTP 适配（参数校验、调 service、组装响应） | `manager/handler/*.go` |
+| 后台业务服务层 | 跨 handler 复用的业务逻辑、多表事务编排，不依赖 echo | `manager/service/*.go` |
+| 后台中间件层 | 登录态校验、接口级权限判定，只做 HTTP 适配 | `manager/middleware/*.go` |
 | 数据持久层 | 数据库访问、模型定义、查询构造 | `store/*.go` |
 | 通用工具层 | 常量、日志格式化、SSE 包装等 | `constant/`、`log/`、`proxy/sse/` |
 
@@ -32,10 +33,18 @@
 
 - `framework/echo.go` 只做 HTTP 参数解析和响应适配，不写业务逻辑。
 - `proxy/direct.go` 只负责 Pipeline 组装，不实现具体业务。
-- `proxy/handler/` 是业务逻辑唯一入口，每个 handler 应尽量独立、可测试。
-- `store/` 只负责数据读写，不处理 HTTP 或协议细节。
+- `proxy/handler/` 是代理业务逻辑唯一入口，每个 handler 应尽量独立、可测试。
 - `parser/` 只负责协议相关的解析与提取，不直接操作数据库或写响应。
-- `manager/service/` 封装登录会话等需跨 handler 复用、且不依赖 echo 的业务逻辑；`manager/handler/` 与 `manager/middleware/` 只做 HTTP 适配，复杂业务下沉到 service。
+- `store/` 是纯 SQL 包装层：只做单条/单表的数据读写（`Get/Select/Exec`），不处理 HTTP 或协议细节，**不写跨表编排、不写业务判断**；每个 Store 的命名空间入口写在自己文件内（如 `func (s *Session) Xxx() *XxxStore`），不集中到 `store/base.go`。
+- `manager/handler/` 是后端给前端的接口唯一入口，只做 HTTP 适配：参数校验、调 service、组装响应；**不直接写跨表事务、不写可复用业务逻辑**。
+- `manager/service/` 是后台业务逻辑承载层：跨 handler 复用、不依赖 echo 的业务逻辑、以及**涉及多表/带业务语义的事务编排**都放这里；handler 与 middleware 只调用 service 暴露的方法，不重复实现。
+- `manager/middleware/` 只做 HTTP 适配（鉴权、权限判定、登录态注入），复杂业务下沉到 service。
+
+### 2.3 事务边界
+
+- `store.T(fn)` 只提供事务执行入口，**事务体（fn 内组合多个 Store 调用、业务判断、失败回滚语义）不应写在 `store/` 内**，应写在 `manager/service`（后台）或 `proxy/handler`（代理计费等无 manager 入口的场景）。
+- `store/` 里的方法默认在调用方传入的 `*Session` 上执行：若调用方用 `store.T` 包裹则自动进事务，若用 `store.C()` 则非事务，store 方法本身不感知是否事务。
+- 一个事务只编排「同一业务动作」需要的多张表，不要把无关写操作塞进同一事务。
 
 ## 3. 代码组织规则
 
@@ -113,17 +122,20 @@
 
 `manager/` 是后端管理服务的总入口，不仅限于 Provider，还包括用户、充值、数据统计、模型配置等管理功能。
 
-1. 在 `manager/handler/` 下按业务领域新增文件（如 `user.go`、`charge.go`）。同一领域的普通用户版与超管版合并到同一文件，不单独起 `*_admin.go` 文件。
-2. 业务函数签名自由组合 `(context.Context, *Req)` 等入参，返回 `(Resp, *base.BizError)`；由 `base.Wrap` 动态包装成 echo.HandlerFunc。
-3. 在 `manager/router/router.go` 的 `Register(g *echo.Group)` 中用 `base.Wrap(handler.Xxx)` 注册路由；路由组根路径 `/manager` 由 `framework/echo.go` 直写。
-4. **接口命名**：列表查询统一用 `/list` 后缀（如 `/users/list`、`/providers/list`、`/models/list`、`/recharge/records/list`）。普通用户自助接口用 `/self` 后缀，超管接口不加 `/self`。
+1. 在 `manager/handler/` 下按业务领域新增文件（如 `user.go`、`charge.go`）。同一领域的普通用户版与超管版合并到同一文件，不单独起 `*_admin.go` 文件。handler 只做 HTTP 适配：参数校验、调 service、组装响应，不写跨表事务。
+2. 带业务语义的逻辑（尤其多表事务编排、跨 handler 复用逻辑）下沉到 `manager/service/`，handler 只调用 service 暴露的方法。单表的简单读写可直接在 handler 里调 store，但仍建议统一走 service 以保持一致性。
+3. 业务函数签名自由组合 `(context.Context, *Req)` 等入参，返回 `(Resp, *base.BizError)`；由 `base.Wrap` 动态包装成 echo.HandlerFunc。登录态从 `context.Context` 取（`base.CurrentUser`）。
+4. 在 `manager/router/router.go` 的 `Register(g *echo.Group)` 中用 `base.Wrap(handler.Xxx)` 注册路由；路由组根路径 `/manager` 由 `framework/echo.go` 直写。
+5. **接口命名**：列表查询统一用 `/list` 后缀（如 `/users/list`、`/providers/list`、`/models/list`、`/recharge/records/list`）。普通用户自助接口用 `/self` 后缀，超管接口不加 `/self`。
+6. **中间件挂载**：`login` / `refresh` 不挂 Auth；`logout` 挂 Auth 不挂 Require；其余挂 Auth + Require。
 
 ### 7.4 新增数据库实体
 
 1. 在 `sql/sqlite.sql` 中补充 DDL。
 2. 在 `store/model/models.go` 中定义模型。
-3. 在 `store/` 下新增对应 Store 文件，提供 CRUD 方法。
+3. 在 `store/` 下新增对应 Store 文件，提供单表 CRUD 方法，不写跨表编排。
 4. 命名空间入口写在该 Store 文件内（如 `func (s *Session) Xxx() *XxxStore`），不要集中放到 `store/base.go`。
+5. 涉及该实体的多表事务编排写在 `manager/service/`，用 `store.T(fn)` 包裹，在 fn 内组合多个 Store 调用。
 
 ### 7.5 开发管理台前端
 

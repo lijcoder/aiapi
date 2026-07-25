@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### 2026-07-25
+
+- 明确后端四层职责与事务边界（更新 `AGENTS.md`）：
+  - `store/` 为纯 SQL 包装层，只做单表读写，不写跨表编排与业务判断。
+  - `manager/service/` 承载跨 handler 复用业务逻辑与多表事务编排；`manager/handler/` 只做 HTTP 适配，不直接写事务。
+  - 事务体用 `store.T(fn)` 包裹，写在 `manager/service`（后台）或 `proxy/handler`（代理计费等无 manager 入口场景），不写在 `store/` 内。
+  - 同步补充分层表、handler/service 边界、新增 Manager API / 数据库实体的步骤要求。
+
 ### 2026-07-24
 
 - 修复重启服务后登录态丢失问题：refresh cookie 的 `Secure` 标记原硬编码为 `true`，导致 HTTP（非 HTTPS）部署下浏览器拒绝存储/发送该 cookie，重启后 access JWT 失效触发 refresh 时拿不到 cookie，被迫重登。现改为跟随当前请求是否 HTTPS 动态判定（`c.Scheme()=="https"`）：HTTPS 直连或反代透传 `X-Forwarded-Proto` 时开启 `Secure`，HTTP 下关闭，本地开发与纯 HTTP 部署不再丢登录态。
