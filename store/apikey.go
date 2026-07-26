@@ -152,7 +152,7 @@ func (ks *ApiKeyStore) SumLimitedBudgetByUser(userID int64) (float64, error) {
 
 // Delete 删除 API Key（同时清理模型白名单）
 func (ks *ApiKeyStore) Delete(id int64) error {
-	return T(func(s *Session) error {
+	return ks.s.T(func(s *Session) error {
 		if _, err := s.Query(
 			`DELETE FROM apikey_model_access WHERE api_key_id = :id`,
 			map[string]any{"id": id},

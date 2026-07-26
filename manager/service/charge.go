@@ -34,7 +34,7 @@ func NewChargeService() *ChargeService { return &ChargeService{} }
 //   - before 由 after - amount 反推，不准读后写
 func (s *ChargeService) RechargeWithRecord(userID int64, amount float64, operator, remark string) (*model.RechargeRecord, error) {
 	var rec *model.RechargeRecord
-	err := store.T(func(ss *store.Session) error {
+	err := store.C().T(func(ss *store.Session) error {
 		// 1. 原子加余额（行锁，串行化同一行的写）
 		if err := ss.Charge().RechargeUserBudget(userID, amount); err != nil {
 			return err

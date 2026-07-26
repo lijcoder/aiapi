@@ -42,8 +42,9 @@
 
 ### 2.3 事务边界
 
-- `store.T(fn)` 只提供事务执行入口，**事务体（fn 内组合多个 Store 调用、业务判断、失败回滚语义）不应写在 `store/` 内**，应写在 `manager/service`（后台）或 `proxy/handler`（代理计费等无 manager 入口的场景）。
-- `store/` 里的方法默认在调用方传入的 `*Session` 上执行：若调用方用 `store.T` 包裹则自动进事务，若用 `store.C()` 则非事务，store 方法本身不感知是否事务。
+- `Session.T(fn)` 只提供事务执行入口，**事务体（fn 内组合多个 Store 调用、业务判断、失败回滚语义）不应写在 `store/` 内**，应写在 `manager/service`（后台）或 `proxy/handler`（代理计费等无 manager 入口的场景）。
+- `store/` 里的方法默认在调用方传入的 `*Session` 上执行：若调用方用 `Session.T(fn)` 包裹则自动进事务，若用 `store.C()` 则非事务，store 方法本身不感知是否事务。
+- Session 保存 `tx`/`page` 状态字段，不再用 `context.Value` 传业务参数（tx、分页），context 回归“请求级跨边界数据”本职。`store.C()` 无参，`Session.T(fn)` 在当前 Session 上切换 tx（嵌套调用复用当前 tx，不开新事务，保证原子性）。
 - 一个事务只编排「同一业务动作」需要的多张表，不要把无关写操作塞进同一事务。
 
 ### 2.4 并发安全（金额/计数类写操作）
@@ -150,6 +151,14 @@
 5. **接口命名**：列表查询统一用 `/list` 后缀（如 `/users/list`、`/providers/list`、`/models/list`、`/recharge/records/list`）。普通用户自助接口用 `/self` 后缀，超管接口不加 `/self`。
 6. **中间件挂载**：`login` / `refresh` 不挂 Auth；`logout` 挂 Auth 不挂 Require；其余挂 Auth + Require。
 7. **self / admin 合并模式**：同一业务的自助版与超管版合并为一个通用函数，self 入口只设当前用户 ID 后委托。如 `RechargeSelf` 设 `req.UserID = cur.ID` 后调 `Recharge`；`RechargeRecordsSelf` 设 `req.UserID = cur.ID` 后调 `RechargeRecords`。通用函数做参数校验 + 调 service，self 入口不重复校验逻辑。
+8. **分页接口**：列表查询接口应支持分页，采用 Session 状态 + 显式控制模式：
+   - 分页类型分层：`manager/base` 定义 `PageReq`（入参，内嵌到 Req 结构体）与 `PageResult[T]`（出参）；`store` 暴露 `PageContext`（传给 `store.C().SetPage` 的内部载体，拦截器写回 `Total`）。handler 不直接 import `store/base`。
+   - handler 创建 `store.PageContext{Page, PageSize}`，用 `store.C().SetPage(pc).Charge().List(...)` 链式调用，store 方法写普通 `Select`，`QueryBuilder` 从 Session 读 `PageContext`，有则自动拦截：先 `SELECT COUNT(*) FROM (<原SQL>) t` 查总数写回 `pc.Total`，再追加 `LIMIT ? OFFSET ?` 查当前页
+   - 非事务单次分页：链式调用，Session 用完即弃，不用 `ClearPage`
+   - 事务内多次查询：用 `s.SetPage(pc)` / `s.ClearPage()` 显式控制分页作用于哪些语句
+   - handler 从 `pc.Total` 拿总数，组装 `*base.PageResult[T]{Items, Total, Page, PageSize}` 返回
+   - `page` 1-based，`page_size` 默认 20、上限 100
+   - 未 `SetPage` 时 `Select` 退化为普通查询
 
 ### 7.4 新增数据库实体
 
@@ -157,7 +166,7 @@
 2. 在 `store/model/models.go` 中定义模型。
 3. 在 `store/` 下新增对应 Store 文件，提供单表 CRUD 方法，不写跨表编排。
 4. 命名空间入口写在该 Store 文件内（如 `func (s *Session) Xxx() *XxxStore`），不要集中放到 `store/base.go`。
-5. 涉及该实体的多表事务编排写在 `manager/service/`，用 `store.T(fn)` 包裹，在 fn 内组合多个 Store 调用。
+5. 涉及该实体的多表事务编排写在 `manager/service/`，用 `store.C().T(fn)` 包裹，在 fn 内组合多个 Store 调用。
 
 ### 7.5 开发管理台前端
 

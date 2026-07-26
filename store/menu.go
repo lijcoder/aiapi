@@ -146,7 +146,7 @@ func (ms *MenuStore) RevokeMenu(roleID, menuID int64) error {
 
 // ReplaceRoleMenus 事务替换角色的全部菜单关联。
 func (ms *MenuStore) ReplaceRoleMenus(roleID int64, menuIDs []int64) error {
-	return T(func(s *Session) error {
+	return ms.s.T(func(s *Session) error {
 		// 先删除旧关联
 		_, err := s.Query(
 			`DELETE FROM role_menus WHERE role_id = :role_id`,

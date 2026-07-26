@@ -49,7 +49,7 @@ func Record(ctx *types.Context) {
 	}
 
 	// 4. 用户余额和 Key 余额扣减放在同一事务中
-	err := store.T(func(s *store.Session) error {
+	err := store.C().T(func(s *store.Session) error {
 		// 4.1 扣用户余额
 		if err := s.Charge().DeductUserBudget(ctx.UserID, cost); err != nil {
 			return err

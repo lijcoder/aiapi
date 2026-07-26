@@ -1,7 +1,6 @@
 package base
 
 import (
-	"context"
 	"log/slog"
 
 	"github.com/jmoiron/sqlx"
@@ -15,8 +14,6 @@ type DB interface {
 // 编译期校验：*sqlx.DB 和 *sqlx.Tx 都实现 DB
 var _ DB = (*sqlx.DB)(nil)
 var _ DB = (*sqlx.Tx)(nil)
-
-type ctxKey struct{}
 
 var defaultDB DB
 
@@ -46,20 +43,7 @@ func SetDefaultDB(d DB) {
 	defaultDB = d
 }
 
-// DBFrom 从 ctx 中提取当前事务连接，不存在则返回默认连接。
-func DBFrom(ctx context.Context) DB {
-	if d, ok := ctx.Value(ctxKey{}).(DB); ok {
-		return d
-	}
-	return defaultDB
-}
-
-// WithDBContext 将 DB 连接注入 ctx，供事务内传递使用。
-func WithDBContext(ctx context.Context, d DB) context.Context {
-	return context.WithValue(ctx, ctxKey{}, d)
-}
-
-// DriverName 返回初始化时缓存的驱动名，供 queryx 在非 DB 场景使用。
+// DriverName 返回初始化时缓存的驱动名，供 QueryBuilder 构造占位符。
 func DriverName() string {
 	return driverName
 }

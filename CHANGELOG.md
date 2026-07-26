@@ -7,6 +7,9 @@
 
 ### 2026-07-25
 
+- 新增通用分页能力（Session 状态 + 显式控制）：`store/base/page.go` 提供 `PageContext`，`manager/base/page.go` 提供 `PageReq`/`PageResult[T]`。handler 创建 `store.PageContext`，用 `store.C().SetPage(pc).Charge().List(...)` 链式调用，`QueryBuilder.Select` 检测到后自动拦截：先 `SELECT COUNT(*) FROM (<原SQL>) t` 查总数写回 `pc.Total`，再追加 `LIMIT ? OFFSET ?` 查当前页。非事务单次分页不用 `ClearPage`（Session 用完即弃）；事务内用 `SetPage`/`ClearPage` 显式控制。store 方法只需写普通 `Select`，未 `SetPage` 时退化为普通查询。`page` 1-based，`page_size` 默认 20、上限 100。分页类型分层：`manager/base` 定义 API 层 `PageReq`/`PageResult`，`store` 暴露内部 `PageContext`，handler 不直接 import `store/base`。
+- 充值流水接口改为分页：`/manager/recharge/records`、`/manager/recharge/records/self`、`/manager/recharge/records/list` 入参加 `{page, page_size}`，返回 `{items, total, page, page_size}`。
+- 统一 Session 架构：`store.T` 包级函数改为 `Session.T(fn)` 方法，调用方式 `store.C().T(fn)`。事务在当前 Session 上切换 tx，嵌套调用复用当前 tx（不开新事务，保证原子性）。`store.C()` 无参，Session 保存 `tx`/`page` 状态字段，不再用 `context.Value` 传业务参数（tx、分页），context 回归“请求级跨边界数据”本职。
 - 重构充值业务：`store/charge.go` 的 `RechargeWithRecord`（读余额→加余额→写流水事务编排）下沉到新增的 `manager/service/charge.go` 的 `ChargeService`；`manager/handler/recharge.go` 改为调 service，不再自写事务。store 回归纯 SQL 包装。service 新增哨兵错误 `ErrUserNotFound`。
 - 修复并发充值流水不准：原「先 SELECT 读余额再 UPDATE」是读后写，快照读拿旧值会丢更新。改为「先 UPDATE 加余额（行锁）→ 同事务内 SELECT 新余额 → before 由 after 反推」，跨 SQLite/MySQL/PostgreSQL 通用。
 - 充值接口 self/admin 合并：`RechargeSelf` 设当前用户 ID 后委托 `Recharge`，`RechargeRecordsSelf` 同样委托 `RechargeRecords`，消除重复校验逻辑。

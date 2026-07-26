@@ -9,18 +9,20 @@ import (
 
 // QueryBuilder 通用查询构造器
 // 统一封装 Named + In + Rebind 三步管道，支持 DB 和 Tx
+// 持有 page 用于分页拦截（检测 PageContext）
 type QueryBuilder struct {
-	ext     sqlx.Ext        // 底层执行器：*sqlx.DB 或 *sqlx.Tx
-	bindTyp int             // 占位符类型：sqlx.QUESTION / sqlx.DOLLAR / sqlx.AMPERAND
-	query   string          // 处理后的最终 SQL（已展开 IN、已转换占位符）
-	args    []interface{}   // 处理后的最终参数列表
-	err     error           // 预处理阶段的累积错误（执行时优先返回）
+	ext     sqlx.Ext      // 底层执行器：*sqlx.DB 或 *sqlx.Tx
+	page    *PageContext  // 分页参数，nil 则不拦截
+	bindTyp int           // 占位符类型：sqlx.QUESTION / sqlx.DOLLAR / sqlx.AMPERAND
+	query   string        // 处理后的最终 SQL（已展开 IN、已转换占位符）
+	args    []interface{} // 处理后的最终参数列表
+	err     error         // 预处理阶段的累积错误（执行时优先返回）
 }
 
 // NewQuery 从 sqlx.Ext 创建 QueryBuilder
-// driverName 用于确定占位符类型；DB 场景可传 db.DriverName()，Tx 场景需调用方手动传入
-func NewQuery(ext sqlx.Ext, driverName string, query string, params any) *QueryBuilder {
-	qb := &QueryBuilder{ext: ext}
+// driverName 用于确定占位符类型；page 用于分页拦截，传 nil 则不拦截
+func NewQuery(ext sqlx.Ext, driverName string, page *PageContext, query string, params any) *QueryBuilder {
+	qb := &QueryBuilder{ext: ext, page: page}
 	if params == nil {
 		params = map[string]any{}
 	}
@@ -87,9 +89,13 @@ func (qb *QueryBuilder) Get(dest interface{}) error {
 
 // Select 执行查询并将多行结果绑定到 dest
 // dest 必须是 *[]struct 或 *[]map[string]interface{}
+// 若设置了 PageContext，自动拦截：先 COUNT 总数写回 pc.Total，再追加 LIMIT/OFFSET 查当前页。
 func (qb *QueryBuilder) Select(dest interface{}) error {
 	if qb.err != nil {
 		return qb.err
+	}
+	if qb.page != nil {
+		return applyPage(qb, dest, qb.page)
 	}
 	return sqlx.Select(qb.ext, dest, qb.query, qb.args...)
 }

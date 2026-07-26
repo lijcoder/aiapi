@@ -167,7 +167,7 @@ func (ms *ModelStore) GetApiKeyModelAccess(apiKeyID int64) (policy string, model
 // SetApiKeyModelAccess 设置某 API Key 的模型访问策略（事务内全量替换）。
 // policy=all 时清空白名单；policy=whitelist 时按 modelIDs 重写白名单。
 func (ms *ModelStore) SetApiKeyModelAccess(apiKeyID int64, policy string, modelIDs []int64) error {
-	return T(func(s *Session) error {
+	return ms.s.T(func(s *Session) error {
 		if _, err := s.Query(
 			`UPDATE api_keys SET model_policy = :policy WHERE id = :id`,
 			map[string]any{"id": apiKeyID, "policy": policy},

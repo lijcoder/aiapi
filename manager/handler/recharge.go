@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/lijcoder/aiapi/manager/base"
+	base "github.com/lijcoder/aiapi/manager/base"
 	"github.com/lijcoder/aiapi/manager/service"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
@@ -23,6 +23,7 @@ type RechargeReq struct {
 
 type RecordsReq struct {
 	UserID int64 `json:"userId"`
+	base.PageReq
 }
 
 type RechargeResult struct {
@@ -57,34 +58,36 @@ func Recharge(ctx context.Context, req *RechargeReq) (*RechargeResult, *base.Biz
 	return &RechargeResult{Record: rec, Budget: rec.BalanceAfter}, nil
 }
 
-// RechargeRecordsSelf 查询自己的充值流水
-func RechargeRecordsSelf(ctx context.Context) ([]model.RechargeRecord, *base.BizError) {
+// RechargeRecordsSelf 查询自己的充值流水（分页）
+func RechargeRecordsSelf(ctx context.Context, req *RecordsReq) (*base.PageResult[model.RechargeRecord], *base.BizError) {
 	cur := base.CurrentUser(ctx)
-	var req = &RecordsReq{}
 	req.UserID = cur.ID
 	return RechargeRecords(ctx, req)
 }
 
-// RechargeRecords 查询指定用户的充值流水
-func RechargeRecords(ctx context.Context, req *RecordsReq) ([]model.RechargeRecord, *base.BizError) {
-	recs, err := store.C().Charge().ListRechargeRecords(req.UserID)
+// RechargeRecords 查询指定用户的充值流水（分页）
+func RechargeRecords(ctx context.Context, req *RecordsReq) (*base.PageResult[model.RechargeRecord], *base.BizError) {
+	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
+	recs, err := store.C().SetPage(pc).Charge().ListRechargeRecords(req.UserID)
 	if err != nil {
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
-	return recs, nil
+	return &base.PageResult[model.RechargeRecord]{Items: recs, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
 
 // ListRechargeReq 全平台充值流水查询请求
 type ListRechargeReq struct {
 	Keyword string `json:"keyword"` // 按用户名/账号/备注模糊搜索
+	base.PageReq
 }
 
-// ListRechargeRecords 超管查询全平台充值流水
-func ListRechargeRecords(ctx context.Context, req *ListRechargeReq) ([]model.RechargeRecord, *base.BizError) {
-	recs, err := store.C().Charge().ListAllRechargeRecords(strings.TrimSpace(req.Keyword))
+// ListRechargeRecords 超管查询全平台充值流水（分页）
+func ListRechargeRecords(ctx context.Context, req *ListRechargeReq) (*base.PageResult[model.RechargeRecord], *base.BizError) {
+	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
+	recs, err := store.C().SetPage(pc).Charge().ListAllRechargeRecords(strings.TrimSpace(req.Keyword))
 	if err != nil {
 		slog.Error("[Recharge] ListAll failed", "err", err)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
-	return recs, nil
+	return &base.PageResult[model.RechargeRecord]{Items: recs, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }

@@ -264,6 +264,8 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 
 ### 接口一览
 
+> **分页接口**：标注「分页」的接口接受 `page`（页码，1-based，<1 当 1）和 `page_size`（每页条数，默认 20，上限 100）参数，返回 `{items, total, page, page_size}` 结构。
+
 | 路径 | 说明 | 需登录 |
 |------|------|--------|
 | `POST /manager/login` | 登录，body `{account, password}`，返回 `{access_token, expires_in}` 并写 refresh cookie | 否 |
@@ -272,8 +274,8 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/self` | 当前用户基本信息 | 是 |
 | `POST /manager/recharge/self` | 给自己充值，body `{amount, remark}`（`userId` 由服务端注入当前用户，传入会被覆盖） | 是 |
 | `POST /manager/recharge` | 管理员充值，body `{userId, amount, remark}` | 是 |
-| `POST /manager/recharge/records` | 管理员查指定用户充值流水，body `{userId}` | 是 |
-| `POST /manager/recharge/records/self` | 查自己的充值流水（`userId` 由服务端注入当前用户） | 是 |
+| `POST /manager/recharge/records` | 管理员查指定用户充值流水（分页），body `{userId, page, page_size}` | 是 |
+| `POST /manager/recharge/records/self` | 查自己的充值流水（分页），body `{page, page_size}`（`userId` 由服务端注入当前用户） | 是 |
 | `POST /manager/models` | 模型列表 | 是 |
 | `POST /manager/apikeys/list/self` | 查自己的 API Key 列表（key 脱敏） | 是 |
 | `POST /manager/apikeys/create/self` | 创建 API Key，body `{name, budget, unlimited}`，明文 key 仅本次返回 | 是 |
@@ -314,7 +316,7 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/apikeys/budget` | 修改指定用户 Key 额度，body `{id, budget, unlimited}` |
 | `POST /manager/apikeys/models/get` | 查指定 Key 的模型访问策略，body `{api_key_id}`，返回 `{model_policy, model_ids}` |
 | `POST /manager/apikeys/models/set` | 设置指定 Key 的模型访问策略，body `{api_key_id, model_policy(all\|whitelist), model_ids}` |
-| `POST /manager/recharge/records/list` | 全平台充值流水，body `{keyword}` 按用户名/账号/备注搜索 |
+| `POST /manager/recharge/records/list` | 全平台充值流水（分页），body `{keyword, page, page_size}` 按用户名/账号/备注搜索 |
 | `POST /manager/usage/stats` | 全局统计，body `{mode, start_date, end_date, user_id(可选), api_key_id(可选), model(可选), provider(可选), group_by(可选: user/model/provider/api_key)}` |
 | `POST /manager/usage/filters` | 全局筛选选项（含用户列表） |
 | `POST /manager/dashboard` | 仪表盘：汇总指标 + 近 7 天趋势 |
