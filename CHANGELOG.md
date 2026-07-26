@@ -8,11 +8,15 @@
 ### 2026-07-25
 
 - 重构充值业务：`store/charge.go` 的 `RechargeWithRecord`（读余额→加余额→写流水事务编排）下沉到新增的 `manager/service/charge.go` 的 `ChargeService`；`manager/handler/recharge.go` 改为调 service，不再自写事务。store 回归纯 SQL 包装。service 新增哨兵错误 `ErrUserNotFound`。
-
+- 修复并发充值流水不准：原「先 SELECT 读余额再 UPDATE」是读后写，快照读拿旧值会丢更新。改为「先 UPDATE 加余额（行锁）→ 同事务内 SELECT 新余额 → before 由 after 反推」，跨 SQLite/MySQL/PostgreSQL 通用。
+- 充值接口 self/admin 合并：`RechargeSelf` 设当前用户 ID 后委托 `Recharge`，`RechargeRecordsSelf` 同样委托 `RechargeRecords`，消除重复校验逻辑。
 - 明确后端四层职责与事务边界（更新 `AGENTS.md`）：
   - `store/` 为纯 SQL 包装层，只做单表读写，不写跨表编排与业务判断。
   - `manager/service/` 承载跨 handler 复用业务逻辑与多表事务编排；`manager/handler/` 只做 HTTP 适配，不直接写事务。
   - 事务体用 `store.T(fn)` 包裹，写在 `manager/service`（后台）或 `proxy/handler`（代理计费等无 manager 入口场景），不写在 `store/` 内。
+  - 新增 §2.4 并发安全规则：金额/计数类写操作必须「先 UPDATE 后事务内 SELECT」，禁止读后写、禁止依赖 `RETURNING`/`FOR UPDATE`（跨库不通用）。
+  - 新增 §2.5 注释风格：store 方法注释只说做什么，不描述事务用法/调用时机。
+  - 新增 §7.3 self/admin 合并模式约定。
   - 同步补充分层表、handler/service 边界、新增 Manager API / 数据库实体的步骤要求。
 
 ### 2026-07-24

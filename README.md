@@ -270,10 +270,10 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 | `POST /manager/refresh` | 刷新 access JWT + 轮换 refresh token（靠 cookie，不走 access JWT） | 否 |
 | `POST /manager/logout` | 登出，吊销当前登录链并清 cookie | 是 |
 | `POST /manager/self` | 当前用户基本信息 | 是 |
-| `POST /manager/recharge/self` | 给自己充值，body `{amount, remark}` | 是 |
+| `POST /manager/recharge/self` | 给自己充值，body `{amount, remark}`（`userId` 由服务端注入当前用户，传入会被覆盖） | 是 |
 | `POST /manager/recharge` | 管理员充值，body `{userId, amount, remark}` | 是 |
 | `POST /manager/recharge/records` | 管理员查指定用户充值流水，body `{userId}` | 是 |
-| `POST /manager/recharge/records/self` | 查自己的充值流水 | 是 |
+| `POST /manager/recharge/records/self` | 查自己的充值流水（`userId` 由服务端注入当前用户） | 是 |
 | `POST /manager/models` | 模型列表 | 是 |
 | `POST /manager/apikeys/list/self` | 查自己的 API Key 列表（key 脱敏） | 是 |
 | `POST /manager/apikeys/create/self` | 创建 API Key，body `{name, budget, unlimited}`，明文 key 仅本次返回 | 是 |

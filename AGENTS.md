@@ -46,6 +46,27 @@
 - `store/` 里的方法默认在调用方传入的 `*Session` 上执行：若调用方用 `store.T` 包裹则自动进事务，若用 `store.C()` 则非事务，store 方法本身不感知是否事务。
 - 一个事务只编排「同一业务动作」需要的多张表，不要把无关写操作塞进同一事务。
 
+### 2.4 并发安全（金额/计数类写操作）
+
+涉及余额、计数等「读后算再写」的场景，必须保证读到的值是本次写入前的稳定值，禁止「先 SELECT 再 UPDATE 写回」的读后写模式（快照读拿旧值会丢更新）。
+
+通用做法（跨 SQLite/MySQL/PostgreSQL）：
+
+1. 先 `UPDATE budget = budget + :amount`（对同一行的 UPDATE 加行锁串行执行，金额不丢更新）
+2. 再在同事务内 `SELECT budget`（事务内自己修改对后续语句立即可见，拿到的是步骤 1 之后的新值）
+3. 行锁持续到 COMMIT，期间其他事务的 UPDATE 阻塞，故步骤 2 读到的是稳定值
+4. 需要记 before/after 流水时，`before = after - amount` 反推
+
+禁止的反模式：
+- 先 `SELECT budget` 再 `UPDATE budget = :newValue`（读后写，快照读拿旧值 → 丢更新）
+- 依赖 `UPDATE ... RETURNING`（MySQL 8 不支持，跨库不通用）
+- 依赖 `SELECT ... FOR UPDATE`（SQLite 不支持该语法）
+
+### 2.5 注释风格
+
+- `store/` 方法注释只说明「这个方法做什么」，不描述事务用法、调用时机、并发语义等——这些属于 service/handler 的编排逻辑，写在 store 里是越界且误导。
+- service/handler 的复杂逻辑（事务编排、并发安全原理）才需要详细注释。
+
 ## 3. 代码组织规则
 
 ### 3.1 新增功能时，先找对应层次
@@ -128,6 +149,7 @@
 4. 在 `manager/router/router.go` 的 `Register(g *echo.Group)` 中用 `base.Wrap(handler.Xxx)` 注册路由；路由组根路径 `/manager` 由 `framework/echo.go` 直写。
 5. **接口命名**：列表查询统一用 `/list` 后缀（如 `/users/list`、`/providers/list`、`/models/list`、`/recharge/records/list`）。普通用户自助接口用 `/self` 后缀，超管接口不加 `/self`。
 6. **中间件挂载**：`login` / `refresh` 不挂 Auth；`logout` 挂 Auth 不挂 Require；其余挂 Auth + Require。
+7. **self / admin 合并模式**：同一业务的自助版与超管版合并为一个通用函数，self 入口只设当前用户 ID 后委托。如 `RechargeSelf` 设 `req.UserID = cur.ID` 后调 `Recharge`；`RechargeRecordsSelf` 设 `req.UserID = cur.ID` 后调 `RechargeRecords`。通用函数做参数校验 + 调 service，self 入口不重复校验逻辑。
 
 ### 7.4 新增数据库实体
 
