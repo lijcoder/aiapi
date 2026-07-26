@@ -22,9 +22,9 @@ func Register(g *echo.Group) {
 	g.Use(middleware.Require)
 	g.POST("/self", base.Wrap(handler.Self))
 	g.POST("/recharge/self", base.Wrap(handler.RechargeSelf))
-	g.POST("/recharge", base.Wrap(handler.RechargeAdmin))
+	g.POST("/recharge", base.Wrap(handler.Recharge))
 	g.POST("/recharge/records", base.Wrap(handler.RechargeRecords))
-	g.POST("/recharge/records/self", base.Wrap(handler.RechargeSelfRecords))
+	g.POST("/recharge/records/self", base.Wrap(handler.RechargeRecordsSelf))
 
 	g.POST("/models", base.Wrap(handler.ListModels))
 

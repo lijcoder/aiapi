@@ -33,6 +33,7 @@ import (
 //   - ErrSessionNotFound  → CodeSessionExpired（同上）
 //   - ErrSessionReuse     → CodeSessionReuse（重用攻击，已吊销 family）
 //   - ErrUserDisabled     → 用户被禁用/删除
+//   - ErrUserNotFound     → 用户不存在（充值等操作目标用户缺失）
 
 var (
 	ErrTokenExpired    = errors.New("token expired")
@@ -40,6 +41,7 @@ var (
 	ErrSessionExpired  = errors.New("session expired")
 	ErrSessionReuse    = errors.New("session reuse detected")
 	ErrUserDisabled    = errors.New("user disabled")
+	ErrUserNotFound    = errors.New("user not found")
 )
 
 // ===== 对外类型 =====

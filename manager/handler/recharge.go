@@ -2,21 +2,20 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 
 	"github.com/lijcoder/aiapi/manager/base"
+	"github.com/lijcoder/aiapi/manager/service"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
 )
 
-// 请求/响应结构体
-type RechargeSelfReq struct {
-	Amount float64 `json:"amount"`
-	Remark string  `json:"remark"`
-}
+// chargeService 与 middleware/handler 共用同一实例（无状态）。
+var chargeService = service.NewChargeService()
 
-type RechargeAdminReq struct {
+type RechargeReq struct {
 	UserID int64   `json:"userId"`
 	Amount float64 `json:"amount"`
 	Remark string  `json:"remark"`
@@ -32,30 +31,14 @@ type RechargeResult struct {
 }
 
 // RechargeSelf 普通用户给自己充值
-func RechargeSelf(ctx context.Context, req *RechargeSelfReq) (*RechargeResult, *base.BizError) {
+func RechargeSelf(ctx context.Context, req *RechargeReq) (*RechargeResult, *base.BizError) {
 	cur := base.CurrentUser(ctx)
-	result := &RechargeResult{}
-	if req.Amount <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "amount must be positive")
-	}
-	err := store.T(func(s *store.Session) error {
-		rec, err := s.Charge().RechargeWithRecord(cur.ID, req.Amount, cur.Account, req.Remark)
-		if err != nil {
-			return err
-		}
-		result.Record = rec
-		return nil
-	})
-	if err != nil {
-		slog.Error("recharge self failed", "err", err, "user_id", cur.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
-	}
-	result.Budget = result.Record.BalanceAfter
-	return result, nil
+	req.UserID = cur.ID
+	return Recharge(ctx, req)
 }
 
-// RechargeAdmin 管理员给指定用户充值
-func RechargeAdmin(ctx context.Context, req *RechargeAdminReq) (*RechargeResult, *base.BizError) {
+// Recharge 给指定用户充值
+func Recharge(ctx context.Context, req *RechargeReq) (*RechargeResult, *base.BizError) {
 	cur := base.CurrentUser(ctx)
 	if req.UserID <= 0 {
 		return nil, base.NewBizError(base.CodeInvalidParams, "user_id is required")
@@ -63,41 +46,26 @@ func RechargeAdmin(ctx context.Context, req *RechargeAdminReq) (*RechargeResult,
 	if req.Amount <= 0 {
 		return nil, base.NewBizError(base.CodeInvalidParams, "amount must be positive")
 	}
-	target, err := store.C().User().GetByID(req.UserID)
+	rec, err := chargeService.RechargeWithRecord(req.UserID, req.Amount, cur.Account, req.Remark)
 	if err != nil {
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
-	}
-	if target == nil {
-		return nil, base.NewBizError(base.CodeUserNotFound, "user not found")
-	}
-	result := &RechargeResult{}
-	err = store.T(func(s *store.Session) error {
-		rec, err := s.Charge().RechargeWithRecord(req.UserID, req.Amount, cur.Account, req.Remark)
-		if err != nil {
-			return err
+		if errors.Is(err, service.ErrUserNotFound) {
+			return nil, base.NewBizError(base.CodeUserNotFound, "user not found")
 		}
-		result.Record = rec
-		return nil
-	})
-	if err != nil {
-		slog.Error("recharge admin failed", "err", err, "target_user_id", req.UserID)
+		slog.Error("recharge failed", "err", err, "target_user_id", req.UserID, "operator", cur.Account)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
-	result.Budget = result.Record.BalanceAfter
-	return result, nil
+	return &RechargeResult{Record: rec, Budget: rec.BalanceAfter}, nil
 }
 
-// RechargeSelfRecords 查询自己的充值流水
-func RechargeSelfRecords(ctx context.Context) ([]model.RechargeRecord, *base.BizError) {
+// RechargeRecordsSelf 查询自己的充值流水
+func RechargeRecordsSelf(ctx context.Context) ([]model.RechargeRecord, *base.BizError) {
 	cur := base.CurrentUser(ctx)
-	recs, err := store.C().Charge().ListRechargeRecords(cur.ID)
-	if err != nil {
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
-	}
-	return recs, nil
+	var req = &RecordsReq{}
+	req.UserID = cur.ID
+	return RechargeRecords(ctx, req)
 }
 
-// RechargeRecords 管理员查询指定用户的充值流水
+// RechargeRecords 查询指定用户的充值流水
 func RechargeRecords(ctx context.Context, req *RecordsReq) ([]model.RechargeRecord, *base.BizError) {
 	recs, err := store.C().Charge().ListRechargeRecords(req.UserID)
 	if err != nil {

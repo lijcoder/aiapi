@@ -25,6 +25,15 @@ func (cs *ChargeStore) DeductUserBudget(userID int64, amount float64) error {
 	return err
 }
 
+// DeductKeyBudget 扣减 API Key 余额（amount 为正）
+func (cs *ChargeStore) DeductKeyBudget(key string, amount float64) error {
+	_, err := cs.s.Query(
+		`UPDATE api_keys SET budget = budget - :amount WHERE key = :key`,
+		map[string]any{"key": key, "amount": amount},
+	).Exec()
+	return err
+}
+
 // RechargeUserBudget 充值用户余额（amount 为正）
 func (cs *ChargeStore) RechargeUserBudget(userID int64, amount float64) error {
 	_, err := cs.s.Query(
@@ -34,13 +43,14 @@ func (cs *ChargeStore) RechargeUserBudget(userID int64, amount float64) error {
 	return err
 }
 
-// DeductKeyBudget 扣减 API Key 余额（amount 为正）
-func (cs *ChargeStore) DeductKeyBudget(key string, amount float64) error {
-	_, err := cs.s.Query(
-		`UPDATE api_keys SET budget = budget - :amount WHERE key = :key`,
-		map[string]any{"key": key, "amount": amount},
-	).Exec()
-	return err
+// GetUserBudget 查询用户余额
+func (cs *ChargeStore) GetUserBudget(userID int64) (float64, error) {
+	var budget float64
+	err := cs.s.Query(
+		`SELECT budget FROM users WHERE id = :user_id`,
+		map[string]any{"user_id": userID},
+	).Get(&budget)
+	return budget, err
 }
 
 // InsertRechargeRecord 插入充值记录
@@ -59,36 +69,6 @@ func (cs *ChargeStore) InsertRechargeRecord(rec *model.RechargeRecord) error {
 	}
 	rec.ID = id
 	return nil
-}
-
-// RechargeWithRecord 在当前 Session（应在事务中）内完成一次充值：
-// 读取充值前余额 → 增加余额 → 写入充值流水。amount 必须由调用方保证 > 0。
-// operator 为发起方账号（自充值写用户本人账号，管理员充值写管理员账号）。
-func (cs *ChargeStore) RechargeWithRecord(userID int64, amount float64, operator, remark string) (*model.RechargeRecord, error) {
-	var u model.User
-	if err := cs.s.Query(
-		`SELECT * FROM users WHERE id = :user_id`,
-		map[string]any{"user_id": userID},
-	).Get(&u); err != nil {
-		return nil, err
-	}
-
-	if err := cs.RechargeUserBudget(userID, amount); err != nil {
-		return nil, err
-	}
-
-	rec := &model.RechargeRecord{
-		UserID:        userID,
-		Amount:        amount,
-		BalanceBefore: u.Budget,
-		BalanceAfter:  u.Budget + amount,
-		Operator:      operator,
-		Remark:        remark,
-	}
-	if err := cs.InsertRechargeRecord(rec); err != nil {
-		return nil, err
-	}
-	return rec, nil
 }
 
 // ListRechargeRecords 查询某用户的充值流水（倒序）
@@ -123,4 +103,3 @@ func (cs *ChargeStore) ListAllRechargeRecords(keyword string) ([]model.RechargeR
 	}
 	return recs, nil
 }
-

@@ -7,6 +7,8 @@
 
 ### 2026-07-25
 
+- 重构充值业务：`store/charge.go` 的 `RechargeWithRecord`（读余额→加余额→写流水事务编排）下沉到新增的 `manager/service/charge.go` 的 `ChargeService`；`manager/handler/recharge.go` 改为调 service，不再自写事务。store 回归纯 SQL 包装。service 新增哨兵错误 `ErrUserNotFound`。
+
 - 明确后端四层职责与事务边界（更新 `AGENTS.md`）：
   - `store/` 为纯 SQL 包装层，只做单表读写，不写跨表编排与业务判断。
   - `manager/service/` 承载跨 handler 复用业务逻辑与多表事务编排；`manager/handler/` 只做 HTTP 适配，不直接写事务。
