@@ -111,8 +111,8 @@ func parseDateRangeMonth(startStr, endStr string) (string, string, error) {
 }
 
 var (
-	errInvalidDateRange = &base.BizError{Code: base.CodeInvalidParams, Msg: "invalid date range"}
-	errDateRangeTooLong = &base.BizError{Code: base.CodeInvalidParams, Msg: "day mode date range cannot exceed 31 days"}
+	errInvalidDateRange = &base.BizError{Code: base.CodeInvalidParams, Msg: "日期范围无效"}
+	errDateRangeTooLong = &base.BizError{Code: base.CodeInvalidParams, Msg: "按天查询最多只能选择 31 天"}
 )
 
 // ===== Handler =====

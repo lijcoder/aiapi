@@ -169,7 +169,7 @@ function labelTitle() {
 }
 
 const cols = computed(() => [
-  { title: labelTitle(), key: 'label', width: 180, ellipsis: { tooltip: true }, fixed: 'left',
+  { title: labelTitle(), key: 'label', width: 160, ellipsis: { tooltip: true }, fixed: 'left',
     render(r) {
       if (query.groupBy !== 'api_key') return r.label
       const deleted = r.key_exists === false
@@ -197,6 +197,16 @@ async function doQuery() {
   if (!dateRange.value || dateRange.value.length < 2) {
     message.warning('请选择时间范围')
     return
+  }
+  // 按天查询最多 31 天，超出自动截断到最近 31 天
+  if (query.mode === 'day') {
+    const oneDay = 24 * 60 * 60 * 1000
+    const span = dateRange.value[1] - dateRange.value[0]
+    if (span > 31 * oneDay) {
+      const end = dateRange.value[1]
+      dateRange.value = [end - 31 * oneDay + oneDay, end]
+      message.warning('按天查询最多只能选择 31 天，已自动截断到最近 31 天')
+    }
   }
   loading.value = true
   try {
