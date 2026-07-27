@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+- 移除 pprof 调试接口：`--add-pprof` 启动参数与 `/debug/pprof/*` 路由全部删除（此前开启后无任何鉴权，会公开 goroutine/堆等运行时信息）。README 中相关说明同步移除。
+
 ### 2026-07-27
 
 - 修复前端日历面板英文显示：`n-config-provider` 补 `:date-locale="dateZhCN"`，naive-ui 的日期/日历组件文案由独立的 date-locale 控制，此前只设了 `locale="zhCN"` 导致月份/星期仍显示英文。

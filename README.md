@@ -11,7 +11,6 @@
 - **请求日志**：保存每次请求的参数、响应状态、耗时与错误信息
 - **Provider 管理**：内置 CRUD 接口动态管理上游配置
 - **API Key 管理**：校验调用方身份，支持启用/禁用
-- **pprof 调试**：可选启用 Go 性能分析接口
 - **管理台**：内置 Web 管理界面，支持双 token 安全登录、充值、流水查询
 
 ## 架构概览
@@ -83,9 +82,6 @@ export AIAPI_JWT_SECRET="your-super-secret-at-least-32-bytes-long"
 
 # 指定端口
 ./aiapi --port 8888
-
-# 启用 pprof 调试接口
-./aiapi --pprof
 ```
 
 ### 测试代理
@@ -206,21 +202,6 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
 ### 应用日志
 
 默认输出到标准输出与 `~/.aiapi/logs/app.log`，支持按大小/时间轮转。
-
-### pprof
-
-启动时添加 `--pprof` 参数，然后访问：
-
-```bash
-# 查看性能概览
-curl http://localhost:8888/debug/pprof
-
-# 下载 30 秒 CPU profile
-go tool pprof http://localhost:8888/debug/pprof/profile
-
-# 查看堆内存
-go tool pprof http://localhost:8888/debug/pprof/heap
-```
 
 ## 开发扩展
 
