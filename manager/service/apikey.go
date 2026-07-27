@@ -44,3 +44,13 @@ func (s *ApiKeyService) GetModelAccess(apiKeyID int64) (policy string, modelIDs 
 	modelIDs, err = store.C().ModelAccess().ListApiKeyModelIDs(apiKeyID)
 	return
 }
+
+// Delete 删除 API Key（事务内同时清理模型白名单）。
+func (s *ApiKeyService) Delete(apiKeyID int64) error {
+	return store.C().T(func(ss *store.Session) error {
+		if err := ss.ModelAccess().DeleteApiKeyModelItems(apiKeyID); err != nil {
+			return err
+		}
+		return ss.ApiKey().DeleteApiKey(apiKeyID)
+	})
+}

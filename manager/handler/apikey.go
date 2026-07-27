@@ -241,7 +241,7 @@ func DeleteApiKeySelf(ctx context.Context, req *ApiKeyIdReq) (*struct{}, *base.B
 	if k == nil || k.UserID != cur.ID {
 		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
 	}
-	if err := store.C().ApiKey().Delete(k.ID); err != nil {
+	if err := service.NewApiKeyService().Delete(k.ID); err != nil {
 		slog.Error("delete api key failed", "err", err, "id", k.ID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
@@ -365,7 +365,7 @@ func DeleteApiKeyAdmin(ctx context.Context, req *ApiKeyIdReq) (*struct{}, *base.
 	if k == nil {
 		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
 	}
-	if err := store.C().ApiKey().Delete(k.ID); err != nil {
+	if err := service.NewApiKeyService().Delete(k.ID); err != nil {
 		slog.Error("delete api key failed", "err", err, "id", k.ID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
