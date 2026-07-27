@@ -145,26 +145,11 @@ func (rs *RoleStore) ListRolesByUserIDs(userIDs []int64) (map[int64][]model.Role
 	return result, nil
 }
 
-// ReplaceUserRoles 事务替换用户的全部角色关联。
-func (rs *RoleStore) ReplaceUserRoles(userID int64, roleIDs []int64) error {
-	return rs.s.T(func(s *Session) error {
-		// 先删除旧关联
-		_, err := s.Query(
-			`DELETE FROM user_roles WHERE user_id = :user_id`,
-			map[string]any{"user_id": userID},
-		).Exec()
-		if err != nil {
-			return err
-		}
-		for _, rid := range roleIDs {
-			_, err = s.Query(
-				`INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)`,
-				map[string]any{"user_id": userID, "role_id": rid},
-			).Exec()
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+// DeleteUserRoles 删除用户的全部角色关联。
+func (rs *RoleStore) DeleteUserRoles(userID int64) error {
+	_, err := rs.s.Query(
+		`DELETE FROM user_roles WHERE user_id = :user_id`,
+		map[string]any{"user_id": userID},
+	).Exec()
+	return err
 }

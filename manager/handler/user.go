@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lijcoder/aiapi/manager/base"
+	"github.com/lijcoder/aiapi/manager/service"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
 	"golang.org/x/crypto/bcrypt"
@@ -315,7 +316,7 @@ func AssignRoles(ctx context.Context, req *AssignRolesReq) (*struct{}, *base.Biz
 	if u == nil {
 		return nil, base.NewBizError(base.CodeUserNotFound, "user not found")
 	}
-	if err := store.C().Role().ReplaceUserRoles(req.ID, req.RoleIDs); err != nil {
+	if err := service.NewRoleService().ReplaceUserRoles(req.ID, req.RoleIDs); err != nil {
 		slog.Error("[User] ReplaceUserRoles failed", "err", err, "id", req.ID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
