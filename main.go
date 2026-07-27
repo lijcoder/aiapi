@@ -49,9 +49,13 @@ func main() {
 	registerRuntime()
 	e.Logger.Fatal(e.StartServer(&http.Server{
 		Addr:              constant.Address(),
-		ReadTimeout:       time.Second * 5,
+		ReadTimeout:       time.Second * 10, // 客户端请求 body 需在 10s 内发完（仅约束读取阶段，不影响响应流）
 		ReadHeaderTimeout: time.Second * 2,
-		WriteTimeout:      time.Second * 90,
+		IdleTimeout:       time.Second * 90, // keep-alive 空闲连接存活时间（不设置则复用 ReadTimeout，空闲连接过早被关）
+		// WriteTimeout 必须保持 0：它是「请求头读完 → 响应写完」的总时长死线，
+		// 任何固定值都会切断超长 SSE 流式响应（LLM 流可能持续数分钟）。
+		// 连接生命周期改由请求 context 控制（客户端断开 → 取消上游请求）。
+		WriteTimeout: 0,
 	}))
 }
 
