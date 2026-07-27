@@ -7,6 +7,8 @@
 
 ### 2026-07-27
 
+- 修复前端日历面板英文显示：`n-config-provider` 补 `:date-locale="dateZhCN"`，naive-ui 的日期/日历组件文案由独立的 date-locale 控制，此前只设了 `locale="zhCN"` 导致月份/星期仍显示英文。
+
 - manager 业务错误码收敛：`manager/base/bizcode.go` 从 19 个码精简到 7 个（`CodeSuccess`/`CodeUnknown`/`CodeBadRequest`/`CodeUnauthorized`/`CodeForbidden`/`CodeNotFound`/`CodeTokenExpired`）。只保留有消费方按 code 分支（前端唯一依赖 `CodeTokenExpired` 1016 触发 `/refresh`）或 HTTP 状态语义不同的码；其余业务错误（已存在/不存在/额度不足/密码错误等）统一用通用码 + 中文错误信息区分，不再为每种业务定义独立码。删除死码 `CodeUserDisabled`。
   - handler 错误信息全部中文化；DB 等内部错误统一返回预置实例 `base.ErrInternal`（"系统繁忙，请稍后重试"），替代约 60 处 `NewBizError(CodeUnknown, ...)` 样板。
   - 新增便捷构造 `base.ErrBadReq(msg)` / `base.ErrNotFound(msg)`。
