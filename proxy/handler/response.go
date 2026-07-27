@@ -2,12 +2,14 @@ package handler
 
 import (
 	"bytes"
+	"io"
+	"log/slog"
+	"net/http"
+	"strings"
+
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/sse"
 	"github.com/lijcoder/aiapi/proxy/types"
-	"io"
-	"log/slog"
-	"strings"
 )
 
 // logReadCloser io.TeeReader 的 ReadCloser 包装
@@ -28,13 +30,49 @@ func Response(ctx *types.Context) {
 		writeResponse(ctx)
 	}
 }
-func streamResponse(ctx *types.Context) {
-	ctx.Stream = true
-	for k, vs := range ctx.HttpResp.Header {
+// hopByHopHeaders RFC 7230 §6.1 定义的逐跳头（key 为 Canonical 形式）。
+// 它们只描述「上游 → aiapi」这一段连接的传输状态，对「aiapi → 客户端」
+// 这段连接无意义，转发时必须剥掉，由 Go http.Server 自行重新协商。
+// （参考标准库 httputil.ReverseProxy 的同款过滤）
+var hopByHopHeaders = map[string]bool{
+	"Connection":          true,
+	"Keep-Alive":          true,
+	"Proxy-Authenticate":  true,
+	"Proxy-Authorization": true,
+	"Te":                  true,
+	"Trailer":             true,
+	"Transfer-Encoding":   true,
+	"Upgrade":             true,
+}
+
+// copyUpstreamHeaders 复制上游响应头到客户端，剥掉逐跳头。
+// Connection 头里动态点名的头（如 Connection: X-Internal）同样视为逐跳头剥掉。
+func copyUpstreamHeaders(ctx *types.Context) {
+	src := ctx.HttpResp.Header
+
+	// 解析 Connection 头点名的额外逐跳头（Canonical 形式集合）
+	nominated := map[string]bool{}
+	for _, v := range src.Values("Connection") {
+		for _, name := range strings.Split(v, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				nominated[http.CanonicalHeaderKey(name)] = true
+			}
+		}
+	}
+
+	for k, vs := range src {
+		if hopByHopHeaders[k] || nominated[k] {
+			continue
+		}
 		for _, v := range vs {
 			ctx.Writer.Header().Add(k, v)
 		}
 	}
+}
+
+func streamResponse(ctx *types.Context) {
+	ctx.Stream = true
+	copyUpstreamHeaders(ctx)
 	ctx.Writer.WriteStatusCode(ctx.HttpResp.StatusCode)
 	// 用 TeeReader 透传的同时缓存原始响应体用于日志
 	var logBuf bytes.Buffer
@@ -96,11 +134,7 @@ func interceptResponse(ctx *types.Context) {
 	}
 }
 func writeResponse(ctx *types.Context) {
-	for k, vs := range ctx.HttpResp.Header {
-		for _, v := range vs {
-			ctx.Writer.Header().Add(k, v)
-		}
-	}
+	copyUpstreamHeaders(ctx)
 	ctx.Writer.WriteStatusCode(ctx.HttpResp.StatusCode)
 	if len(ctx.RespBody) > 0 {
 		_, err := ctx.Writer.Write(ctx.RespBody)
