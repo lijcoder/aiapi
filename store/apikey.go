@@ -18,28 +18,21 @@ type ApiKeyStore struct {
 	s *Session
 }
 
-// Get 按 key 查询 API Key 及关联用户
-func (ks *ApiKeyStore) Get(key string) (*model.ApiKey, *model.User, error) {
+// GetByKey 按 key 查询启用的 API Key（仅查 api_keys 表）。
+// key 不存在或未启用时返回 (nil, nil)。
+func (ks *ApiKeyStore) GetByKey(key string) (*model.ApiKey, error) {
 	var k model.ApiKey
 	err := ks.s.Query(
 		`SELECT * FROM api_keys WHERE key = :key AND enabled = 1`,
 		map[string]any{"key": key},
 	).Get(&k)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, nil
+		return nil, nil
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	u, err := ks.s.User().GetByID(k.UserID)
-	if err != nil {
-		return &k, nil, err
-	}
-	if u == nil {
-		return &k, nil, nil
-	}
-	return &k, u, nil
+	return &k, nil
 }
 
 // GetByID 按 ID 查询 API Key（不过滤 enabled，调用方自行判断归属与状态）

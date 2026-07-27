@@ -6,6 +6,7 @@ import (
 
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
+	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
 )
 
@@ -23,7 +24,7 @@ func Auth(ctx *types.Context) {
 		ctx.Code = types.CodeUnauthorized
 		return
 	}
-	key, user, err := store.C().ApiKey().Get(ctx.ApiKey)
+	key, user, err := service.NewApiKeyService().GetKeyAndUser(ctx.ApiKey)
 	if err != nil {
 		ctx.Err = log.WithStack(err)
 		ctx.ErrorMessage = types.InternalServerError

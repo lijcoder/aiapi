@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	base "github.com/lijcoder/aiapi/manager/base"
-	"github.com/lijcoder/aiapi/manager/service"
+	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
 )

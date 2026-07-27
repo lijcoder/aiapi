@@ -5,12 +5,12 @@ import (
 
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
-	"github.com/lijcoder/aiapi/store"
+	"github.com/lijcoder/aiapi/service"
 )
 
 // BudgetCheck 请求前校验用户和 API Key 的余额
 func BudgetCheck(ctx *types.Context) {
-	key, user, err := store.C().ApiKey().Get(ctx.ApiKey)
+	key, user, err := service.NewApiKeyService().GetKeyAndUser(ctx.ApiKey)
 	if err != nil {
 		ctx.Err = log.WithStack(err)
 		ctx.ErrorMessage = types.InternalServerError

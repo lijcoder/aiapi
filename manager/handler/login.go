@@ -9,7 +9,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/lijcoder/aiapi/manager/base"
-	"github.com/lijcoder/aiapi/manager/service"
+	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
 	"golang.org/x/crypto/bcrypt"
 )

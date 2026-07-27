@@ -24,7 +24,7 @@
 | 业务处理层 | 单一职责的 handler，完成具体业务逻辑 | `proxy/handler/*.go` |
 | 协议解析层 | 不同厂商的请求/响应解析与 Key 提取 | `parser/*.go` |
 | 后台管理层 | 后端给前端的接口入口，只做 HTTP 适配（参数校验、调 service、组装响应） | `manager/handler/*.go` |
-| 后台业务服务层 | 跨 handler 复用的业务逻辑、多表事务编排，不依赖 echo | `manager/service/*.go` |
+| 业务服务层 | 跨 handler 复用的业务逻辑、多表事务编排，不依赖 echo | `service/*.go` |
 | 后台中间件层 | 登录态校验、接口级权限判定，只做 HTTP 适配 | `manager/middleware/*.go` |
 | 数据持久层 | 数据库访问、模型定义、查询构造 | `store/*.go` |
 | 通用工具层 | 常量、日志格式化、SSE 包装等 | `constant/`、`log/`、`proxy/sse/` |
@@ -37,12 +37,12 @@
 - `parser/` 只负责协议相关的解析与提取，不直接操作数据库或写响应。
 - `store/` 是纯 SQL 包装层：只做单条/单表的数据读写（`Get/Select/Exec`），不处理 HTTP 或协议细节，**不写跨表编排、不写业务判断**；每个 Store 的命名空间入口写在自己文件内（如 `func (s *Session) Xxx() *XxxStore`），不集中到 `store/base.go`。
 - `manager/handler/` 是后端给前端的接口唯一入口，只做 HTTP 适配：参数校验、调 service、组装响应；**不直接写跨表事务、不写可复用业务逻辑**。
-- `manager/service/` 是后台业务逻辑承载层：跨 handler 复用、不依赖 echo 的业务逻辑、以及**涉及多表/带业务语义的事务编排**都放这里；handler 与 middleware 只调用 service 暴露的方法，不重复实现。
+- `service/` 是业务逻辑承载层（manager 与 proxy 共用）：跨 handler 复用、不依赖 echo 的业务逻辑、以及**涉及多表/带业务语义的事务编排**都放这里；handler 与 middleware 只调用 service 暴露的方法，不重复实现。
 - `manager/middleware/` 只做 HTTP 适配（鉴权、权限判定、登录态注入），复杂业务下沉到 service。
 
 ### 2.3 事务边界
 
-- `Session.T(fn)` 只提供事务执行入口，**事务体（fn 内组合多个 Store 调用、业务判断、失败回滚语义）不应写在 `store/` 内**，应写在 `manager/service`（后台）或 `proxy/handler`（代理计费等无 manager 入口的场景）。
+- `Session.T(fn)` 只提供事务执行入口，**事务体（fn 内组合多个 Store 调用、业务判断、失败回滚语义）不应写在 `store/` 内**，应写在 `service/`（manager 与 proxy 共用的业务层）。
 - `store/` 里的方法默认在调用方传入的 `*Session` 上执行：若调用方用 `Session.T(fn)` 包裹则自动进事务，若用 `store.C()` 则非事务，store 方法本身不感知是否事务。
 - Session 保存 `tx`/`page` 状态字段，不再用 `context.Value` 传业务参数（tx、分页），context 回归“请求级跨边界数据”本职。`store.C()` 无参，`Session.T(fn)` 在当前 Session 上切换 tx（嵌套调用复用当前 tx，不开新事务，保证原子性）。
 - 一个事务只编排「同一业务动作」需要的多张表，不要把无关写操作塞进同一事务。
@@ -145,7 +145,7 @@
 `manager/` 是后端管理服务的总入口，不仅限于 Provider，还包括用户、充值、数据统计、模型配置等管理功能。
 
 1. 在 `manager/handler/` 下按业务领域新增文件（如 `user.go`、`charge.go`）。同一领域的普通用户版与超管版合并到同一文件，不单独起 `*_admin.go` 文件。handler 只做 HTTP 适配：参数校验、调 service、组装响应，不写跨表事务。
-2. 带业务语义的逻辑（尤其多表事务编排、跨 handler 复用逻辑）下沉到 `manager/service/`，handler 只调用 service 暴露的方法。单表的简单读写可直接在 handler 里调 store，但仍建议统一走 service 以保持一致性。
+2. 带业务语义的逻辑（尤其多表事务编排、跨 handler 复用逻辑）下沉到 `service/`，handler 只调用 service 暴露的方法。单表的简单读写可直接在 handler 里调 store，但仍建议统一走 service 以保持一致性。
 3. 业务函数签名自由组合 `(context.Context, *Req)` 等入参，返回 `(Resp, *base.BizError)`；由 `base.Wrap` 动态包装成 echo.HandlerFunc。登录态从 `context.Context` 取（`base.CurrentUser`）。
 4. 在 `manager/router/router.go` 的 `Register(g *echo.Group)` 中用 `base.Wrap(handler.Xxx)` 注册路由；路由组根路径 `/manager` 由 `framework/echo.go` 直写。
 5. **接口命名**：列表查询统一用 `/list` 后缀（如 `/users/list`、`/providers/list`、`/models/list`、`/recharge/records/list`）。普通用户自助接口用 `/self` 后缀，超管接口不加 `/self`。
@@ -166,7 +166,7 @@
 2. 在 `store/model/models.go` 中定义模型。
 3. 在 `store/` 下新增对应 Store 文件，提供单表 CRUD 方法，不写跨表编排。
 4. 命名空间入口写在该 Store 文件内（如 `func (s *Session) Xxx() *XxxStore`），不要集中放到 `store/base.go`。
-5. 涉及该实体的多表事务编排写在 `manager/service/`，用 `store.C().T(fn)` 包裹，在 fn 内组合多个 Store 调用。
+5. 涉及该实体的多表事务编排写在 `service/`，用 `store.C().T(fn)` 包裹，在 fn 内组合多个 Store 调用。
 
 ### 7.5 开发管理台前端
 
@@ -228,6 +228,6 @@
 - 管理接口应考虑访问控制，避免任意用户修改 Provider 配置。
 - `manager/` 下所有需登录态的接口必须经过 `manager/middleware.Auth` 中间件（access JWT 校验 + 接口级权限 `role_permission(entity=API, value=path)` 判定 + 注入登录态），业务函数由 `base.Wrap` 做参数包装与响应输出。
 - 登录态采用双 token 机制：access JWT（HS256 自实现，15min 无状态，经 `Authorization: Bearer` 头传递，前端存内存）+ refresh token（随机串哈希存 `user_sessions` 表，HttpOnly Secure cookie `refresh_token` 传递，滑动 7 天 / 绝对 30 天，带轮换与重用检测）。`/manager/login`、`/manager/refresh` 不挂 Auth 中间件（login 无需登录态；refresh 靠 refresh cookie 续期，不依赖 access JWT）。
-- access JWT 签名密钥走环境变量 `AIAPI_JWT_SECRET`（≥32 字节），启动时由 `base.LoadJWTSecret` 校验；登录会话业务封装在 `manager/service` 的 `SessionService`，改密 / 禁用用户 / 重置密码后吊销该用户所有会话。
+- access JWT 签名密钥走环境变量 `AIAPI_JWT_SECRET`（≥32 字节），启动时由 `base.LoadJWTSecret` 校验；登录会话业务封装在 `service` 的 `SessionService`，改密 / 禁用用户 / 重置密码后吊销该用户所有会话。
 - 登录态不复用 proxy 的 header 鉴权字段；账号不存在 / 禁用 / 密码错统一返回相同文案防枚举。
 - `manager` 自有业务码定义在 `manager/base/bizcode.go`，与 `proxy/types/bizcode.go` 解耦，两套独立编号。

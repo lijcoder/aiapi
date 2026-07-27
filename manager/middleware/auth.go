@@ -7,7 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/lijcoder/aiapi/constant"
 	"github.com/lijcoder/aiapi/manager/base"
-	"github.com/lijcoder/aiapi/manager/service"
+	"github.com/lijcoder/aiapi/service"
 )
 
 // sessionService 与 handler 共用同一实例（无状态）。

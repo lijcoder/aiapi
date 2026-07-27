@@ -10,13 +10,13 @@
 - 新增通用分页能力（Session 状态 + 显式控制）：`store/base/page.go` 提供 `PageContext`，`manager/base/page.go` 提供 `PageReq`/`PageResult[T]`。handler 创建 `store.PageContext`，用 `store.C().SetPage(pc).Charge().List(...)` 链式调用，`QueryBuilder.Select` 检测到后自动拦截：先 `SELECT COUNT(*) FROM (<原SQL>) t` 查总数写回 `pc.Total`，再追加 `LIMIT ? OFFSET ?` 查当前页。非事务单次分页不用 `ClearPage`（Session 用完即弃）；事务内用 `SetPage`/`ClearPage` 显式控制。store 方法只需写普通 `Select`，未 `SetPage` 时退化为普通查询。`page` 1-based，`page_size` 默认 20、上限 100。分页类型分层：`manager/base` 定义 API 层 `PageReq`/`PageResult`，`store` 暴露内部 `PageContext`，handler 不直接 import `store/base`。
 - 充值流水接口改为分页：`/manager/recharge/records`、`/manager/recharge/records/self`、`/manager/recharge/records/list` 入参加 `{page, page_size}`，返回 `{items, total, page, page_size}`。
 - 统一 Session 架构：`store.T` 包级函数改为 `Session.T(fn)` 方法，调用方式 `store.C().T(fn)`。事务在当前 Session 上切换 tx，嵌套调用复用当前 tx（不开新事务，保证原子性）。`store.C()` 无参，Session 保存 `tx`/`page` 状态字段，不再用 `context.Value` 传业务参数（tx、分页），context 回归“请求级跨边界数据”本职。
-- 重构充值业务：`store/charge.go` 的 `RechargeWithRecord`（读余额→加余额→写流水事务编排）下沉到新增的 `manager/service/charge.go` 的 `ChargeService`；`manager/handler/recharge.go` 改为调 service，不再自写事务。store 回归纯 SQL 包装。service 新增哨兵错误 `ErrUserNotFound`。
+- 重构充值业务：`store/charge.go` 的 `RechargeWithRecord`（读余额→加余额→写流水事务编排）下沉到 `service/charge.go` 的 `ChargeService`；`manager/handler/recharge.go` 改为调 service，不再自写事务。store 回归纯 SQL 包装。service 新增哨兵错误 `ErrUserNotFound`。
 - 修复并发充值流水不准：原「先 SELECT 读余额再 UPDATE」是读后写，快照读拿旧值会丢更新。改为「先 UPDATE 加余额（行锁）→ 同事务内 SELECT 新余额 → before 由 after 反推」，跨 SQLite/MySQL/PostgreSQL 通用。
 - 充值接口 self/admin 合并：`RechargeSelf` 设当前用户 ID 后委托 `Recharge`，`RechargeRecordsSelf` 同样委托 `RechargeRecords`，消除重复校验逻辑。
 - 明确后端四层职责与事务边界（更新 `AGENTS.md`）：
   - `store/` 为纯 SQL 包装层，只做单表读写，不写跨表编排与业务判断。
-  - `manager/service/` 承载跨 handler 复用业务逻辑与多表事务编排；`manager/handler/` 只做 HTTP 适配，不直接写事务。
-  - 事务体用 `store.T(fn)` 包裹，写在 `manager/service`（后台）或 `proxy/handler`（代理计费等无 manager 入口场景），不写在 `store/` 内。
+  - `service/` 承载跨 handler 复用业务逻辑与多表事务编排（manager 与 proxy 共用）；`manager/handler/` 只做 HTTP 适配，不直接写事务。
+  - 事务体用 `store.T(fn)` 包裹，写在 `service/`（manager 与 proxy 共用业务层），不写在 `store/` 内。
   - 新增 §2.4 并发安全规则：金额/计数类写操作必须「先 UPDATE 后事务内 SELECT」，禁止读后写、禁止依赖 `RETURNING`/`FOR UPDATE`（跨库不通用）。
   - 新增 §2.5 注释风格：store 方法注释只说做什么，不描述事务用法/调用时机。
   - 新增 §7.3 self/admin 合并模式约定。
@@ -32,7 +32,7 @@
   - **重用检测**：旧 refresh token 再次被使用时吊销整个 family，强制重登（业务码 1017）。
   - 改密 / 禁用用户 / 重置密码后吊销该用户所有会话，即时失效。
   - 账号不存在 / 禁用 / 密码错统一返回相同文案，防账号枚举。
-  - 新增 `manager/service` 包封装登录业务（`SessionService`），handler/middleware 仅做 HTTP 适配。
+  - 新增 `service` 包封装登录业务（`SessionService`），handler/middleware 仅做 HTTP 适配。
   - 新增接口 `POST /manager/refresh`（不挂 Auth 中间件，靠 refresh cookie）；`/manager/login` 返回体改为 `{access_token, expires_in}`。
   - access JWT 签名密钥走环境变量 `AIAPI_JWT_SECRET`（≥32 字节），启动时由 `base.LoadJWTSecret` 校验，缺失或过短启动失败。
   - 业务码新增 `CodeTokenExpired`(1016) / `CodeSessionReuse`(1017)。

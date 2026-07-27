@@ -1,6 +1,9 @@
 package service
 
-import "github.com/lijcoder/aiapi/store"
+import (
+	"github.com/lijcoder/aiapi/store"
+	"github.com/lijcoder/aiapi/store/model"
+)
 
 // ApiKeyService 封装 API Key 相关业务逻辑（事务编排）。
 type ApiKeyService struct{}
@@ -53,4 +56,21 @@ func (s *ApiKeyService) Delete(apiKeyID int64) error {
 		}
 		return ss.ApiKey().DeleteApiKey(apiKeyID)
 	})
+}
+
+// GetKeyAndUser 按 API Key 查询 key 及其关联用户（两步查询）。
+// key 不存在或未启用、用户不存在时返回 nil。
+func (s *ApiKeyService) GetKeyAndUser(apiKey string) (*model.ApiKey, *model.User, error) {
+	k, err := store.C().ApiKey().GetByKey(apiKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	if k == nil {
+		return nil, nil, nil
+	}
+	u, err := store.C().User().GetByID(k.UserID)
+	if err != nil {
+		return k, nil, err
+	}
+	return k, u, nil
 }
