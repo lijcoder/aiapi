@@ -1,4 +1,9 @@
-/* 全局样式：分页器居中（提高选择器特异性覆盖 naive-ui 运行时样式） */
+/* 全局样式：表格分页器居中 + 单元格/表头居中 */
 .n-data-table .n-data-table__pagination {
   justify-content: center;
+}
+
+.n-data-table .n-data-table-th,
+.n-data-table .n-data-table-td {
+  text-align: left;
 }

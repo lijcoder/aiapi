@@ -41,12 +41,12 @@ const { user, fetchUser } = useUser()
 const balance = ref(0)
 
 const columns = [
-  { title: '金额', key: 'amount', width: 120, align: 'center', render(r) { return h('span', {style:'color:#18a058;font-weight:600'}, '¥ ' + fix4(r.amount)) }},
-  { title: '充值前', key: 'balance_before', width: 120, align: 'center', render(r) { return '¥ ' + fix4(r.balance_before) }},
-  { title: '充值后', key: 'balance_after', width: 120, align: 'center', render(r) { return '¥ ' + fix4(r.balance_after) }},
-  { title: '操作人', key: 'operator_name', width: 100, align: 'center', render(r) { return r.operator_name || r.operator || '-' }},
-  { title: '时间', key: 'created_at', width: 170, align: 'center', ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) }},
-  { title: '备注', key: 'remark', align: 'center', ellipsis: { tooltip: true } },
+  { title: '金额', key: 'amount', width: 120, render(r) { return h('span', {style:'color:#18a058;font-weight:600'}, '¥ ' + fix4(r.amount)) }},
+  { title: '充值前', key: 'balance_before', width: 120, render(r) { return '¥ ' + fix4(r.balance_before) }},
+  { title: '充值后', key: 'balance_after', width: 120, render(r) { return '¥ ' + fix4(r.balance_after) }},
+  { title: '操作人', key: 'operator_name', width: 100, render(r) { return r.operator_name || r.operator || '-' }},
+  { title: '时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) }},
+  { title: '备注', key: 'remark', ellipsis: { tooltip: true } },
 ]
 
 const showDialog = ref(false)
