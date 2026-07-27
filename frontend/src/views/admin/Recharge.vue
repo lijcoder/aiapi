@@ -21,6 +21,7 @@
       :pagination="pagination"
       :remote="true"
       @update:page="onPage"
+      @update:page-size="onPageSize"
       style="width:100%"
     />
   </n-card>
@@ -31,6 +32,7 @@ import { ref, computed, h, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NCard, NDataTable, NInput, NButton, NSpace, useMessage } from 'naive-ui'
 import { listAllRechargeRecords, rechargeRecords, getUser } from '../../api'
+import { usePagination } from '../../composables/usePagination'
 import { fix4, formatTime } from '../../utils'
 
 const route = useRoute()
@@ -45,10 +47,7 @@ const title = computed(() => userId.value ? `${userName.value || ('用户 #' + u
 const records = ref([])
 const keyword = ref('')
 const tableLoading = ref(false)
-const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
-
-function onPage(p) { pagination.value.page = p; load() }
-function resetAndLoad() { pagination.value.page = 1; load() }
+const { pagination, onPage, onPageSize, resetAndLoad } = usePagination(load)
 function goBack() { router.push('/admin/users') }
 
 const columns = computed(() => {

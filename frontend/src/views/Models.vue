@@ -7,7 +7,7 @@
         <n-button size="small" @click="resetAndLoad">查询</n-button>
       </n-space>
     </template>
-    <n-data-table :columns="columns" :data="models" :loading="loading" :bordered="false" size="small" :scroll-x="1100" :pagination="pagination" :remote="true" @update:page="onPage" style="width:100%" />
+    <n-data-table :columns="columns" :data="models" :loading="loading" :bordered="false" size="small" :scroll-x="1100" :pagination="pagination" :remote="true" @update:page="onPage" @update:page-size="onPageSize" style="width:100%" />
   </n-card>
 </template>
 
@@ -15,6 +15,7 @@
 import { ref, h, onMounted } from 'vue'
 import { NCard, NDataTable, NInput, NButton, NSpace, NTag } from 'naive-ui'
 import { listModels } from '../api'
+import { usePagination } from '../composables/usePagination'
 import { fix4, formatTime } from '../utils'
 
 const columns = [
@@ -39,10 +40,7 @@ const models = ref([])
 const loading = ref(false)
 const providerKw = ref('')
 const modelKw = ref('')
-const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
-
-function onPage(p) { pagination.value.page = p; load() }
-function resetAndLoad() { pagination.value.page = 1; load() }
+const { pagination, onPage, onPageSize, resetAndLoad } = usePagination(load)
 
 async function load() {
   loading.value = true

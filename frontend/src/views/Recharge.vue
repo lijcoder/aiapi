@@ -10,7 +10,7 @@
       <template #header-extra>
         <n-button type="primary" size="small" @click="openDialog">充值</n-button>
       </template>
-      <n-data-table :columns="columns" :data="records" :loading="tableLoading" :bordered="false" size="small" :pagination="pagination" :remote="true" @update:page="onPage" style="width:100%" />
+      <n-data-table :columns="columns" :data="records" :loading="tableLoading" :bordered="false" size="small" :pagination="pagination" :remote="true" @update:page="onPage" @update:page-size="onPageSize" style="width:100%" />
     </n-card>
 
     <n-modal v-model:show="showDialog" preset="card" title="账户充值" style="width:400px" :mask-closable="false">
@@ -34,6 +34,7 @@ import { ref, onMounted, h } from 'vue'
 import { NCard, NDataTable, NModal, NInputNumber, NInput, NButton, NSpace } from 'naive-ui'
 import { useUser } from '../stores/user'
 import { rechargeSelf, rechargeSelfRecords } from '../api'
+import { usePagination } from '../composables/usePagination'
 import { fix4, formatTime } from '../utils'
 
 const { user, fetchUser } = useUser()
@@ -75,9 +76,7 @@ async function doRecharge() {
 
 const records = ref([])
 const tableLoading = ref(false)
-const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
-
-function onPage(p) { pagination.value.page = p; loadRecords() }
+const { pagination, onPage, onPageSize } = usePagination(loadRecords)
 
 async function loadRecords() {
   tableLoading.value = true

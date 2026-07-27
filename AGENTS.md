@@ -187,6 +187,7 @@
 | 工具函数 | `frontend/src/utils.js` | `fix4`（金额格式化，4 位小数去尾 0）、`formatTime`（时间格式化） |
 | 图表选项 | `frontend/src/charts.js` | ECharts option 构建器、`metricConfig` 指标配置 |
 | 图表生命周期 | `frontend/src/composables/useChart.js` | ECharts init/resize/dispose，`watch` 数据自动重绘 |
+| 分页逻辑 | `frontend/src/composables/usePagination.js` | `n-data-table` 远程分页通用逻辑（`pagination`/`onPage`/`onPageSize`/`resetAndLoad`），含 `showTotal` 展示总数 + `showSizePicker` 切换每页条数 |
 
 #### 表格风格统一
 

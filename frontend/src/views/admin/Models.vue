@@ -19,6 +19,7 @@
         :pagination="pagination"
         :remote="true"
         @update:page="onPage"
+        @update:page-size="onPageSize"
         style="width:100%"
       />
     </n-card>
@@ -84,6 +85,7 @@
 import { ref, h, onMounted } from 'vue'
 import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NCheckbox, NCheckboxGroup, NTag, useMessage, useDialog } from 'naive-ui'
 import { listModelsAdmin, createModel, updateModel, deleteModel } from '../../api'
+import { usePagination } from '../../composables/usePagination'
 import { fix4, formatTime } from '../../utils'
 
 const message = useMessage()
@@ -93,10 +95,7 @@ const models = ref([])
 const tableLoading = ref(false)
 const providerKw = ref('')
 const modelKw = ref('')
-const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
-
-function onPage(p) { pagination.value.page = p; load() }
-function resetAndLoad() { pagination.value.page = 1; load() }
+const { pagination, onPage, onPageSize, resetAndLoad } = usePagination(load)
 
 // 新增/编辑
 const showForm = ref(false)

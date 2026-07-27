@@ -4,7 +4,7 @@
       <template #header-extra>
         <n-button type="primary" size="small" @click="openCreate">创建密钥</n-button>
       </template>
-      <n-data-table :columns="columns" :data="keys" :loading="tableLoading" :bordered="false" size="small" :scroll-x="960" :pagination="pagination" :remote="true" @update:page="onPage" style="width:100%" />
+      <n-data-table :columns="columns" :data="keys" :loading="tableLoading" :bordered="false" size="small" :scroll-x="960" :pagination="pagination" :remote="true" @update:page="onPage" @update:page-size="onPageSize" style="width:100%" />
     </n-card>
 
     <!-- 创建弹窗 -->
@@ -104,6 +104,7 @@ import { ref, h, onMounted, computed } from 'vue'
 import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NAlert, NTag, NIcon, NTooltip, NDropdown, NRadioGroup, NRadio, useMessage, useDialog } from 'naive-ui'
 import { CreateOutline } from '@vicons/ionicons5'
 import { listMyApiKeys, createApiKey, toggleApiKey, deleteApiKey, renameApiKey, updateApiKeyBudget, listModels } from '../api'
+import { usePagination } from '../composables/usePagination'
 import ModelAccessDialog from '../components/ModelAccessDialog.vue'
 import { useUser } from '../stores/user'
 import { fix4, formatTime } from '../utils'
@@ -114,9 +115,7 @@ const { user } = useUser()
 
 const keys = ref([])
 const tableLoading = ref(false)
-const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
-
-function onPage(p) { pagination.value.page = p; loadKeys() }
+const { pagination, onPage, onPageSize } = usePagination(loadKeys)
 
 const showCreate = ref(false)
 const showPlain = ref(false)
