@@ -2,15 +2,18 @@ package handler
 
 import (
 	"bytes"
+	"net/http"
+
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
-	"io"
-	"net/http"
 )
 
 // Forward 转发请求到上游
 func Forward(ctx *types.Context) {
-	req, err := http.NewRequest(ctx.Method, ctx.URL, io.NopCloser(bytes.NewReader(ctx.Body)))
+	// 注意：body 必须直接传 *bytes.Reader，不能用 io.NopCloser 包装。
+	// NewRequest 内部对 *bytes.Reader 做类型断言以设置 ContentLength 和 GetBody；
+	// 包装后断言失败 → ContentLength=0 → 走 chunked 编码，且连接无法复用。
+	req, err := http.NewRequest(ctx.Method, ctx.URL, bytes.NewReader(ctx.Body))
 	if err != nil {
 		ctx.Err = log.WithStack(err)
 		ctx.ErrorMessage = types.InternalServerError
