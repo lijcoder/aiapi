@@ -1,7 +1,7 @@
 package proxy
 
 import (
-	"fmt"
+	"encoding/json"
 
 	"github.com/lijcoder/aiapi/proxy/types"
 )
@@ -64,8 +64,16 @@ func (p *Pipeline) writeError(ctx *types.Context) {
 		msg = types.InternalServerError
 	}
 
-	body := fmt.Sprintf(`{"error":{"message":"%s"}}`, msg)
+	// 用 json.Marshal 而非 Sprintf 拼接：msg 含引号/反斜杠/控制字符时
+	// 手写拼接会生成非法 JSON（如错误信息里带模型名、SQL 片段）
+	body, err := json.Marshal(map[string]any{
+		"error": map[string]any{"message": msg},
+	})
+	if err != nil {
+		// 理论上 map 不会序列化失败，兜底给一个静态 body
+		body = []byte(`{"error":{"message":"internal server error"}}`)
+	}
 	ctx.Writer.Header().Set("Content-Type", "application/json")
 	ctx.Writer.WriteStatusCode(ctx.Code.HTTPStatus())
-	ctx.Writer.Write([]byte(body))
+	ctx.Writer.Write(body)
 }
