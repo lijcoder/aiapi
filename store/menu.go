@@ -144,29 +144,13 @@ func (ms *MenuStore) RevokeMenu(roleID, menuID int64) error {
 	return err
 }
 
-// ReplaceRoleMenus 事务替换角色的全部菜单关联。
-func (ms *MenuStore) ReplaceRoleMenus(roleID int64, menuIDs []int64) error {
-	return ms.s.T(func(s *Session) error {
-		// 先删除旧关联
-		_, err := s.Query(
-			`DELETE FROM role_menus WHERE role_id = :role_id`,
-			map[string]any{"role_id": roleID},
-		).Exec()
-		if err != nil {
-			return err
-		}
-		// 插入新关联
-		for _, mid := range menuIDs {
-			_, err = s.Query(
-				`INSERT INTO role_menus (role_id, menu_id) VALUES (:role_id, :menu_id)`,
-				map[string]any{"role_id": roleID, "menu_id": mid},
-			).Exec()
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+// DeleteRoleMenus 删除角色的全部菜单关联。
+func (ms *MenuStore) DeleteRoleMenus(roleID int64) error {
+	_, err := ms.s.Query(
+		`DELETE FROM role_menus WHERE role_id = :role_id`,
+		map[string]any{"role_id": roleID},
+	).Exec()
+	return err
 }
 
 // ===== 通用工具 =====
