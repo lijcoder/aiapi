@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/lijcoder/aiapi/manager/base"
+	"github.com/lijcoder/aiapi/manager/service"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
 )
@@ -478,7 +479,7 @@ func GetApiKeyModelAccessSelf(ctx context.Context, req *ApiKeyModelAccessReq) (*
 	if k == nil || k.UserID != cur.ID {
 		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
 	}
-	policy, modelIDs, err := store.C().Model().GetApiKeyModelAccess(req.ApiKeyID)
+	policy, modelIDs, err := service.NewApiKeyService().GetModelAccess(req.ApiKeyID)
 	if err != nil {
 		slog.Error("get api key model access failed", "err", err, "id", req.ApiKeyID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
@@ -510,7 +511,7 @@ func SetApiKeyModelAccessSelf(ctx context.Context, req *SetApiKeyModelAccessReq)
 	if modelIDs == nil {
 		modelIDs = []int64{}
 	}
-	if err := store.C().Model().SetApiKeyModelAccess(req.ApiKeyID, req.ModelPolicy, modelIDs); err != nil {
+	if err := service.NewApiKeyService().SetModelAccess(req.ApiKeyID, req.ModelPolicy, modelIDs); err != nil {
 		slog.Error("set api key model access failed", "err", err, "id", req.ApiKeyID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
@@ -530,7 +531,7 @@ func GetApiKeyModelAccessAdmin(ctx context.Context, req *ApiKeyModelAccessReq) (
 	if k == nil {
 		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
 	}
-	policy, modelIDs, err := store.C().Model().GetApiKeyModelAccess(req.ApiKeyID)
+	policy, modelIDs, err := service.NewApiKeyService().GetModelAccess(req.ApiKeyID)
 	if err != nil {
 		slog.Error("get api key model access failed", "err", err, "id", req.ApiKeyID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
@@ -561,7 +562,7 @@ func SetApiKeyModelAccessAdmin(ctx context.Context, req *SetApiKeyModelAccessReq
 	if modelIDs == nil {
 		modelIDs = []int64{}
 	}
-	if err := store.C().Model().SetApiKeyModelAccess(req.ApiKeyID, req.ModelPolicy, modelIDs); err != nil {
+	if err := service.NewApiKeyService().SetModelAccess(req.ApiKeyID, req.ModelPolicy, modelIDs); err != nil {
 		slog.Error("set api key model access failed", "err", err, "id", req.ApiKeyID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
