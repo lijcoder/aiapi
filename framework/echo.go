@@ -66,5 +66,9 @@ func proxyDirectProcess(c echo.Context) error {
 		Writer:    writer,
 		Headers:   c.Request().Header,
 		StartTime: time.Now(),
+		// 框架适配：从 echo 提取标准库 context 注入 proxy 层。
+		// 客户端断开时 echo/http.Server 会取消它，proxy 据此取消上游请求。
+		// 对接其他框架时，在对应适配层提供同样的 context 即可。
+		Ctx: c.Request().Context(),
 	})
 }

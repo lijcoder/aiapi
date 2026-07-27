@@ -13,7 +13,9 @@ func Forward(ctx *types.Context) {
 	// 注意：body 必须直接传 *bytes.Reader，不能用 io.NopCloser 包装。
 	// NewRequest 内部对 *bytes.Reader 做类型断言以设置 ContentLength 和 GetBody；
 	// 包装后断言失败 → ContentLength=0 → 走 chunked 编码，且连接无法复用。
-	req, err := http.NewRequest(ctx.Method, ctx.URL, bytes.NewReader(ctx.Body))
+	// 携带请求 context：客户端断开时取消上游请求，及时释放连接与 goroutine；
+	// 流式阶段 body.Read 也会被取消，透传循环随之退出。
+	req, err := http.NewRequestWithContext(ctx.Ctx, ctx.Method, ctx.URL, bytes.NewReader(ctx.Body))
 	if err != nil {
 		ctx.Err = log.WithStack(err)
 		ctx.ErrorMessage = types.InternalServerError

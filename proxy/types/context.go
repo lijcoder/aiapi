@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -26,6 +27,12 @@ type ProxyRequest struct {
 	Writer    ProxyResponseWrite
 	Headers   map[string][]string
 	StartTime time.Time
+
+	// Ctx 请求生命周期 context（标准库类型，与具体 HTTP 框架无关）。
+	// 由框架适配层注入（如 echo 适配层传 c.Request().Context()），
+	// 客户端断开时框架会取消它，proxy 用它取消发往上游的请求。
+	// 允许为 nil（如单元测试），NewContext 会兜底为 context.Background()。
+	Ctx context.Context
 }
 
 // Context 管道上下文，承载所有请求/响应状态
@@ -33,6 +40,7 @@ type Context struct {
 	P      parser.Parser
 	Writer ProxyResponseWrite
 
+	Ctx                                context.Context // 请求生命周期 context（见 ProxyRequest.Ctx）
 	Method, Path, Format, ProviderType string
 	ApiKey                             string
 	Body                               []byte
@@ -61,8 +69,13 @@ type Context struct {
 
 // NewContext 创建管道上下文
 func NewContext(req ProxyRequest, p parser.Parser) *Context {
+	c := req.Ctx
+	if c == nil {
+		c = context.Background()
+	}
 	return &Context{
 		P:            p,
+		Ctx:          c,
 		Writer:       req.Writer,
 		Method:       req.Method,
 		Path:         req.Path,
