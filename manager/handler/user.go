@@ -107,7 +107,7 @@ func ListUsers(ctx context.Context, req *ListUsersReq) (*ListUsersResp, *base.Bi
 	for _, u := range users {
 		ids = append(ids, u.ID)
 	}
-	roleMap, err := store.C().Role().ListRolesByUserIDs(ids)
+	roleMap, err := service.NewRoleService().RolesByUserIDs(ids)
 	if err != nil {
 		slog.Error("[User] ListRolesByUserIDs failed", "err", err)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)

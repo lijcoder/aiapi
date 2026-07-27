@@ -54,7 +54,7 @@ type UsageStatRow struct {
 }
 
 // StatsByUser 统计汇总：按时间（天/月）或按维度（模型/提供商/api_key）分组
-func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate, apiKey, mdl, provider, groupBy string) ([]UsageStatRow, error) {
+func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate, apiKey, mdl, provider, groupBy, orderDir string) ([]UsageStatRow, error) {
 	var labelExpr string
 	switch groupBy {
 	case "model":
@@ -75,17 +75,8 @@ func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate, apiKey
 
 	where, params := buildUsageWhere(userID, startDate, endDate, apiKey, mdl, provider)
 
-	// 按时间分组时需要 GROUP BY labelExpr；按维度分组时按维度列 GROUP BY
 	groupExpr := labelExpr
-	if groupBy == "" {
-		groupExpr = labelExpr // 时间表达式本身
-	}
 
-	// 时间趋势按 label 升序（旧→新，折线图正序）；维度分组按 label 降序（值大在前）
-	orderDir := "ASC"
-	if groupBy != "" {
-		orderDir = "DESC"
-	}
 	query := fmt.Sprintf(
 		`SELECT %s AS label, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, SUM(cached_tokens) AS cached_tokens, SUM(input_tokens) - SUM(cached_tokens) AS cache_miss_tokens, SUM(reasoning_tokens) AS reasoning_tokens, SUM(total_tokens) AS total_tokens, ROUND(CAST(SUM(cached_tokens) AS REAL) / NULLIF(SUM(input_tokens), 0), 4) AS cache_hit_rate, SUM(cost) AS cost, COUNT(*) AS request_count FROM usage_records %s GROUP BY %s ORDER BY label %s`,
 		labelExpr, where, groupExpr, orderDir,
@@ -142,7 +133,7 @@ func (us *UsageStore) DistinctProvidersByUser(userID int64) ([]string, error) {
 // ===== Admin 版（不限定 user_id） =====
 
 // StatsByAdmin 全局统计汇总，可按 user_id 筛选，支持 group_by=user
-func (us *UsageStore) StatsByAdmin(userID int64, mode, startDate, endDate, apiKey, mdl, provider, groupBy string) ([]UsageStatRow, error) {
+func (us *UsageStore) StatsByAdmin(userID int64, mode, startDate, endDate, apiKey, mdl, provider, groupBy, orderDir string) ([]UsageStatRow, error) {
 	var labelExpr, groupExpr, join string
 	switch groupBy {
 	case "model":
@@ -170,11 +161,6 @@ func (us *UsageStore) StatsByAdmin(userID int64, mode, startDate, endDate, apiKe
 
 	where, params := buildUsageAdminWhere(userID, startDate, endDate, apiKey, mdl, provider)
 
-	// 时间趋势按 label 升序（旧→新，折线图正序）；维度分组按 label 降序（值大在前）
-	orderDir := "ASC"
-	if groupBy != "" {
-		orderDir = "DESC"
-	}
 	query := fmt.Sprintf(
 		`SELECT %s AS label, SUM(u.input_tokens) AS input_tokens, SUM(u.output_tokens) AS output_tokens, SUM(u.cached_tokens) AS cached_tokens, SUM(u.input_tokens) - SUM(u.cached_tokens) AS cache_miss_tokens, SUM(u.reasoning_tokens) AS reasoning_tokens, SUM(u.total_tokens) AS total_tokens, ROUND(CAST(SUM(u.cached_tokens) AS REAL) / NULLIF(SUM(u.input_tokens), 0), 4) AS cache_hit_rate, SUM(u.cost) AS cost, COUNT(*) AS request_count FROM usage_records u %s %s GROUP BY %s ORDER BY label %s`,
 		labelExpr, join, where, groupExpr, orderDir,

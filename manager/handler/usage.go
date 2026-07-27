@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/lijcoder/aiapi/manager/base"
+	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
 )
 
@@ -147,7 +148,7 @@ func UsageStatsSelf(ctx context.Context, req *UsageStatsSelfReq) (*UsageStatsSel
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
 
-	rows, err := store.C().Usage().StatsByUser(cur.ID, mode, startDate, endDate, apiKey, req.Model, req.Provider, req.GroupBy)
+	rows, err := service.NewUsageService().StatsByUser(cur.ID, mode, startDate, endDate, apiKey, req.Model, req.Provider, req.GroupBy)
 	if err != nil {
 		slog.Error("usage stats failed", "err", err, "user_id", cur.ID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
@@ -307,7 +308,7 @@ func UsageStatsAdmin(ctx context.Context, req *UsageStatsAdminReq) (*UsageStatsA
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
 
-	rows, err := store.C().Usage().StatsByAdmin(req.UserID, mode, startDate, endDate, apiKey, req.Model, req.Provider, req.GroupBy)
+	rows, err := service.NewUsageService().StatsByAdmin(req.UserID, mode, startDate, endDate, apiKey, req.Model, req.Provider, req.GroupBy)
 	if err != nil {
 		slog.Error("usage stats admin failed", "err", err)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)

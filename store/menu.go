@@ -2,8 +2,6 @@ package store
 
 import (
 	"database/sql"
-	"fmt"
-	"strings"
 
 	"github.com/lijcoder/aiapi/store/model"
 )
@@ -25,14 +23,13 @@ func (ms *MenuStore) ListByRoleIDs(roleIDs []int64) ([]model.Menu, error) {
 	if len(roleIDs) == 0 {
 		return []model.Menu{}, nil
 	}
-	ph, args := inList("rid", roleIDs)
 	var menus []model.Menu
 	err := ms.s.Query(
 		`SELECT DISTINCT m.* FROM menus m
 		 JOIN role_menus rm ON m.id = rm.menu_id
-		 WHERE rm.role_id IN (`+ph+`)
+		 WHERE rm.role_id IN (:rids)
 		 ORDER BY m.sort_order`,
-		args,
+		map[string]any{"rids": roleIDs},
 	).Select(&menus)
 	if err != nil {
 		return nil, err
@@ -153,17 +150,4 @@ func (ms *MenuStore) DeleteRoleMenus(roleID int64) error {
 	return err
 }
 
-// ===== 通用工具 =====
 
-// inList 生成 SQL IN 占位符列表和对应参数 map。
-// 如 inList("rid", []int64{1,2,3}) → (":rid_0, :rid_1, :rid_2", {"rid_0":1, "rid_1":2, "rid_2":3})
-func inList(prefix string, ids []int64) (string, map[string]any) {
-	placeholders := make([]string, len(ids))
-	args := make(map[string]any, len(ids))
-	for i, id := range ids {
-		key := fmt.Sprintf("%s_%d", prefix, i)
-		placeholders[i] = ":" + key
-		args[key] = id
-	}
-	return strings.Join(placeholders, ", "), args
-}

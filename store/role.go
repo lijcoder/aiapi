@@ -110,39 +110,32 @@ func (rs *RoleStore) ListRolesByUser(userID int64) ([]model.Role, error) {
 	return roles, nil
 }
 
-// ListRolesByUserIDs 批量查询多个用户的角色，返回 map[userID][]Role。
-func (rs *RoleStore) ListRolesByUserIDs(userIDs []int64) (map[int64][]model.Role, error) {
-	result := make(map[int64][]model.Role)
+// UserRoleRow 用户-角色关联查询行。
+type UserRoleRow struct {
+	UserID   int64  `db:"user_id"`
+	RoleID   int64  `db:"id"`
+	RoleName string `db:"name"`
+	Code     string `db:"code"`
+}
+
+// ListRoleRowsByUserIDs 批量查询多个用户的角色关联行（按 role_id 排序）。
+func (rs *RoleStore) ListRoleRowsByUserIDs(userIDs []int64) ([]UserRoleRow, error) {
 	if len(userIDs) == 0 {
-		return result, nil
+		return nil, nil
 	}
-	type row struct {
-		UserID   int64  `db:"user_id"`
-		RoleID   int64  `db:"id"`
-		RoleName string `db:"name"`
-		Code     string `db:"code"`
-	}
-	ph, args := inList("uid", userIDs)
-	var rows []row
+	var rows []UserRoleRow
 	err := rs.s.Query(
 		`SELECT ur.user_id, r.id, r.name, r.code
 		 FROM roles r
 		 INNER JOIN user_roles ur ON ur.role_id = r.id
-		 WHERE ur.user_id IN (`+ph+`)
+		 WHERE ur.user_id IN (:uids)
 		 ORDER BY r.id`,
-		args,
+		map[string]any{"uids": userIDs},
 	).Select(&rows)
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range rows {
-		result[r.UserID] = append(result[r.UserID], model.Role{
-			ID:   r.RoleID,
-			Name: r.RoleName,
-			Code: r.Code,
-		})
-	}
-	return result, nil
+	return rows, nil
 }
 
 // DeleteUserRoles 删除用户的全部角色关联。
