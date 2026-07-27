@@ -29,10 +29,7 @@ type userItem struct {
 
 type ListUsersReq struct {
 	Keyword string `json:"keyword"` // 按姓名/账号模糊搜索
-}
-
-type ListUsersResp struct {
-	Users []userItem `json:"users"`
+	base.PageReq
 }
 
 type CreateUserReq struct {
@@ -94,9 +91,10 @@ func ListRoles(ctx context.Context) (*ListRolesResp, *base.BizError) {
 
 // ===== Handler =====
 
-// ListUsers 管理员查询用户列表（含角色信息）
-func ListUsers(ctx context.Context, req *ListUsersReq) (*ListUsersResp, *base.BizError) {
-	users, err := store.C().User().List()
+// ListUsers 管理员查询用户列表（含角色信息，分页）
+func ListUsers(ctx context.Context, req *ListUsersReq) (*base.PageResult[userItem], *base.BizError) {
+	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
+	users, err := store.C().SetPage(pc).User().List(strings.TrimSpace(req.Keyword))
 	if err != nil {
 		slog.Error("[User] List failed", "err", err)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
@@ -113,15 +111,8 @@ func ListUsers(ctx context.Context, req *ListUsersReq) (*ListUsersResp, *base.Bi
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
 
-	// 关键字过滤
 	items := make([]userItem, 0, len(users))
 	for _, u := range users {
-		if req.Keyword != "" {
-			kw := req.Keyword
-		if !containsFold(u.Name, kw) && !containsFold(u.Account, kw) {
-				continue
-			}
-		}
 		roles := roleMap[u.ID]
 		roleNames := make([]string, 0, len(roles))
 		roleIDs := make([]int64, 0, len(roles))
@@ -141,7 +132,28 @@ func ListUsers(ctx context.Context, req *ListUsersReq) (*ListUsersResp, *base.Bi
 			RoleIDs:   roleIDs,
 		})
 	}
-	return &ListUsersResp{Users: items}, nil
+	return &base.PageResult[userItem]{Items: items, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
+}
+
+// GetUserAdmin 超管查询单个用户信息
+func GetUserAdmin(ctx context.Context, req *UserIdReq) (*userItem, *base.BizError) {
+	if req.ID <= 0 {
+		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+	}
+	u, err := store.C().User().GetByID(req.ID)
+	if err != nil {
+		slog.Error("[User] GetByID failed", "err", err, "id", req.ID)
+		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+	}
+	return &userItem{
+		ID:        u.ID,
+		Name:      u.Name,
+		Account:   u.Account,
+		Budget:    u.Budget,
+		Unlimited: u.Unlimited,
+		Enabled:   u.Enabled,
+		CreatedAt: u.CreatedAt,
+	}, nil
 }
 
 // CreateUser 管理员创建用户
@@ -323,9 +335,3 @@ func AssignRoles(ctx context.Context, req *AssignRolesReq) (*struct{}, *base.Biz
 	return &struct{}{}, nil
 }
 
-// ===== 工具函数 =====
-
-// containsFold 大小写不敏感的子串匹配
-func containsFold(s, sub string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(sub))
-}

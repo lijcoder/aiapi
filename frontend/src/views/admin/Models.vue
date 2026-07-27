@@ -3,9 +3,9 @@
     <n-card title="模型管理" size="small">
       <template #header-extra>
         <n-space align="center">
-          <n-input v-model:value="providerKw" placeholder="提供商" size="small" clearable style="width:140px" @keydown.enter="load" @clear="load" />
-          <n-input v-model:value="modelKw" placeholder="模型" size="small" clearable style="width:160px" @keydown.enter="load" @clear="load" />
-          <n-button size="small" @click="load">查询</n-button>
+          <n-input v-model:value="providerKw" placeholder="提供商" size="small" clearable style="width:140px" @keydown.enter="resetAndLoad" @clear="resetAndLoad" />
+          <n-input v-model:value="modelKw" placeholder="模型" size="small" clearable style="width:160px" @keydown.enter="resetAndLoad" @clear="resetAndLoad" />
+          <n-button size="small" @click="resetAndLoad">查询</n-button>
           <n-button size="small" type="primary" @click="openCreate">新增模型</n-button>
         </n-space>
       </template>
@@ -15,7 +15,10 @@
         :loading="tableLoading"
         :bordered="false"
         size="small"
-                :scroll-x="1140"
+        :scroll-x="1140"
+        :pagination="pagination"
+        :remote="true"
+        @update:page="onPage"
         style="width:100%"
       />
     </n-card>
@@ -90,6 +93,10 @@ const models = ref([])
 const tableLoading = ref(false)
 const providerKw = ref('')
 const modelKw = ref('')
+const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
+
+function onPage(p) { pagination.value.page = p; load() }
+function resetAndLoad() { pagination.value.page = 1; load() }
 
 // 新增/编辑
 const showForm = ref(false)
@@ -162,8 +169,9 @@ function fmtK(n) {
 async function load() {
   tableLoading.value = true
   try {
-    const data = await listModelsAdmin(providerKw.value, modelKw.value)
-    models.value = data?.models || []
+    const res = await listModelsAdmin(providerKw.value, modelKw.value, pagination.value.page, pagination.value.pageSize)
+    models.value = res?.items || []
+    pagination.value.itemCount = res?.total || 0
   } catch (e) {
     message.error(e.msg || '加载失败')
   } finally { tableLoading.value = false }

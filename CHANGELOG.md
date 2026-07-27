@@ -7,6 +7,13 @@
 
 ### 2026-07-26
 
+- 列表接口全量分页：`api_key`、模型、提供商、用户列表均改为分页查询，避免全量数据查询过多导致数据库卡死。
+  - `ListApiKeySelf`/`ListApiKeyAdmin` 返回 `*base.PageResult[apiKeyItem]`
+  - `ListModelsAdmin` 返回 `*base.PageResult[modelItem]`（`ListModels` 保持全量，用于下拉框填充）
+  - `ListProviders` 返回 `*base.PageResult[providerItem]`
+  - `ListUsers` 返回 `*base.PageResult[userItem]`，关键字过滤从 Go 内存下推到 SQL `WHERE ... LIKE`
+  - 新增 `/users/get` 接口查询单个用户信息（替代全量 `listUsers` 查找）
+  - 前端各列表页加远程分页器（`n-data-table` remote 模式）
 - store 包重构完成：store 回归纯 SQL 包装层，所有事务编排、跨表组装、业务判断下沉到 `service/`。涉及 A1-A6（事务编排）、B1-B2（跨表组装）、C1-C3（业务判断）共 11 项。
 - `manager/service/` 迁移到顶层 `service/` 包，manager 与 proxy 共用业务层，消除 proxy 自建 service 的重复。
 - store 按表/领域拆分 Store：`ModelAccessStore` 独立于 `ModelStore`（操作 `api_keys.model_policy` + `apikey_model_access` 白名单）。

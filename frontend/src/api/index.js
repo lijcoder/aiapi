@@ -113,12 +113,12 @@ export function rechargeSelfRecords(page = 1, pageSize = 20) {
   return request('/recharge/records/self', { page, page_size: pageSize })
 }
 
-export function listModels() {
-  return request('/models')
+export function listModels(provider = '', model = '', page = 1, pageSize = 20) {
+  return request('/models', { provider, model, page, page_size: pageSize })
 }
 
-export function listMyApiKeys() {
-  return request('/apikeys/list/self')
+export function listMyApiKeys(page = 1, pageSize = 20) {
+  return request('/apikeys/list/self', { page, page_size: pageSize })
 }
 
 export function createApiKey(name, budget, unlimited) {
@@ -166,8 +166,12 @@ export function updatePasswordSelf(oldPassword, newPassword) {
 
 // ===== 超管：用户管理 =====
 
-export function listUsers(keyword) {
-  return request('/users/list', { keyword: keyword || '' })
+export function listUsers(keyword, page = 1, pageSize = 20) {
+  return request('/users/list', { keyword: keyword || '', page, page_size: pageSize })
+}
+
+export function getUser(id) {
+  return request('/users/get', { id })
 }
 
 export function createUser(name, account, password, budget, unlimited) {
@@ -196,8 +200,8 @@ export function listRoles() {
 
 // ===== 超管：Provider 管理 =====
 
-export function listProviders() {
-  return request('/providers/list')
+export function listProviders(page = 1, pageSize = 20) {
+  return request('/providers/list', { page, page_size: pageSize })
 }
 
 export function createProvider(type, domain, headers) {
@@ -214,8 +218,8 @@ export function toggleProvider(type) {
 
 // ===== 超管：模型管理 =====
 
-export function listModelsAdmin(provider, model) {
-  return request('/models/list', { provider: provider || '', model: model || '' })
+export function listModelsAdmin(provider, model, page = 1, pageSize = 20) {
+  return request('/models/list', { provider: provider || '', model: model || '', page, page_size: pageSize })
 }
 
 export function createModel(data) {
@@ -232,8 +236,8 @@ export function deleteModel(id) {
 
 // ===== 超管：管理指定用户的 API Key =====
 
-export function listUserApiKeys(userId) {
-  return request('/apikeys/list', { user_id: userId })
+export function listUserApiKeys(userId, page = 1, pageSize = 20) {
+  return request('/apikeys/list', { user_id: userId, page, page_size: pageSize })
 }
 
 export function toggleUserApiKey(id) {

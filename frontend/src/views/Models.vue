@@ -1,12 +1,19 @@
 <template>
   <n-card title="模型列表" size="small">
-    <n-data-table :columns="columns" :data="models" :loading="loading" :bordered="false" size="small" :scroll-x="1100" style="width:100%" />
+    <template #header-extra>
+      <n-space align="center">
+        <n-input v-model:value="providerKw" placeholder="提供商" size="small" clearable style="width:140px" @keydown.enter="resetAndLoad" @clear="resetAndLoad" />
+        <n-input v-model:value="modelKw" placeholder="模型" size="small" clearable style="width:160px" @keydown.enter="resetAndLoad" @clear="resetAndLoad" />
+        <n-button size="small" @click="resetAndLoad">查询</n-button>
+      </n-space>
+    </template>
+    <n-data-table :columns="columns" :data="models" :loading="loading" :bordered="false" size="small" :scroll-x="1100" :pagination="pagination" :remote="true" @update:page="onPage" style="width:100%" />
   </n-card>
 </template>
 
 <script setup>
 import { ref, h, onMounted } from 'vue'
-import { NCard, NDataTable, NTag } from 'naive-ui'
+import { NCard, NDataTable, NInput, NButton, NSpace, NTag } from 'naive-ui'
 import { listModels } from '../api'
 import { fix4, formatTime } from '../utils'
 
@@ -30,10 +37,20 @@ const columns = [
 
 const models = ref([])
 const loading = ref(false)
+const providerKw = ref('')
+const modelKw = ref('')
+const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
+
+function onPage(p) { pagination.value.page = p; load() }
+function resetAndLoad() { pagination.value.page = 1; load() }
 
 async function load() {
   loading.value = true
-  try { models.value = (await listModels()) || [] } catch {} finally { loading.value = false }
+  try {
+    const res = await listModels(providerKw.value, modelKw.value, pagination.value.page, pagination.value.pageSize)
+    models.value = res?.items || []
+    pagination.value.itemCount = res?.total || 0
+  } catch {} finally { loading.value = false }
 }
 
 onMounted(() => load())

@@ -11,6 +11,9 @@
         :bordered="false"
         size="small"
         :scroll-x="600"
+        :pagination="pagination"
+        :remote="true"
+        @update:page="onPage"
         style="width:100%"
       />
     </n-card>
@@ -93,6 +96,9 @@ const dialog = useDialog()
 
 const providers = ref([])
 const tableLoading = ref(false)
+const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
+
+function onPage(p) { pagination.value.page = p; load() }
 
 // 新增/编辑
 const showForm = ref(false)
@@ -132,8 +138,9 @@ const columns = [
 async function load() {
   tableLoading.value = true
   try {
-    const data = await listProviders()
-    providers.value = data?.providers || []
+    const res = await listProviders(pagination.value.page, pagination.value.pageSize)
+    providers.value = res?.items || []
+    pagination.value.itemCount = res?.total || 0
   } catch (e) {
     message.error(e.msg || '加载失败')
   } finally { tableLoading.value = false }

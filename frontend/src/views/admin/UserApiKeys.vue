@@ -10,7 +10,7 @@
       <template #header-extra>
         <n-button size="small" @click="goBack">返回</n-button>
       </template>
-      <n-data-table :columns="columns" :data="keys" :loading="tableLoading" :bordered="false" size="small" :scroll-x="960" style="width:100%" />
+      <n-data-table :columns="columns" :data="keys" :loading="tableLoading" :bordered="false" size="small" :scroll-x="960" :pagination="pagination" :remote="true" @update:page="onPage" style="width:100%" />
     </n-card>
 
     <!-- 改名弹窗 -->
@@ -64,7 +64,7 @@ import { ref, h, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NTag, NIcon, NTooltip, NDropdown, NRadioGroup, NRadio, NBreadcrumb, NBreadcrumbItem, useMessage, useDialog } from 'naive-ui'
 import { CreateOutline } from '@vicons/ionicons5'
-import { listUserApiKeys, toggleUserApiKey, deleteUserApiKey, renameUserApiKey, updateUserApiKeyBudget, listUsers, listModelsAdmin } from '../../api'
+import { listUserApiKeys, toggleUserApiKey, deleteUserApiKey, renameUserApiKey, updateUserApiKeyBudget, getUser, listModels } from '../../api'
 import ModelAccessDialog from '../../components/ModelAccessDialog.vue'
 import { fix4, formatTime } from '../../utils'
 
@@ -79,6 +79,9 @@ const userBudget = ref(0)
 
 const keys = ref([])
 const tableLoading = ref(false)
+const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
+
+function onPage(p) { pagination.value.page = p; loadKeys() }
 
 const showRename = ref(false)
 const renameId = ref(0)
@@ -155,8 +158,7 @@ function goBack() {
 
 async function loadUserInfo() {
   try {
-    const data = await listUsers('')
-    const u = (data?.users || []).find(x => x.id === userId)
+    const u = await getUser(userId)
     if (u) {
       userName.value = u.name || u.account
       userBudget.value = u.unlimited ? 0 : (u.budget || 0)
@@ -166,7 +168,11 @@ async function loadUserInfo() {
 
 async function loadKeys() {
   tableLoading.value = true
-  try { keys.value = (await listUserApiKeys(userId)) || [] } catch (e) {
+  try {
+    const res = await listUserApiKeys(userId, pagination.value.page, pagination.value.pageSize)
+    keys.value = res?.items || []
+    pagination.value.itemCount = res?.total || 0
+  } catch (e) {
     message.error(e.msg || '加载失败')
   } finally { tableLoading.value = false }
 }
@@ -240,8 +246,7 @@ function openModelAccess(r) {
 
 async function loadModels() {
   try {
-    const data = await listModelsAdmin('', '')
-    allModels.value = data?.models || []
+    allModels.value = (await listModels()) || []
   } catch {}
 }
 

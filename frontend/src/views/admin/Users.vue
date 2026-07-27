@@ -3,7 +3,7 @@
     <n-card title="用户管理" size="small">
       <template #header-extra>
         <n-space align="center">
-          <n-input v-model:value="keyword" placeholder="搜索姓名/账号" size="small" clearable style="width:200px" @keydown.enter="load" @clear="load" />
+          <n-input v-model:value="keyword" placeholder="搜索姓名/账号" size="small" clearable style="width:200px" @keydown.enter="resetAndLoad" @clear="resetAndLoad" />
           <n-button size="small" type="primary" @click="openCreate">创建用户</n-button>
         </n-space>
       </template>
@@ -14,6 +14,9 @@
         :bordered="false"
         size="small"
         :scroll-x="1000"
+        :pagination="pagination"
+        :remote="true"
+        @update:page="onPage"
         style="width:100%"
       />
     </n-card>
@@ -153,6 +156,10 @@ const users = ref([])
 const allRoles = ref([])
 const keyword = ref('')
 const tableLoading = ref(false)
+const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
+
+function onPage(p) { pagination.value.page = p; load() }
+function resetAndLoad() { pagination.value.page = 1; load() }
 
 // 创建
 const showCreate = ref(false)
@@ -235,9 +242,9 @@ async function loadRoles() {
 async function load() {
   tableLoading.value = true
   try {
-    const data = await listUsers(keyword.value)
-    users.value = data?.users || []
-    // 充值后需要刷新余额等信息
+    const res = await listUsers(keyword.value, pagination.value.page, pagination.value.pageSize)
+    users.value = res?.items || []
+    pagination.value.itemCount = res?.total || 0
   } catch (e) {
     message.error(e.msg || '加载失败')
   } finally { tableLoading.value = false }

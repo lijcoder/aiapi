@@ -26,8 +26,9 @@ type providerItem struct {
 	CreatedAt time.Time      `json:"created_at"`
 }
 
-type ListProvidersResp struct {
-	Providers []providerItem `json:"providers"`
+// ListProvidersReq 提供商列表查询请求（分页）
+type ListProvidersReq struct {
+	base.PageReq
 }
 
 type CreateProviderReq struct {
@@ -49,8 +50,9 @@ type ToggleProviderReq struct {
 // ===== Handler =====
 
 // ListProviders 列出全部 Provider
-func ListProviders(ctx context.Context) (*ListProvidersResp, *base.BizError) {
-	list, err := store.C().Provider().List()
+func ListProviders(ctx context.Context, req *ListProvidersReq) (*base.PageResult[providerItem], *base.BizError) {
+	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
+	list, err := store.C().SetPage(pc).Provider().List()
 	if err != nil {
 		slog.Error("[Provider] List failed", "err", err)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
@@ -65,7 +67,7 @@ func ListProviders(ctx context.Context) (*ListProvidersResp, *base.BizError) {
 			CreatedAt: p.CreatedAt,
 		})
 	}
-	return &ListProvidersResp{Providers: items}, nil
+	return &base.PageResult[providerItem]{Items: items, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
 
 // CreateProvider 新增 Provider

@@ -68,12 +68,16 @@ func (us *UserStore) SetEnabled(userID int64, enabled bool) error {
 }
 
 // List 列出全部用户（按 id 倒序）。
-func (us *UserStore) List() ([]model.User, error) {
+func (us *UserStore) List(keyword string) ([]model.User, error) {
+	q := `SELECT * FROM users`
+	args := map[string]any{}
+	if keyword != "" {
+		q += ` WHERE name LIKE :kw OR account LIKE :kw`
+		args["kw"] = "%" + keyword + "%"
+	}
+	q += ` ORDER BY id DESC`
 	var users []model.User
-	err := us.s.Query(
-		`SELECT * FROM users ORDER BY id DESC`,
-		nil,
-	).Select(&users)
+	err := us.s.Query(q, args).Select(&users)
 	if err != nil {
 		return nil, err
 	}

@@ -4,7 +4,7 @@
       <template #header-extra>
         <n-button type="primary" size="small" @click="openCreate">创建密钥</n-button>
       </template>
-      <n-data-table :columns="columns" :data="keys" :loading="tableLoading" :bordered="false" size="small" :scroll-x="960" style="width:100%" />
+      <n-data-table :columns="columns" :data="keys" :loading="tableLoading" :bordered="false" size="small" :scroll-x="960" :pagination="pagination" :remote="true" @update:page="onPage" style="width:100%" />
     </n-card>
 
     <!-- 创建弹窗 -->
@@ -114,6 +114,9 @@ const { user } = useUser()
 
 const keys = ref([])
 const tableLoading = ref(false)
+const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
+
+function onPage(p) { pagination.value.page = p; loadKeys() }
 
 const showCreate = ref(false)
 const showPlain = ref(false)
@@ -326,7 +329,8 @@ function openModelAccess(r) {
 
 async function loadModels() {
   try {
-    allModels.value = (await listModels()) || []
+    const res = await listModels('', '', 1, 1000)
+    allModels.value = res?.items || []
   } catch {}
 }
 
@@ -359,7 +363,11 @@ async function doSaveBudget() {
 
 async function loadKeys() {
   tableLoading.value = true
-  try { keys.value = (await listMyApiKeys()) || [] } catch (e) {
+  try {
+    const res = await listMyApiKeys(pagination.value.page, pagination.value.pageSize)
+    keys.value = res?.items || []
+    pagination.value.itemCount = res?.total || 0
+  } catch (e) {
     message.error(e.msg || '加载失败')
   } finally { tableLoading.value = false }
 }

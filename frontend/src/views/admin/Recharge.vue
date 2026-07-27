@@ -30,7 +30,7 @@
 import { ref, computed, h, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NCard, NDataTable, NInput, NButton, NSpace, useMessage } from 'naive-ui'
-import { listAllRechargeRecords, rechargeRecords, listUsers } from '../../api'
+import { listAllRechargeRecords, rechargeRecords, getUser } from '../../api'
 import { fix4, formatTime } from '../../utils'
 
 const route = useRoute()
@@ -69,8 +69,7 @@ const columns = computed(() => {
 async function loadUserInfo() {
   if (!userId.value) return
   try {
-    const data = await listUsers('')
-    const u = (data?.users || []).find(x => x.id === userId.value)
+    const u = await getUser(userId.value)
     if (u) userName.value = u.name || u.account
   } catch {}
 }

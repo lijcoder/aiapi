@@ -31,10 +31,7 @@ type modelItem struct {
 type ListModelsAdminReq struct {
 	Provider string `json:"provider"`
 	Model    string `json:"model"`
-}
-
-type ListModelsAdminResp struct {
-	Models []modelItem `json:"models"`
+	base.PageReq
 }
 
 type CreateModelReq struct {
@@ -68,18 +65,28 @@ type ModelIdReq struct {
 
 // ===== Handler =====
 
-// ListModels 普通用户查询全部模型列表
-func ListModels(ctx context.Context) ([]model.Model, *base.BizError) {
-	models, err := store.C().Model().List("", "")
+// ListModelsReq 普通用户模型列表查询请求（支持搜索 + 分页）
+type ListModelsReq struct {
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	base.PageReq
+}
+
+// ListModels 普通用户查询模型列表，支持按 provider/model 模糊搜索
+func ListModels(ctx context.Context, req *ListModelsReq) (*base.PageResult[model.Model], *base.BizError) {
+	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
+	list, err := store.C().SetPage(pc).Model().List(strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model))
 	if err != nil {
+		slog.Error("[Model] List failed", "err", err)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
 	}
-	return models, nil
+	return &base.PageResult[model.Model]{Items: list, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
 
 // ListModelsAdmin 管理员查询全部模型，支持按 provider/model 模糊搜索
-func ListModelsAdmin(ctx context.Context, req *ListModelsAdminReq) (*ListModelsAdminResp, *base.BizError) {
-	list, err := store.C().Model().List(strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model))
+func ListModelsAdmin(ctx context.Context, req *ListModelsAdminReq) (*base.PageResult[modelItem], *base.BizError) {
+	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
+	list, err := store.C().SetPage(pc).Model().List(strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model))
 	if err != nil {
 		slog.Error("[Model] List failed", "err", err)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
@@ -88,7 +95,7 @@ func ListModelsAdmin(ctx context.Context, req *ListModelsAdminReq) (*ListModelsA
 	for _, m := range list {
 		items = append(items, toModelItem(m))
 	}
-	return &ListModelsAdminResp{Models: items}, nil
+	return &base.PageResult[modelItem]{Items: items, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
 
 // CreateModel 管理员新增模型

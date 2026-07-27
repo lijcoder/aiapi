@@ -46,6 +46,7 @@ func Register(g *echo.Group) {
 
 	// 超管：用户管理
 	g.POST("/users/list", base.Wrap(handler.ListUsers))
+	g.POST("/users/get", base.Wrap(handler.GetUserAdmin))
 	g.POST("/users/create", base.Wrap(handler.CreateUser))
 	g.POST("/users/update", base.Wrap(handler.UpdateUser))
 	g.POST("/users/toggle", base.Wrap(handler.ToggleUser))

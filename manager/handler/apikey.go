@@ -43,6 +43,17 @@ type ApiKeyIdReq struct {
 	ID int64 `json:"id"`
 }
 
+// ApiKeyListSelfReq 当前用户 API Key 列表查询请求（分页）
+type ApiKeyListSelfReq struct {
+	base.PageReq
+}
+
+// ApiKeyListReq 超管查询指定用户的 API Key 列表请求（分页）
+type ApiKeyListReq struct {
+	UserID int64 `json:"user_id"`
+	base.PageReq
+}
+
 // ApiKeyAdminReq 超管管理指定用户的 API Key 请求
 
 type ApiKeyAdminReq struct {
@@ -166,10 +177,11 @@ func checkBudgetWithinUserLimit(cur *model.User, excludeID int64, newBudget floa
 	return nil
 }
 
-// ListApiKeySelf 查询当前用户的 API Key 列表（key 脱敏）
-func ListApiKeySelf(ctx context.Context) ([]apiKeyItem, *base.BizError) {
+// ListApiKeySelf 查询当前用户的 API Key 列表（key 脱敏，分页）
+func ListApiKeySelf(ctx context.Context, req *ApiKeyListSelfReq) (*base.PageResult[apiKeyItem], *base.BizError) {
 	cur := base.CurrentUser(ctx)
-	keys, err := store.C().ApiKey().ListByUser(cur.ID)
+	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
+	keys, err := store.C().SetPage(pc).ApiKey().ListByUser(cur.ID)
 	if err != nil {
 		slog.Error("list api keys failed", "err", err, "user_id", cur.ID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
@@ -178,7 +190,7 @@ func ListApiKeySelf(ctx context.Context) ([]apiKeyItem, *base.BizError) {
 	for _, k := range keys {
 		items = append(items, toApiKeyItem(k, true))
 	}
-	return items, nil
+	return &base.PageResult[apiKeyItem]{Items: items, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
 
 // CreateApiKeySelf 创建 API Key，明文 key 仅在本响应中返回一次
@@ -314,11 +326,12 @@ func UpdateBudgetApiKeySelf(ctx context.Context, req *UpdateBudgetApiKeyReq) (*a
 // ===== 超管：管理指定用户的 API Key =====
 
 // ListApiKeyAdmin 超管查询指定用户的 API Key 列表（key 脱敏）
-func ListApiKeyAdmin(ctx context.Context, req *ApiKeyAdminReq) ([]apiKeyItem, *base.BizError) {
+func ListApiKeyAdmin(ctx context.Context, req *ApiKeyListReq) (*base.PageResult[apiKeyItem], *base.BizError) {
 	if req.UserID <= 0 {
 		return nil, base.NewBizError(base.CodeInvalidParams, "user_id is required")
 	}
-	keys, err := store.C().ApiKey().ListByUser(req.UserID)
+	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
+	keys, err := store.C().SetPage(pc).ApiKey().ListByUser(req.UserID)
 	if err != nil {
 		slog.Error("list api keys failed", "err", err, "user_id", req.UserID)
 		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
@@ -327,7 +340,7 @@ func ListApiKeyAdmin(ctx context.Context, req *ApiKeyAdminReq) ([]apiKeyItem, *b
 	for _, k := range keys {
 		items = append(items, toApiKeyItem(k, true))
 	}
-	return items, nil
+	return &base.PageResult[apiKeyItem]{Items: items, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
 
 // ToggleApiKeyAdmin 超管启用/禁用指定用户的 API Key
