@@ -17,6 +17,19 @@ import (
 // sessionService 登录会话业务（签发/刷新/吊销）。进程内单例，无状态。
 var sessionService = service.NewSessionService()
 
+// dummyPasswordHash 账号不存在时用于 bcrypt 比对的哑 hash（见 Login 注释）。
+// init 时生成一次（约 100ms 启动开销），成本参数与真实密码一致；
+// 对应明文无人知晓，任何输入都不会匹配成功。
+var dummyPasswordHash []byte
+
+func init() {
+	h, err := bcrypt.GenerateFromPassword([]byte("dummy-password-for-timing"), bcrypt.DefaultCost)
+	if err != nil {
+		panic("generate dummy password hash failed: " + err.Error())
+	}
+	dummyPasswordHash = h
+}
+
 type loginReq struct {
 	Account  string `json:"account"`
 	Password string `json:"password"`
@@ -42,12 +55,18 @@ func Login(c echo.Context) error {
 		slog.Error("login get user failed", "err", err)
 		return base.Fail(c, base.ErrInternal.Code, base.ErrInternal.Msg)
 	}
-	// 统一错误文案：账号不存在/密码错/账号禁用均返回「账号或密码错误」
-	// 防止攻击者通过差异响应枚举有效账号
-	if user == nil || !user.Enabled {
-		return base.Fail(c, base.CodeBadRequest, "账号或密码错误")
+	// 防枚举两道防线：
+	// 1. 统一文案：账号不存在/密码错/账号禁用均返回「账号或密码错误」
+	// 2. 时序对齐：账号不存在时也对哑 hash 执行一次 bcrypt 比对，
+	//    使「账号不存在」与「密码错误」的响应耗时一致（bcrypt 约 50~100ms，
+	//    不比对会快一个数量级，攻击者掐表即可分辨账号是否存在）。
+	//    账号禁用则用真实 hash 比对，同样保持时序一致。
+	passwordHash := dummyPasswordHash
+	if user != nil {
+		passwordHash = []byte(user.Password)
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+	pwdErr := bcrypt.CompareHashAndPassword(passwordHash, []byte(req.Password))
+	if user == nil || !user.Enabled || pwdErr != nil {
 		return base.Fail(c, base.CodeBadRequest, "账号或密码错误")
 	}
 
