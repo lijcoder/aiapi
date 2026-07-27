@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/lijcoder/aiapi/store/base"
 	"github.com/lijcoder/aiapi/store/model"
 )
 
@@ -80,72 +79,6 @@ func (ss *UserSessionStore) GetActiveByFamily(familyID string) (*model.UserSessi
 		return nil, err
 	}
 	return &us, nil
-}
-
-// Rotate 轮换 refresh token：删旧 token + 建同 family 新 token，事务内执行。
-//   - oldToken：被轮换掉的旧 token 哈希
-//   - newToken：新 token 哈希
-//   - newExpiresAt：新 token 的滑动过期时间（调用方已与绝对上限取 min）
-//
-// 返回新会话记录。调用方据此签发 access JWT（需 newSess.ID 作为 sid）。
-func (ss *UserSessionStore) Rotate(oldToken, newToken string, newExpiresAt time.Time) (*model.UserSession, error) {
-	var newSess *model.UserSession
-	err := ss.s.Transaction(func(bs *base.Session) error {
-		t := &Session{Session: bs} // 包装回 store.Session 以便用 Query
-		// 查旧 session 拿 family/user/absolute_expires 等信息
-		var old model.UserSession
-		err := t.Query(
-			`SELECT * FROM user_sessions WHERE token = :token`,
-			map[string]any{"token": oldToken},
-		).Get(&old)
-		if errors.Is(err, sql.ErrNoRows) {
-			return errors.New("session to rotate not found")
-		}
-		if err != nil {
-			return err
-		}
-
-		// 删旧 token
-		if _, err := t.Query(
-			`DELETE FROM user_sessions WHERE token = :token`,
-			map[string]any{"token": oldToken},
-		).Exec(); err != nil {
-			return err
-		}
-
-		// 建同 family 新 token，复用原 user_id / absolute_expires_at / ua / ip
-		_, err = t.Query(
-			`INSERT INTO user_sessions (token, family_id, user_id, expires_at, absolute_expires_at, ua, ip)
-			 VALUES (:token, :family_id, :user_id, :expires_at, :absolute_expires_at, :ua, :ip)`,
-			map[string]any{
-				"token":               newToken,
-				"family_id":           old.FamilyID,
-				"user_id":             old.UserID,
-				"expires_at":          newExpiresAt,
-				"absolute_expires_at": old.AbsoluteExpiresAt,
-				"ua":                  old.UA,
-				"ip":                  old.IP,
-			},
-		).Exec()
-		if err != nil {
-			return err
-		}
-
-		// 查回新 session
-		err = t.Query(
-			`SELECT * FROM user_sessions WHERE token = :token`,
-			map[string]any{"token": newToken},
-		).Get(&old)
-		if err != nil {
-			return err
-		}
-		newSess = &old
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return newSess, nil
 }
 
 // Delete 删除单条会话（按 token 哈希）。

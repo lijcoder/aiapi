@@ -162,7 +162,7 @@ func (s *SessionService) Refresh(presentedRefresh string) (*TokenPair, error) {
 	if newExp.After(sess.AbsoluteExpiresAt) {
 		newExp = sess.AbsoluteExpiresAt
 	}
-	if _, err = store.C().UserSession().Rotate(presentedHash, hashToken(newRefresh), newExp); err != nil {
+	if _, err := s.rotate(presentedHash, hashToken(newRefresh), newExp); err != nil {
 		return nil, err
 	}
 
@@ -216,6 +216,45 @@ func (s *SessionService) RevokeByRefreshToken(refreshToken string) error {
 // 用于改密 / 禁用用户 / 重置密码，强制全部重登。
 func (s *SessionService) RevokeByUser(userID int64) error {
 	return store.C().UserSession().DeleteByUser(userID)
+}
+
+// rotate 轮换 refresh token：删旧 + 建同 family 新 token，事务内执行。
+// 返回新会话记录，调用方据此签发 access JWT。
+func (s *SessionService) rotate(oldToken, newToken string, newExpiresAt time.Time) (*model.UserSession, error) {
+	var newSess *model.UserSession
+	err := store.C().T(func(ss *store.Session) error {
+		// 查旧 session 拿 family/user/absolute_expires 等信息
+		old, err := ss.UserSession().GetByToken(oldToken)
+		if err != nil {
+			return err
+		}
+		if old == nil {
+			return errors.New("session to rotate not found")
+		}
+
+		// 删旧 token
+		if err := ss.UserSession().Delete(oldToken); err != nil {
+			return err
+		}
+
+		// 建同 family 新 token，复用原 user_id / absolute_expires_at / ua / ip
+		if err := ss.UserSession().Create(
+			newToken, old.FamilyID, old.UserID, newExpiresAt, old.AbsoluteExpiresAt, old.UA, old.IP,
+		); err != nil {
+			return err
+		}
+
+		// 查回新 session
+		newSess, err = ss.UserSession().GetByToken(newToken)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return newSess, nil
 }
 
 // ===================================================================
