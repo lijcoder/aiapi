@@ -29,9 +29,9 @@ import (
 //
 // handler / middleware 据此映射 HTTP 业务码：
 //   - ErrTokenExpired     → CodeTokenExpired（前端触发 /refresh）
-//   - ErrSessionExpired   → CodeSessionExpired（清 cookie 跳登录）
-//   - ErrSessionNotFound  → CodeSessionExpired（同上）
-//   - ErrSessionReuse     → CodeSessionReuse（重用攻击，已吊销 family）
+//   - ErrSessionExpired   → CodeUnauthorized（清 cookie 跳登录）
+//   - ErrSessionNotFound  → CodeUnauthorized（同上）
+//   - ErrSessionReuse     → CodeUnauthorized（重用攻击，已吊销 family）
 //   - ErrUserDisabled     → 用户被禁用/删除
 //   - ErrUserNotFound     → 用户不存在（充值等操作目标用户缺失）
 

@@ -102,11 +102,11 @@ func TestWrap_ReqValue(t *testing.T) {
 
 func TestWrap_BizError(t *testing.T) {
 	biz := func(ctx context.Context) (string, *base.BizError) {
-		return "", base.NewBizError(base.CodeInvalidParams, "bad")
+		return "", base.ErrBadReq("bad")
 	}
 	c := newUserCtx("/t", "", true)
 	_ = base.Wrap(biz)(c)
-	if c.Response().Status != base.CodeInvalidParams.HTTPStatus() {
+	if c.Response().Status != base.CodeBadRequest.HTTPStatus() {
 		t.Fatalf("status=%d", c.Response().Status)
 	}
 }

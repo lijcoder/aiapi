@@ -155,14 +155,14 @@ func checkBudgetWithinUserLimit(cur *model.User, excludeID int64, newBudget floa
 	sum, err := store.C().ApiKey().SumLimitedBudgetByUser(cur.ID)
 	if err != nil {
 		slog.Error("sum api key budget failed", "err", err, "user_id", cur.ID)
-		return base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return base.ErrInternal
 	}
 	// 排除当前正在修改的 key（如果它原本是有限额的，需从总和中减掉原值）
 	if excludeID > 0 {
 		exist, gerr := store.C().ApiKey().GetByID(excludeID)
 		if gerr != nil {
 			slog.Error("get api key for budget check failed", "err", gerr, "id", excludeID)
-			return base.NewBizError(base.CodeUnknown, base.InternalServerError)
+			return base.ErrInternal
 		}
 		if exist != nil && exist.UserID == cur.ID && !exist.Unlimited {
 			sum -= exist.Budget
@@ -172,7 +172,7 @@ func checkBudgetWithinUserLimit(cur *model.User, excludeID int64, newBudget floa
 		sum += newBudget
 	}
 	if sum > cur.Budget {
-		return base.NewBizError(base.CodeBudgetExceeded, "有限额密钥的额度总和不能超过账户余额")
+		return base.ErrBadReq("有限额密钥的额度总和不能超过账户余额")
 	}
 	return nil
 }
@@ -184,7 +184,7 @@ func ListApiKeySelf(ctx context.Context, req *ApiKeyListSelfReq) (*base.PageResu
 	keys, err := store.C().SetPage(pc).ApiKey().ListByUser(cur.ID)
 	if err != nil {
 		slog.Error("list api keys failed", "err", err, "user_id", cur.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	items := make([]apiKeyItem, 0, len(keys))
 	for _, k := range keys {
@@ -198,10 +198,10 @@ func CreateApiKeySelf(ctx context.Context, req *CreateApiKeyReq) (*CreateApiKeyR
 	cur := base.CurrentUser(ctx)
 	// 名称允许为空，但过长会撑爆前端；这里只做长度上限。
 	if name := strings.TrimSpace(req.Name); len(name) > 64 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "name too long")
+		return nil, base.ErrBadReq("名称过长")
 	}
 	if req.Budget < 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "budget must be >= 0")
+		return nil, base.ErrBadReq("额度不能为负数")
 	}
 	// 校验有限额 key 的总额不超过用户余额
 	if berr := checkBudgetWithinUserLimit(cur, 0, req.Budget, req.Unlimited); berr != nil {
@@ -211,7 +211,7 @@ func CreateApiKeySelf(ctx context.Context, req *CreateApiKeyReq) (*CreateApiKeyR
 	k, err := createApiKeyRetry(cur.ID, strings.TrimSpace(req.Name), req.Budget, req.Unlimited)
 	if err != nil {
 		slog.Error("create api key failed", "err", err, "user_id", cur.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &CreateApiKeyResp{ApiKey: toApiKeyItem(*k, false)}, nil
 }
@@ -220,19 +220,19 @@ func CreateApiKeySelf(ctx context.Context, req *CreateApiKeyReq) (*CreateApiKeyR
 func ToggleApiKeySelf(ctx context.Context, req *ApiKeyIdReq) (*apiKeyItem, *base.BizError) {
 	cur := base.CurrentUser(ctx)
 	if req.ID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+		return nil, base.ErrBadReq("id 不能为空")
 	}
 	k, err := store.C().ApiKey().GetByID(req.ID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil || k.UserID != cur.ID {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	if err := store.C().ApiKey().SetEnabled(k.ID, !k.Enabled); err != nil {
 		slog.Error("toggle api key failed", "err", err, "id", k.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	k.Enabled = !k.Enabled
 	item := toApiKeyItem(*k, true)
@@ -243,19 +243,19 @@ func ToggleApiKeySelf(ctx context.Context, req *ApiKeyIdReq) (*apiKeyItem, *base
 func DeleteApiKeySelf(ctx context.Context, req *ApiKeyIdReq) (*struct{}, *base.BizError) {
 	cur := base.CurrentUser(ctx)
 	if req.ID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+		return nil, base.ErrBadReq("id 不能为空")
 	}
 	k, err := store.C().ApiKey().GetByID(req.ID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil || k.UserID != cur.ID {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	if err := service.NewApiKeyService().Delete(k.ID); err != nil {
 		slog.Error("delete api key failed", "err", err, "id", k.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &struct{}{}, nil
 }
@@ -264,26 +264,26 @@ func DeleteApiKeySelf(ctx context.Context, req *ApiKeyIdReq) (*struct{}, *base.B
 func RenameApiKeySelf(ctx context.Context, req *RenameApiKeyReq) (*apiKeyItem, *base.BizError) {
 	cur := base.CurrentUser(ctx)
 	if req.ID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+		return nil, base.ErrBadReq("id 不能为空")
 	}
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		return nil, base.NewBizError(base.CodeInvalidParams, "name is required")
+		return nil, base.ErrBadReq("名称不能为空")
 	}
 	if len(name) > 64 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "name too long")
+		return nil, base.ErrBadReq("名称过长")
 	}
 	k, err := store.C().ApiKey().GetByID(req.ID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil || k.UserID != cur.ID {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	if err := store.C().ApiKey().UpdateName(k.ID, name); err != nil {
 		slog.Error("rename api key failed", "err", err, "id", k.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	k.Name = name
 	item := toApiKeyItem(*k, true)
@@ -296,18 +296,18 @@ func RenameApiKeySelf(ctx context.Context, req *RenameApiKeyReq) (*apiKeyItem, *
 func UpdateBudgetApiKeySelf(ctx context.Context, req *UpdateBudgetApiKeyReq) (*apiKeyItem, *base.BizError) {
 	cur := base.CurrentUser(ctx)
 	if req.ID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+		return nil, base.ErrBadReq("id 不能为空")
 	}
 	if req.Budget < 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "budget must be >= 0")
+		return nil, base.ErrBadReq("额度不能为负数")
 	}
 	k, err := store.C().ApiKey().GetByID(req.ID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil || k.UserID != cur.ID {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	// 校验有限额 key 的总额不超过用户余额（排除当前 key 原值）
 	if berr := checkBudgetWithinUserLimit(cur, k.ID, req.Budget, req.Unlimited); berr != nil {
@@ -315,7 +315,7 @@ func UpdateBudgetApiKeySelf(ctx context.Context, req *UpdateBudgetApiKeyReq) (*a
 	}
 	if err := store.C().ApiKey().UpdateBudget(k.ID, req.Budget, req.Unlimited); err != nil {
 		slog.Error("update api key budget failed", "err", err, "id", k.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	k.Budget = req.Budget
 	k.Unlimited = req.Unlimited
@@ -328,13 +328,13 @@ func UpdateBudgetApiKeySelf(ctx context.Context, req *UpdateBudgetApiKeyReq) (*a
 // ListApiKeyAdmin 超管查询指定用户的 API Key 列表（key 脱敏）
 func ListApiKeyAdmin(ctx context.Context, req *ApiKeyListReq) (*base.PageResult[apiKeyItem], *base.BizError) {
 	if req.UserID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "user_id is required")
+		return nil, base.ErrBadReq("user_id 不能为空")
 	}
 	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
 	keys, err := store.C().SetPage(pc).ApiKey().ListByUser(req.UserID)
 	if err != nil {
 		slog.Error("list api keys failed", "err", err, "user_id", req.UserID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	items := make([]apiKeyItem, 0, len(keys))
 	for _, k := range keys {
@@ -346,19 +346,19 @@ func ListApiKeyAdmin(ctx context.Context, req *ApiKeyListReq) (*base.PageResult[
 // ToggleApiKeyAdmin 超管启用/禁用指定用户的 API Key
 func ToggleApiKeyAdmin(ctx context.Context, req *ApiKeyIdReq) (*apiKeyItem, *base.BizError) {
 	if req.ID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+		return nil, base.ErrBadReq("id 不能为空")
 	}
 	k, err := store.C().ApiKey().GetByID(req.ID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	if err := store.C().ApiKey().SetEnabled(k.ID, !k.Enabled); err != nil {
 		slog.Error("toggle api key failed", "err", err, "id", k.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	k.Enabled = !k.Enabled
 	item := toApiKeyItem(*k, true)
@@ -368,19 +368,19 @@ func ToggleApiKeyAdmin(ctx context.Context, req *ApiKeyIdReq) (*apiKeyItem, *bas
 // DeleteApiKeyAdmin 超管删除指定用户的 API Key
 func DeleteApiKeyAdmin(ctx context.Context, req *ApiKeyIdReq) (*struct{}, *base.BizError) {
 	if req.ID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+		return nil, base.ErrBadReq("id 不能为空")
 	}
 	k, err := store.C().ApiKey().GetByID(req.ID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	if err := service.NewApiKeyService().Delete(k.ID); err != nil {
 		slog.Error("delete api key failed", "err", err, "id", k.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &struct{}{}, nil
 }
@@ -388,26 +388,26 @@ func DeleteApiKeyAdmin(ctx context.Context, req *ApiKeyIdReq) (*struct{}, *base.
 // RenameApiKeyAdmin 超管重命名指定用户的 API Key
 func RenameApiKeyAdmin(ctx context.Context, req *RenameApiKeyReq) (*apiKeyItem, *base.BizError) {
 	if req.ID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+		return nil, base.ErrBadReq("id 不能为空")
 	}
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
-		return nil, base.NewBizError(base.CodeInvalidParams, "name is required")
+		return nil, base.ErrBadReq("名称不能为空")
 	}
 	if len(name) > 64 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "name too long")
+		return nil, base.ErrBadReq("名称过长")
 	}
 	k, err := store.C().ApiKey().GetByID(req.ID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	if err := store.C().ApiKey().UpdateName(k.ID, name); err != nil {
 		slog.Error("rename api key failed", "err", err, "id", k.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	k.Name = name
 	item := toApiKeyItem(*k, true)
@@ -418,31 +418,31 @@ func RenameApiKeyAdmin(ctx context.Context, req *RenameApiKeyReq) (*apiKeyItem, 
 // 按 key 归属的用户余额校验总额。
 func UpdateBudgetApiKeyAdmin(ctx context.Context, req *UpdateBudgetApiKeyReq) (*apiKeyItem, *base.BizError) {
 	if req.ID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+		return nil, base.ErrBadReq("id 不能为空")
 	}
 	if req.Budget < 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "budget must be >= 0")
+		return nil, base.ErrBadReq("额度不能为负数")
 	}
 	k, err := store.C().ApiKey().GetByID(req.ID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	// 用 key 归属用户做额度校验
 	owner, err := store.C().User().GetByIDAny(k.UserID)
 	if err != nil || owner == nil {
 		slog.Error("get key owner failed", "err", err, "user_id", k.UserID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if berr := checkBudgetWithinUserLimit(owner, k.ID, req.Budget, req.Unlimited); berr != nil {
 		return nil, berr
 	}
 	if err := store.C().ApiKey().UpdateBudget(k.ID, req.Budget, req.Unlimited); err != nil {
 		slog.Error("update api key budget failed", "err", err, "id", k.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	k.Budget = req.Budget
 	k.Unlimited = req.Unlimited
@@ -473,7 +473,7 @@ func UpdateBudgetApiKeyAdmin(ctx context.Context, req *UpdateBudgetApiKeyReq) (*
 // validateModelPolicy 校验策略值
 func validateModelPolicy(p string) *base.BizError {
 	if p != store.ModelPolicyAll && p != store.ModelPolicyWhitelist {
-		return base.NewBizError(base.CodeInvalidParams, "model_policy must be 'all' or 'whitelist'")
+		return base.ErrBadReq("model_policy 只能是 all 或 whitelist")
 	}
 	return nil
 }
@@ -482,20 +482,20 @@ func validateModelPolicy(p string) *base.BizError {
 func GetApiKeyModelAccessSelf(ctx context.Context, req *ApiKeyModelAccessReq) (*ApiKeyModelAccessResp, *base.BizError) {
 	cur := base.CurrentUser(ctx)
 	if req.ApiKeyID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "api_key_id is required")
+		return nil, base.ErrBadReq("api_key_id 不能为空")
 	}
 	k, err := store.C().ApiKey().GetByID(req.ApiKeyID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ApiKeyID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil || k.UserID != cur.ID {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	policy, modelIDs, err := service.NewApiKeyService().GetModelAccess(req.ApiKeyID)
 	if err != nil {
 		slog.Error("get api key model access failed", "err", err, "id", req.ApiKeyID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if modelIDs == nil {
 		modelIDs = []int64{}
@@ -507,7 +507,7 @@ func GetApiKeyModelAccessSelf(ctx context.Context, req *ApiKeyModelAccessReq) (*
 func SetApiKeyModelAccessSelf(ctx context.Context, req *SetApiKeyModelAccessReq) (*ApiKeyModelAccessResp, *base.BizError) {
 	cur := base.CurrentUser(ctx)
 	if req.ApiKeyID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "api_key_id is required")
+		return nil, base.ErrBadReq("api_key_id 不能为空")
 	}
 	if berr := validateModelPolicy(req.ModelPolicy); berr != nil {
 		return nil, berr
@@ -515,10 +515,10 @@ func SetApiKeyModelAccessSelf(ctx context.Context, req *SetApiKeyModelAccessReq)
 	k, err := store.C().ApiKey().GetByID(req.ApiKeyID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ApiKeyID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil || k.UserID != cur.ID {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	modelIDs := req.ModelIDs
 	if modelIDs == nil {
@@ -526,7 +526,7 @@ func SetApiKeyModelAccessSelf(ctx context.Context, req *SetApiKeyModelAccessReq)
 	}
 	if err := service.NewApiKeyService().SetModelAccess(req.ApiKeyID, req.ModelPolicy, modelIDs); err != nil {
 		slog.Error("set api key model access failed", "err", err, "id", req.ApiKeyID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &ApiKeyModelAccessResp{ModelPolicy: req.ModelPolicy, ModelIDs: modelIDs}, nil
 }
@@ -534,20 +534,20 @@ func SetApiKeyModelAccessSelf(ctx context.Context, req *SetApiKeyModelAccessReq)
 // GetApiKeyModelAccessAdmin 超管查询指定 Key 的模型策略
 func GetApiKeyModelAccessAdmin(ctx context.Context, req *ApiKeyModelAccessReq) (*ApiKeyModelAccessResp, *base.BizError) {
 	if req.ApiKeyID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "api_key_id is required")
+		return nil, base.ErrBadReq("api_key_id 不能为空")
 	}
 	k, err := store.C().ApiKey().GetByID(req.ApiKeyID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ApiKeyID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	policy, modelIDs, err := service.NewApiKeyService().GetModelAccess(req.ApiKeyID)
 	if err != nil {
 		slog.Error("get api key model access failed", "err", err, "id", req.ApiKeyID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if modelIDs == nil {
 		modelIDs = []int64{}
@@ -558,7 +558,7 @@ func GetApiKeyModelAccessAdmin(ctx context.Context, req *ApiKeyModelAccessReq) (
 // SetApiKeyModelAccessAdmin 超管设置指定 Key 的模型策略
 func SetApiKeyModelAccessAdmin(ctx context.Context, req *SetApiKeyModelAccessReq) (*ApiKeyModelAccessResp, *base.BizError) {
 	if req.ApiKeyID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "api_key_id is required")
+		return nil, base.ErrBadReq("api_key_id 不能为空")
 	}
 	if berr := validateModelPolicy(req.ModelPolicy); berr != nil {
 		return nil, berr
@@ -566,10 +566,10 @@ func SetApiKeyModelAccessAdmin(ctx context.Context, req *SetApiKeyModelAccessReq
 	k, err := store.C().ApiKey().GetByID(req.ApiKeyID)
 	if err != nil {
 		slog.Error("get api key failed", "err", err, "id", req.ApiKeyID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if k == nil {
-		return nil, base.NewBizError(base.CodeApiKeyNotFound, "api key not found")
+		return nil, base.ErrNotFound("API Key 不存在")
 	}
 	modelIDs := req.ModelIDs
 	if modelIDs == nil {
@@ -577,7 +577,7 @@ func SetApiKeyModelAccessAdmin(ctx context.Context, req *SetApiKeyModelAccessReq
 	}
 	if err := service.NewApiKeyService().SetModelAccess(req.ApiKeyID, req.ModelPolicy, modelIDs); err != nil {
 		slog.Error("set api key model access failed", "err", err, "id", req.ApiKeyID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &ApiKeyModelAccessResp{ModelPolicy: req.ModelPolicy, ModelIDs: modelIDs}, nil
 }

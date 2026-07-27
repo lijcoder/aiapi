@@ -111,8 +111,8 @@ func parseDateRangeMonth(startStr, endStr string) (string, string, error) {
 }
 
 var (
-	errInvalidDateRange = &base.BizError{Code: base.CodeInvalidParams, Msg: "日期范围无效"}
-	errDateRangeTooLong = &base.BizError{Code: base.CodeInvalidParams, Msg: "按天查询最多只能选择 31 天"}
+	errInvalidDateRange = &base.BizError{Code: base.CodeBadRequest, Msg: "日期范围无效"}
+	errDateRangeTooLong = &base.BizError{Code: base.CodeBadRequest, Msg: "按天查询最多只能选择 31 天"}
 )
 
 // ===== Handler =====
@@ -125,10 +125,10 @@ func UsageStatsSelf(ctx context.Context, req *UsageStatsSelfReq) (*UsageStatsSel
 		mode = "day"
 	}
 	if mode != "day" && mode != "month" {
-		return nil, base.NewBizError(base.CodeInvalidParams, "mode must be day or month")
+		return nil, base.ErrBadReq("mode 只能是 day 或 month")
 	}
 	if req.GroupBy != "" && req.GroupBy != "model" && req.GroupBy != "provider" && req.GroupBy != "api_key" {
-		return nil, base.NewBizError(base.CodeInvalidParams, "group_by must be empty, model, provider or api_key")
+		return nil, base.ErrBadReq("group_by 只能为空、model、provider 或 api_key")
 	}
 
 	var startDate, endDate string
@@ -139,19 +139,19 @@ func UsageStatsSelf(ctx context.Context, req *UsageStatsSelfReq) (*UsageStatsSel
 		startDate, endDate, err = parseDateRangeMonth(req.StartDate, req.EndDate)
 	}
 	if err != nil {
-		return nil, base.NewBizError(base.CodeInvalidParams, err.Error())
+		return nil, base.ErrBadReq(err.Error())
 	}
 
 	apiKey, err := resolveApiKey(cur.ID, req.ApiKeyId)
 	if err != nil {
 		slog.Error("resolve api key failed", "err", err, "api_key_id", req.ApiKeyId)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	rows, err := service.NewUsageService().StatsByUser(cur.ID, mode, startDate, endDate, apiKey, req.Model, req.Provider, req.GroupBy)
 	if err != nil {
 		slog.Error("usage stats failed", "err", err, "user_id", cur.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	// 按 api_key 分组时：脱敏 + 填充名称 + 标记是否已删除
@@ -159,7 +159,7 @@ func UsageStatsSelf(ctx context.Context, req *UsageStatsSelfReq) (*UsageStatsSel
 		apiKeys, err := store.C().ApiKey().ListByUser(cur.ID)
 		if err != nil {
 			slog.Error("list api keys for stats failed", "err", err, "user_id", cur.ID)
-			return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+			return nil, base.ErrInternal
 		}
 		keyNameMap := make(map[string]string, len(apiKeys))
 		for _, k := range apiKeys {
@@ -209,7 +209,7 @@ func UsageFiltersSelf(ctx context.Context) (*UsageFiltersResp, *base.BizError) {
 	apiKeys, err := store.C().ApiKey().ListByUser(cur.ID)
 	if err != nil {
 		slog.Error("list api keys for filters failed", "err", err, "user_id", cur.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	keyOpts := make([]UsageFilterOption, 0, len(apiKeys))
 	for _, k := range apiKeys {
@@ -223,13 +223,13 @@ func UsageFiltersSelf(ctx context.Context) (*UsageFiltersResp, *base.BizError) {
 	models, err := store.C().Usage().DistinctModelsByUser(cur.ID)
 	if err != nil {
 		slog.Error("distinct models failed", "err", err, "user_id", cur.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	providers, err := store.C().Usage().DistinctProvidersByUser(cur.ID)
 	if err != nil {
 		slog.Error("distinct providers failed", "err", err, "user_id", cur.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	return &UsageFiltersResp{
@@ -284,10 +284,10 @@ func UsageStatsAdmin(ctx context.Context, req *UsageStatsAdminReq) (*UsageStatsA
 		mode = "day"
 	}
 	if mode != "day" && mode != "month" {
-		return nil, base.NewBizError(base.CodeInvalidParams, "mode must be day or month")
+		return nil, base.ErrBadReq("mode 只能是 day 或 month")
 	}
 	if req.GroupBy != "" && req.GroupBy != "model" && req.GroupBy != "provider" && req.GroupBy != "api_key" && req.GroupBy != "user" {
-		return nil, base.NewBizError(base.CodeInvalidParams, "group_by must be empty, model, provider, api_key or user")
+		return nil, base.ErrBadReq("group_by 只能为空、model、provider、api_key 或 user")
 	}
 
 	var startDate, endDate string
@@ -298,20 +298,20 @@ func UsageStatsAdmin(ctx context.Context, req *UsageStatsAdminReq) (*UsageStatsA
 		startDate, endDate, err = parseDateRangeMonth(req.StartDate, req.EndDate)
 	}
 	if err != nil {
-		return nil, base.NewBizError(base.CodeInvalidParams, err.Error())
+		return nil, base.ErrBadReq(err.Error())
 	}
 
 	// api_key_id → 完整 key（admin 版不校验归属）
 	apiKey, err := resolveApiKeyAdmin(req.ApiKeyId)
 	if err != nil {
 		slog.Error("resolve api key failed", "err", err, "api_key_id", req.ApiKeyId)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	rows, err := service.NewUsageService().StatsByAdmin(req.UserID, mode, startDate, endDate, apiKey, req.Model, req.Provider, req.GroupBy)
 	if err != nil {
 		slog.Error("usage stats admin failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	// 按 api_key 分组：填充名称 + 脱敏 + 标记是否已删除
@@ -319,7 +319,7 @@ func UsageStatsAdmin(ctx context.Context, req *UsageStatsAdminReq) (*UsageStatsA
 		allKeys, err := store.C().ApiKey().ListAll()
 		if err != nil {
 			slog.Error("list all api keys for stats failed", "err", err)
-			return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+			return nil, base.ErrInternal
 		}
 		keyNameMap := make(map[string]string, len(allKeys))
 		for _, k := range allKeys {
@@ -367,14 +367,14 @@ func UsageFiltersAdmin(ctx context.Context) (*UsageFiltersAdminResp, *base.BizEr
 	users, err := store.C().Usage().DistinctUsersByAdmin()
 	if err != nil {
 		slog.Error("distinct users failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	// api_key 列表（全平台）
 	allKeys, err := store.C().ApiKey().ListAll()
 	if err != nil {
 		slog.Error("list all api keys failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	keyOpts := make([]UsageFilterOption, 0, len(allKeys))
 	for _, k := range allKeys {
@@ -388,13 +388,13 @@ func UsageFiltersAdmin(ctx context.Context) (*UsageFiltersAdminResp, *base.BizEr
 	models, err := store.C().Usage().DistinctModelsByAdmin(0)
 	if err != nil {
 		slog.Error("distinct models failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	providers, err := store.C().Usage().DistinctProvidersByAdmin(0)
 	if err != nil {
 		slog.Error("distinct providers failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	return &UsageFiltersAdminResp{

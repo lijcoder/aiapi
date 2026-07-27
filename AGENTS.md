@@ -233,4 +233,4 @@
 - 登录态采用双 token 机制：access JWT（HS256 自实现，15min 无状态，经 `Authorization: Bearer` 头传递，前端存内存）+ refresh token（随机串哈希存 `user_sessions` 表，HttpOnly Secure cookie `refresh_token` 传递，滑动 7 天 / 绝对 30 天，带轮换与重用检测）。`/manager/login`、`/manager/refresh` 不挂 Auth 中间件（login 无需登录态；refresh 靠 refresh cookie 续期，不依赖 access JWT）。
 - access JWT 签名密钥走环境变量 `AIAPI_JWT_SECRET`（≥32 字节），启动时由 `base.LoadJWTSecret` 校验；登录会话业务封装在 `service` 的 `SessionService`，改密 / 禁用用户 / 重置密码后吊销该用户所有会话。
 - 登录态不复用 proxy 的 header 鉴权字段；账号不存在 / 禁用 / 密码错统一返回相同文案防枚举。
-- `manager` 自有业务码定义在 `manager/base/bizcode.go`，与 `proxy/types/bizcode.go` 解耦，两套独立编号。
+- `manager` 自有业务码定义在 `manager/base/bizcode.go`，与 `proxy/types/bizcode.go` 解耦，两套独立编号。manager 侧只保留 7 个通用码：有消费方按 code 分支的（前端唯一依赖 `CodeTokenExpired` 1016 触发 refresh，编号不可变）或 HTTP 状态语义不同的；**业务错误不为每种业务定义独立码**，handler 统一用 `base.ErrBadReq(中文消息)` / `base.ErrNotFound(中文消息)` 返回，错误信息必须中文；DB 等内部错误统一返回预置实例 `base.ErrInternal`。

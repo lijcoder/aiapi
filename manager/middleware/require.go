@@ -13,7 +13,7 @@ import (
 func forbidden(c echo.Context) error {
 	return c.JSON(http.StatusForbidden, constant.HttpGeneralResp{
 		Code: base.CodeForbidden.ID,
-		Msg:  "forbidden",
+		Msg:  "没有操作权限",
 	})
 }
 

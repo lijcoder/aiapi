@@ -114,7 +114,7 @@ func (p *handlerPlan) serve(c echo.Context) error {
 		case kindReqPtr, kindReqValue:
 			req := reflect.New(spec.typ)
 			if err := BindJSON(c, req.Interface()); err != nil {
-				return Fail(c, CodeBadRequest, "invalid request body")
+				return Fail(c, CodeBadRequest, "请求体格式错误")
 			}
 			if spec.kind == kindReqPtr {
 				args[i] = req

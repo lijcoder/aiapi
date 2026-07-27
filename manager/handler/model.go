@@ -78,7 +78,7 @@ func ListModels(ctx context.Context, req *ListModelsReq) (*base.PageResult[model
 	list, err := store.C().SetPage(pc).Model().List(strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model))
 	if err != nil {
 		slog.Error("[Model] List failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &base.PageResult[model.Model]{Items: list, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
@@ -89,7 +89,7 @@ func ListModelsAdmin(ctx context.Context, req *ListModelsAdminReq) (*base.PageRe
 	list, err := store.C().SetPage(pc).Model().List(strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model))
 	if err != nil {
 		slog.Error("[Model] List failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	items := make([]modelItem, 0, len(list))
 	for _, m := range list {
@@ -101,16 +101,16 @@ func ListModelsAdmin(ctx context.Context, req *ListModelsAdminReq) (*base.PageRe
 // CreateModel 管理员新增模型
 func CreateModel(ctx context.Context, req *CreateModelReq) (*modelItem, *base.BizError) {
 	if req.Provider == "" || req.Model == "" {
-		return nil, base.NewBizError(base.CodeInvalidParams, "provider and model are required")
+		return nil, base.ErrBadReq("provider 和 model 不能为空")
 	}
 	// 检查唯一性
 	exist, err := store.C().Model().Get(req.Provider, req.Model)
 	if err != nil {
 		slog.Error("[Model] Get failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if exist != nil {
-		return nil, base.NewBizError(base.CodeModelExists, "model already exists")
+		return nil, base.ErrBadReq("模型已存在")
 	}
 
 	m := &model.Model{
@@ -127,10 +127,10 @@ func CreateModel(ctx context.Context, req *CreateModelReq) (*modelItem, *base.Bi
 	}
 	if err := store.C().Model().Create(m); err != nil {
 		if store.IsUniqueConstraintErr(err) {
-			return nil, base.NewBizError(base.CodeModelExists, "model already exists")
+			return nil, base.ErrBadReq("模型已存在")
 		}
 		slog.Error("[Model] Create failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	item := toModelItem(*m)
 	return &item, nil
@@ -139,15 +139,15 @@ func CreateModel(ctx context.Context, req *CreateModelReq) (*modelItem, *base.Bi
 // UpdateModel 管理员编辑模型（provider+model 不可改）
 func UpdateModel(ctx context.Context, req *UpdateModelReq) (*modelItem, *base.BizError) {
 	if req.ID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+		return nil, base.ErrBadReq("id 不能为空")
 	}
 	m, err := store.C().Model().GetByID(req.ID)
 	if err != nil {
 		slog.Error("[Model] GetByID failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if m == nil {
-		return nil, base.NewBizError(base.CodeModelNotFound, "model not found")
+		return nil, base.ErrNotFound("模型不存在")
 	}
 
 	m.InputCacheHitPrice = req.InputCacheHitPrice
@@ -160,7 +160,7 @@ func UpdateModel(ctx context.Context, req *UpdateModelReq) (*modelItem, *base.Bi
 	m.SupportsVideo = req.SupportsVideo
 	if err := store.C().Model().Update(m); err != nil {
 		slog.Error("[Model] Update failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	item := toModelItem(*m)
 	return &item, nil
@@ -169,19 +169,19 @@ func UpdateModel(ctx context.Context, req *UpdateModelReq) (*modelItem, *base.Bi
 // DeleteModel 管理员删除模型
 func DeleteModel(ctx context.Context, req *ModelIdReq) (*struct{}, *base.BizError) {
 	if req.ID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "id is required")
+		return nil, base.ErrBadReq("id 不能为空")
 	}
 	m, err := store.C().Model().GetByID(req.ID)
 	if err != nil {
 		slog.Error("[Model] GetByID failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if m == nil {
-		return nil, base.NewBizError(base.CodeModelNotFound, "model not found")
+		return nil, base.ErrNotFound("模型不存在")
 	}
 	if err := store.C().Model().Delete(req.ID); err != nil {
 		slog.Error("[Model] Delete failed", "err", err, "id", req.ID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &struct{}{}, nil
 }

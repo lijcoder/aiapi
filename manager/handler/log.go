@@ -22,7 +22,7 @@ func Logs(ctx context.Context) (*LogsResp, *base.BizError) {
 	f, err := os.Open(logFile)
 	if err != nil {
 		slog.Error("[LogsLast100] open log file failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	defer f.Close()
 

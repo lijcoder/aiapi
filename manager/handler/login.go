@@ -31,31 +31,31 @@ type loginReq struct {
 func Login(c echo.Context) error {
 	var req loginReq
 	if err := base.BindJSON(c, &req); err != nil {
-		return base.Fail(c, base.CodeBadRequest, "invalid request body")
+		return base.Fail(c, base.CodeBadRequest, "请求体格式错误")
 	}
 	if req.Account == "" || req.Password == "" {
-		return base.Fail(c, base.CodeInvalidParams, "account and password are required")
+		return base.Fail(c, base.CodeBadRequest, "账号和密码不能为空")
 	}
 
 	user, err := store.C().User().GetByAccount(req.Account)
 	if err != nil {
 		slog.Error("login get user failed", "err", err)
-		return base.Fail(c, base.CodeUnknown, base.InternalServerError)
+		return base.Fail(c, base.ErrInternal.Code, base.ErrInternal.Msg)
 	}
-	// 统一错误文案：账号不存在/密码错/账号禁用均返回 "account or password incorrect"
+	// 统一错误文案：账号不存在/密码错/账号禁用均返回「账号或密码错误」
 	// 防止攻击者通过差异响应枚举有效账号
 	if user == nil || !user.Enabled {
-		return base.Fail(c, base.CodeWrongPassword, "account or password incorrect")
+		return base.Fail(c, base.CodeBadRequest, "账号或密码错误")
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return base.Fail(c, base.CodeWrongPassword, "account or password incorrect")
+		return base.Fail(c, base.CodeBadRequest, "账号或密码错误")
 	}
 
 	// 签发 token 对
 	pair, err := sessionService.Issue(user.ID, summarizeUA(c.Request().UserAgent()), c.RealIP())
 	if err != nil {
 		slog.Error("issue tokens failed", "err", err, "user_id", user.ID)
-		return base.Fail(c, base.CodeUnknown, base.InternalServerError)
+		return base.Fail(c, base.ErrInternal.Code, base.ErrInternal.Msg)
 	}
 
 	setRefreshCookie(c, pair.RefreshToken, pair.RefreshExp)
@@ -71,7 +71,7 @@ func Login(c echo.Context) error {
 func Refresh(c echo.Context) error {
 	cookie, err := c.Cookie(base.CookieName)
 	if err != nil || cookie.Value == "" {
-		return base.Fail(c, base.CodeUnauthorized, "no refresh token")
+		return base.Fail(c, base.CodeUnauthorized, "未登录")
 	}
 
 	pair, err := sessionService.Refresh(cookie.Value)
@@ -79,15 +79,15 @@ func Refresh(c echo.Context) error {
 		// 重用攻击 / 用户被禁用 → 清 cookie，强制重登
 		if errors.Is(err, service.ErrSessionReuse) || errors.Is(err, service.ErrUserDisabled) {
 			clearRefreshCookie(c)
-			return base.Fail(c, base.CodeSessionReuse, "session reused, please login again")
+			return base.Fail(c, base.CodeUnauthorized, "登录状态异常，请重新登录")
 		}
 		// token 过期/不存在 → 清 cookie
 		if errors.Is(err, service.ErrSessionExpired) || errors.Is(err, service.ErrSessionNotFound) {
 			clearRefreshCookie(c)
-			return base.Fail(c, base.CodeSessionExpired, "session expired")
+			return base.Fail(c, base.CodeUnauthorized, "登录已过期，请重新登录")
 		}
 		slog.Error("refresh tokens failed", "err", err)
-		return base.Fail(c, base.CodeUnknown, base.InternalServerError)
+		return base.Fail(c, base.ErrInternal.Code, base.ErrInternal.Msg)
 	}
 
 	setRefreshCookie(c, pair.RefreshToken, pair.RefreshExp)

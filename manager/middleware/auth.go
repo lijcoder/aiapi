@@ -18,7 +18,7 @@ var sessionService = service.NewSessionService()
 func fail(c echo.Context) error {
 	return c.JSON(http.StatusUnauthorized, constant.HttpGeneralResp{
 		Code: base.CodeUnauthorized.ID,
-		Msg:  "unauthorized",
+		Msg:  "未登录或登录已过期",
 	})
 }
 
@@ -26,7 +26,7 @@ func fail(c echo.Context) error {
 func failExpired(c echo.Context) error {
 	return c.JSON(http.StatusUnauthorized, constant.HttpGeneralResp{
 		Code: base.CodeTokenExpired.ID,
-		Msg:  "token expired",
+		Msg:  "登录已过期",
 	})
 }
 

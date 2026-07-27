@@ -20,7 +20,7 @@ func Dashboard(ctx context.Context) (*DashboardResp, *base.BizError) {
 	summary, trend, err := service.NewDashboardService().Dashboard()
 	if err != nil {
 		slog.Error("[Dashboard] failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if trend == nil {
 		trend = []store.DashboardTrendRow{}

@@ -40,17 +40,17 @@ func Self(ctx context.Context) (*SelfResp, *base.BizError) {
 	curID := base.CurrentUser(ctx).ID
 	user, err := store.C().User().GetByID(curID)
 	if err != nil {
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if user == nil {
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	// 查用户角色 ID 列表
 	roles, err := store.C().Role().ListRolesByUser(curID)
 	if err != nil {
 		slog.Error("[Self] ListRolesByUser failed", "err", err, "user_id", curID)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	var roleIDs []int64
 	for _, r := range roles {
@@ -61,7 +61,7 @@ func Self(ctx context.Context) (*SelfResp, *base.BizError) {
 	menus, err := store.C().Menu().ListByRoleIDs(roleIDs)
 	if err != nil {
 		slog.Error("[Self] ListByRoleIDs failed", "err", err, "role_ids", roleIDs)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	return &SelfResp{

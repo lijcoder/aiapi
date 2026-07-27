@@ -55,7 +55,7 @@ func ListProviders(ctx context.Context, req *ListProvidersReq) (*base.PageResult
 	list, err := store.C().SetPage(pc).Provider().List()
 	if err != nil {
 		slog.Error("[Provider] List failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	items := make([]providerItem, 0, len(list))
 	for _, p := range list {
@@ -73,16 +73,16 @@ func ListProviders(ctx context.Context, req *ListProvidersReq) (*base.PageResult
 // CreateProvider 新增 Provider
 func CreateProvider(ctx context.Context, req *CreateProviderReq) (*providerItem, *base.BizError) {
 	if req.Type == "" {
-		return nil, base.NewBizError(base.CodeInvalidParams, "type is required")
+		return nil, base.ErrBadReq("类型不能为空")
 	}
 	// 检查唯一性
 	exist, err := store.C().Provider().GetByType(req.Type)
 	if err != nil {
 		slog.Error("[Provider] GetByType failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if exist != nil {
-		return nil, base.NewBizError(base.CodeProviderExists, "provider type already exists")
+		return nil, base.ErrBadReq("Provider 类型已存在")
 	}
 
 	cfg := model.ProviderConfig{
@@ -92,7 +92,7 @@ func CreateProvider(ctx context.Context, req *CreateProviderReq) (*providerItem,
 	cfgJSON, err := json.Marshal(cfg)
 	if err != nil {
 		slog.Error("[Provider] marshal config failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	p := &model.Provider{
@@ -102,10 +102,10 @@ func CreateProvider(ctx context.Context, req *CreateProviderReq) (*providerItem,
 	}
 	if err := store.C().Provider().Create(p); err != nil {
 		if store.IsUniqueConstraintErr(err) {
-			return nil, base.NewBizError(base.CodeProviderExists, "provider type already exists")
+			return nil, base.ErrBadReq("Provider 类型已存在")
 		}
 		slog.Error("[Provider] Create failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	return &providerItem{
@@ -118,15 +118,15 @@ func CreateProvider(ctx context.Context, req *CreateProviderReq) (*providerItem,
 // UpdateProvider 编辑 Provider（type 不可改）
 func UpdateProvider(ctx context.Context, req *UpdateProviderReq) (*providerItem, *base.BizError) {
 	if req.Type == "" {
-		return nil, base.NewBizError(base.CodeInvalidParams, "type is required")
+		return nil, base.ErrBadReq("类型不能为空")
 	}
 	p, err := store.C().Provider().GetByType(req.Type)
 	if err != nil {
 		slog.Error("[Provider] GetByType failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if p == nil {
-		return nil, base.NewBizError(base.CodeProviderNotFound, "provider not found")
+		return nil, base.ErrNotFound("Provider 不存在")
 	}
 
 	cfg := model.ProviderConfig{
@@ -136,12 +136,12 @@ func UpdateProvider(ctx context.Context, req *UpdateProviderReq) (*providerItem,
 	cfgJSON, err := json.Marshal(cfg)
 	if err != nil {
 		slog.Error("[Provider] marshal config failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	p.Config = string(cfgJSON)
 	if err := store.C().Provider().Update(p); err != nil {
 		slog.Error("[Provider] Update failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 
 	return &providerItem{
@@ -154,19 +154,19 @@ func UpdateProvider(ctx context.Context, req *UpdateProviderReq) (*providerItem,
 // ToggleProvider 启用/禁用 Provider
 func ToggleProvider(ctx context.Context, req *ToggleProviderReq) (*struct{}, *base.BizError) {
 	if req.Type == "" {
-		return nil, base.NewBizError(base.CodeInvalidParams, "type is required")
+		return nil, base.ErrBadReq("类型不能为空")
 	}
 	p, err := store.C().Provider().GetByType(req.Type)
 	if err != nil {
 		slog.Error("[Provider] GetByType failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	if p == nil {
-		return nil, base.NewBizError(base.CodeProviderNotFound, "provider not found")
+		return nil, base.ErrNotFound("Provider 不存在")
 	}
 	if err := store.C().Provider().SetEnabled(req.Type, !p.Enabled); err != nil {
 		slog.Error("[Provider] SetEnabled failed", "err", err, "type", req.Type)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &struct{}{}, nil
 }

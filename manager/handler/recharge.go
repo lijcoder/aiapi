@@ -42,18 +42,18 @@ func RechargeSelf(ctx context.Context, req *RechargeReq) (*RechargeResult, *base
 func Recharge(ctx context.Context, req *RechargeReq) (*RechargeResult, *base.BizError) {
 	cur := base.CurrentUser(ctx)
 	if req.UserID <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "user_id is required")
+		return nil, base.ErrBadReq("user_id 不能为空")
 	}
 	if req.Amount <= 0 {
-		return nil, base.NewBizError(base.CodeInvalidParams, "amount must be positive")
+		return nil, base.ErrBadReq("充值金额必须大于 0")
 	}
 	rec, err := chargeService.RechargeWithRecord(req.UserID, req.Amount, cur.Account, req.Remark)
 	if err != nil {
 		if errors.Is(err, service.ErrUserNotFound) {
-			return nil, base.NewBizError(base.CodeUserNotFound, "user not found")
+			return nil, base.ErrNotFound("用户不存在")
 		}
 		slog.Error("recharge failed", "err", err, "target_user_id", req.UserID, "operator", cur.Account)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &RechargeResult{Record: rec, Budget: rec.BalanceAfter}, nil
 }
@@ -70,7 +70,7 @@ func RechargeRecords(ctx context.Context, req *RecordsReq) (*base.PageResult[mod
 	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
 	recs, err := store.C().SetPage(pc).Charge().ListRechargeRecords(req.UserID)
 	if err != nil {
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &base.PageResult[model.RechargeRecord]{Items: recs, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
@@ -87,7 +87,7 @@ func ListRechargeRecords(ctx context.Context, req *ListRechargeReq) (*base.PageR
 	recs, err := store.C().SetPage(pc).Charge().ListAllRechargeRecords(strings.TrimSpace(req.Keyword))
 	if err != nil {
 		slog.Error("[Recharge] ListAll failed", "err", err)
-		return nil, base.NewBizError(base.CodeUnknown, base.InternalServerError)
+		return nil, base.ErrInternal
 	}
 	return &base.PageResult[model.RechargeRecord]{Items: recs, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
