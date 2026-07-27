@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### 2026-07-26
+
+- store 包重构完成：store 回归纯 SQL 包装层，所有事务编排、跨表组装、业务判断下沉到 `service/`。涉及 A1-A6（事务编排）、B1-B2（跨表组装）、C1-C3（业务判断）共 11 项。
+- `manager/service/` 迁移到顶层 `service/` 包，manager 与 proxy 共用业务层，消除 proxy 自建 service 的重复。
+- store 按表/领域拆分 Store：`ModelAccessStore` 独立于 `ModelStore`（操作 `api_keys.model_policy` + `apikey_model_access` 白名单）。
+- 删除 `inList` 工具函数：QueryBuilder 内置 `sqlx.In` 自动展开 `IN (:ids)`，不手动拼接占位符。
+- 更新 `AGENTS.md`/`README.md` 架构说明与开发规则。
+
 ### 2026-07-25
 
 - 新增通用分页能力（Session 状态 + 显式控制）：`store/base/page.go` 提供 `PageContext`，`manager/base/page.go` 提供 `PageReq`/`PageResult[T]`。handler 创建 `store.PageContext`，用 `store.C().SetPage(pc).Charge().List(...)` 链式调用，`QueryBuilder.Select` 检测到后自动拦截：先 `SELECT COUNT(*) FROM (<原SQL>) t` 查总数写回 `pc.Total`，再追加 `LIMIT ? OFFSET ?` 查当前页。非事务单次分页不用 `ClearPage`（Session 用完即弃）；事务内用 `SetPage`/`ClearPage` 显式控制。store 方法只需写普通 `Select`，未 `SetPage` 时退化为普通查询。`page` 1-based，`page_size` 默认 20、上限 100。分页类型分层：`manager/base` 定义 API 层 `PageReq`/`PageResult`，`store` 暴露内部 `PageContext`，handler 不直接 import `store/base`。

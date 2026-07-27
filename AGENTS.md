@@ -35,9 +35,9 @@
 - `proxy/direct.go` 只负责 Pipeline 组装，不实现具体业务。
 - `proxy/handler/` 是代理业务逻辑唯一入口，每个 handler 应尽量独立、可测试。
 - `parser/` 只负责协议相关的解析与提取，不直接操作数据库或写响应。
-- `store/` 是纯 SQL 包装层：只做单条/单表的数据读写（`Get/Select/Exec`），不处理 HTTP 或协议细节，**不写跨表编排、不写业务判断**；每个 Store 的命名空间入口写在自己文件内（如 `func (s *Session) Xxx() *XxxStore`），不集中到 `store/base.go`。
+- `store/` 是纯 SQL 包装层：只做单条/单表的数据读写（`Get/Select/Exec`），不处理 HTTP 或协议细节，**不写跨表编排、不写业务判断、不写事务体**；每个 Store 的命名空间入口写在自己文件内（如 `func (s *Session) Xxx() *XxxStore`），不集中到 `store/base.go`。按表/领域拆分 Store，不同表的操作不混在同一 Store（如操作 `api_keys.model_policy` + `apikey_model_access` 的 `ModelAccessStore` 独立于操作 `models` 表的 `ModelStore`）。`IN` 查询直接写 `IN (:ids)` 传 slice 参数，QueryBuilder 内置 `sqlx.In` 自动展开，不手动拼接占位符。
 - `manager/handler/` 是后端给前端的接口唯一入口，只做 HTTP 适配：参数校验、调 service、组装响应；**不直接写跨表事务、不写可复用业务逻辑**。
-- `service/` 是业务逻辑承载层（manager 与 proxy 共用）：跨 handler 复用、不依赖 echo 的业务逻辑、以及**涉及多表/带业务语义的事务编排**都放这里；handler 与 middleware 只调用 service 暴露的方法，不重复实现。
+- `service/` 是业务逻辑承载层（manager 与 proxy 共用）：跨 handler 复用、不依赖 echo 的业务逻辑、**涉及多表/带业务语义的事务编排**、跨 Store 组装、业务判断（如分组维度→排序方向）都放这里；handler 与 middleware 只调用 service 暴露的方法，不重复实现。proxy 侧无 manager 入口的场景（如鉴权、计费）也调 `service/`，不在 `proxy/handler` 自建业务逻辑。
 - `manager/middleware/` 只做 HTTP 适配（鉴权、权限判定、登录态注入），复杂业务下沉到 service。
 
 ### 2.3 事务边界
@@ -74,7 +74,8 @@
 
 - 新增上游协议支持 → `parser/`
 - 新增请求处理步骤 → `proxy/handler/`，并在 `proxy/direct.go` 的 Pipeline 中注册
-- 新增管理接口 → `manager/`
+- 新增管理接口 → `manager/handler/`（HTTP 适配）+ `service/`（业务逻辑）
+- 新增业务逻辑（事务编排、跨表组装、业务判断）→ `service/`
 - 新增数据表或查询 → `store/` 与 `sql/`
 - 新增通用常量或工具 → `constant/` 或 `log/`
 
@@ -164,9 +165,10 @@
 
 1. 在 `sql/sqlite.sql` 中补充 DDL。
 2. 在 `store/model/models.go` 中定义模型。
-3. 在 `store/` 下新增对应 Store 文件，提供单表 CRUD 方法，不写跨表编排。
+3. 在 `store/` 下新增对应 Store 文件，提供单表 CRUD 方法，不写跨表编排、不写业务判断。按表拆分 Store，不同表不混在同一 Store。
 4. 命名空间入口写在该 Store 文件内（如 `func (s *Session) Xxx() *XxxStore`），不要集中放到 `store/base.go`。
-5. 涉及该实体的多表事务编排写在 `service/`，用 `store.C().T(fn)` 包裹，在 fn 内组合多个 Store 调用。
+5. 涉及该实体的多表事务编排、跨 Store 组装、业务判断写在 `service/`，用 `store.C().T(fn)` 包裹，在 fn 内组合多个 Store 调用。
+6. `IN` 查询直接写 `IN (:ids)` 传 slice 参数，QueryBuilder 内置 `sqlx.In` 自动展开，不手动拼接占位符。
 
 ### 7.5 开发管理台前端
 

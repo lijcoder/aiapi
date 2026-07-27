@@ -42,6 +42,21 @@
 
 未来如需支持其他客户端协议（如 Gemini/Anthropic），需在 `parser/` 层扩展实现转换。
 
+### 分层架构
+
+| 层 | 目录 | 职责 |
+|----|------|------|
+| 入口层 | `main.go` | 参数解析、日志/数据库初始化、启动服务 |
+| 框架适配层 | `framework/echo.go` | HTTP 路由注册、请求参数提取、响应写入 |
+| 代理编排层 | `proxy/direct.go` | 组装并执行请求处理 Pipeline |
+| 代理处理层 | `proxy/handler/*.go` | 单一职责 handler，完成代理业务逻辑（鉴权、计费、转发等） |
+| 协议解析层 | `parser/*.go` | 不同厂商的请求/响应解析与 Key 提取 |
+| 后台接口层 | `manager/handler/*.go` | 后端给前端的接口入口，只做 HTTP 适配（参数校验、调 service、组装响应） |
+| 业务服务层 | `service/*.go` | 跨 handler 复用的业务逻辑、多表事务编排、业务判断（manager 与 proxy 共用） |
+| 后台中间件 | `manager/middleware/*.go` | 登录态校验、接口级权限判定 |
+| 数据持久层 | `store/*.go` | 纯 SQL 包装层，单表/单条数据读写，不写事务编排与业务判断 |
+| 通用工具层 | `constant/`、`log/`、`proxy/sse/` | 常量、日志格式化、SSE 包装 |
+
 ## 快速开始
 
 ### 环境要求
@@ -211,7 +226,10 @@ go tool pprof http://localhost:8888/debug/pprof/heap
 
 - 新增上游响应解析逻辑：参考 `parser/openai.go` 与 `parser/anthropic.go`
 - 新增 Pipeline 处理步骤：参考 `proxy/handler/` 目录
-- 新增管理接口：参考 `manager/handler/` 目录与 `manager/router/router.go`
+- 新增管理接口：`manager/handler/`（HTTP 适配）+ `service/`（业务逻辑）+ `manager/router/router.go`（路由注册）
+- 新增业务逻辑（事务编排、跨表组装、业务判断）：写在 `service/`，用 `store.C().T(fn)` 包裹事务
+- 新增数据表：`sql/sqlite.sql`（DDL）+ `store/model/models.go`（模型）+ `store/`（纯 SQL Store）
+- 开发规则与架构约束详见 `AGENTS.md`
 
 ## 后台管理 API
 
