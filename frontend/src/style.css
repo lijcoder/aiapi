@@ -1,0 +1,4 @@
+/* 全局样式：分页器居中（提高选择器特异性覆盖 naive-ui 运行时样式） */
+.n-data-table .n-data-table__pagination {
+  justify-content: center;
+}

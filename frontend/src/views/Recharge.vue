@@ -10,7 +10,7 @@
       <template #header-extra>
         <n-button type="primary" size="small" @click="openDialog">充值</n-button>
       </template>
-      <n-data-table :columns="columns" :data="records" :loading="tableLoading" :bordered="false" size="small" style="width:100%" />
+      <n-data-table :columns="columns" :data="records" :loading="tableLoading" :bordered="false" size="small" :pagination="pagination" :remote="true" @update:page="onPage" style="width:100%" />
     </n-card>
 
     <n-modal v-model:show="showDialog" preset="card" title="账户充值" style="width:400px" :mask-closable="false">
@@ -41,12 +41,12 @@ const { user, fetchUser } = useUser()
 const balance = ref(0)
 
 const columns = [
-  { title: '金额', key: 'amount', width: 120, render(r) { return h('span', {style:'color:#18a058;font-weight:600'}, '¥ ' + fix4(r.amount)) }},
-  { title: '充值前', key: 'balance_before', width: 120, render(r) { return '¥ ' + fix4(r.balance_before) }},
-  { title: '充值后', key: 'balance_after', width: 120, render(r) { return '¥ ' + fix4(r.balance_after) }},
-  { title: '操作人', key: 'operator_name', width: 100, render(r) { return r.operator_name || r.operator || '-' }},
-  { title: '时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) }},
-  { title: '备注', key: 'remark', ellipsis: { tooltip: true } },
+  { title: '金额', key: 'amount', width: 120, align: 'center', render(r) { return h('span', {style:'color:#18a058;font-weight:600'}, '¥ ' + fix4(r.amount)) }},
+  { title: '充值前', key: 'balance_before', width: 120, align: 'center', render(r) { return '¥ ' + fix4(r.balance_before) }},
+  { title: '充值后', key: 'balance_after', width: 120, align: 'center', render(r) { return '¥ ' + fix4(r.balance_after) }},
+  { title: '操作人', key: 'operator_name', width: 100, align: 'center', render(r) { return r.operator_name || r.operator || '-' }},
+  { title: '时间', key: 'created_at', width: 170, align: 'center', ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) }},
+  { title: '备注', key: 'remark', align: 'center', ellipsis: { tooltip: true } },
 ]
 
 const showDialog = ref(false)
@@ -75,11 +75,16 @@ async function doRecharge() {
 
 const records = ref([])
 const tableLoading = ref(false)
+const pagination = ref({ page: 1, pageSize: 20, itemCount: 0, showSizePicker: false })
+
+function onPage(p) { pagination.value.page = p; loadRecords() }
 
 async function loadRecords() {
   tableLoading.value = true
   try {
-    records.value = (await rechargeSelfRecords()) || []
+    const res = await rechargeSelfRecords(pagination.value.page, pagination.value.pageSize)
+    records.value = res?.items || []
+    pagination.value.itemCount = res?.total || 0
     await fetchUser()
     balance.value = user.value?.budget || 0
   } catch {} finally { tableLoading.value = false }

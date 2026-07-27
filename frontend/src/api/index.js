@@ -109,8 +109,8 @@ export function rechargeAdmin(userId, amount, remark) {
   return request('/recharge', { userId, amount, remark })
 }
 
-export function rechargeSelfRecords() {
-  return request('/recharge/records/self')
+export function rechargeSelfRecords(page = 1, pageSize = 20) {
+  return request('/recharge/records/self', { page, page_size: pageSize })
 }
 
 export function listModels() {
@@ -141,9 +141,9 @@ export function updateApiKeyBudget(id, budget, unlimited) {
   return request('/apikeys/budget/self', { id, budget, unlimited })
 }
 
-export function rechargeRecords(userId) {
-  if (userId) return request('/recharge/records', { userId })
-  return request('/recharge/records/self')
+export function rechargeRecords(userId, page = 1, pageSize = 20) {
+  if (userId) return request('/recharge/records', { userId, page, page_size: pageSize })
+  return request('/recharge/records/self', { page, page_size: pageSize })
 }
 
 export function usageStats(mode, startDate, endDate, apiKeyId, model, provider, groupBy) {
@@ -272,8 +272,8 @@ export function setApiKeyModelAccessSelf(apiKeyId, modelPolicy, modelIds) {
 
 // ===== 超管：全平台充值流水 =====
 
-export function listAllRechargeRecords(keyword) {
-  return request('/recharge/records/list', { keyword: keyword || '' })
+export function listAllRechargeRecords(keyword, page = 1, pageSize = 20) {
+  return request('/recharge/records/list', { keyword: keyword || '', page, page_size: pageSize })
 }
 
 // ===== 超管：全局统计 =====
