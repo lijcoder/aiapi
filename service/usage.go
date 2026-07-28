@@ -9,19 +9,20 @@ type UsageService struct{}
 func NewUsageService() *UsageService { return &UsageService{} }
 
 // StatsByUser 统计汇总：按时间或维度分组，排序方向由 groupBy 决定（时间 ASC，维度 DESC）。
-func (s *UsageService) StatsByUser(userID int64, mode, startDate, endDate, apiKey, mdl, provider, groupBy string) ([]store.UsageStatRow, error) {
+// apiKeyID>0 时按 key 过滤，0 为不限。
+func (s *UsageService) StatsByUser(userID int64, mode, startDate, endDate string, apiKeyID int64, mdl, provider, groupBy string) ([]store.UsageStatRow, error) {
 	orderDir := "ASC"
 	if groupBy != "" {
 		orderDir = "DESC"
 	}
-	return store.C().Usage().StatsByUser(userID, mode, startDate, endDate, apiKey, mdl, provider, groupBy, orderDir)
+	return store.C().Usage().StatsByUser(userID, mode, startDate, endDate, apiKeyID, mdl, provider, groupBy, orderDir)
 }
 
 // StatsByAdmin 全局统计汇总，排序方向由 groupBy 决定（时间 ASC，维度 DESC）。
-func (s *UsageService) StatsByAdmin(userID int64, mode, startDate, endDate, apiKey, mdl, provider, groupBy string) ([]store.UsageStatRow, error) {
+func (s *UsageService) StatsByAdmin(userID int64, mode, startDate, endDate string, apiKeyID int64, mdl, provider, groupBy string) ([]store.UsageStatRow, error) {
 	orderDir := "ASC"
 	if groupBy != "" {
 		orderDir = "DESC"
 	}
-	return store.C().Usage().StatsByAdmin(userID, mode, startDate, endDate, apiKey, mdl, provider, groupBy, orderDir)
+	return store.C().Usage().StatsByAdmin(userID, mode, startDate, endDate, apiKeyID, mdl, provider, groupBy, orderDir)
 }

@@ -17,8 +17,8 @@ type LogStore struct {
 // Insert 插入请求日志
 func (ls *LogStore) Insert(log *model.RequestLog) error {
 	res, err := ls.s.Query(
-		`INSERT INTO request_logs (api_key, format, provider, path, status_code, request_headers, request_body, response_body, model, input_tokens, output_tokens, total_tokens, error, latency_ms)
-		 VALUES (:api_key, :format, :provider, :path, :status_code, :request_headers, :request_body, :response_body, :model, :input_tokens, :output_tokens, :total_tokens, :error, :latency_ms)`,
+		`INSERT INTO request_logs (api_key_id, format, provider, path, status_code, request_headers, request_body, response_body, model, input_tokens, output_tokens, total_tokens, error, latency_ms)
+		 VALUES (:api_key_id, :format, :provider, :path, :status_code, :request_headers, :request_body, :response_body, :model, :input_tokens, :output_tokens, :total_tokens, :error, :latency_ms)`,
 		log,
 	).Exec()
 	if err != nil {

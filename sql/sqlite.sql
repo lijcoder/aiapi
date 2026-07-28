@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS apikey_model_access (
 CREATE TABLE IF NOT EXISTS usage_records (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id        INTEGER NOT NULL,
-    api_key        TEXT DEFAULT '',
+    api_key_id     INTEGER NOT NULL DEFAULT 0,  -- 关联 api_keys.id，不存 key 原文（防 DB 泄露丢 key）
     provider       TEXT NOT NULL,
     model          TEXT NOT NULL,
     input_tokens   INTEGER NOT NULL DEFAULT 0,
@@ -93,10 +93,17 @@ CREATE TABLE IF NOT EXISTS usage_records (
 CREATE INDEX IF NOT EXISTS idx_usage_records_user  ON usage_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_usage_records_date  ON usage_records(created_at);
 CREATE INDEX IF NOT EXISTS idx_usage_records_model ON usage_records(model);
+CREATE INDEX IF NOT EXISTS idx_usage_records_api_key_id ON usage_records(api_key_id);
+
+-- usage_records 迁移：api_key（明文）→ api_key_id（存量库手动执行，需 SQLite ≥ 3.35）
+--   ALTER TABLE usage_records ADD COLUMN api_key_id INTEGER NOT NULL DEFAULT 0;
+--   UPDATE usage_records SET api_key_id = COALESCE((SELECT id FROM api_keys WHERE api_keys.key = usage_records.api_key), 0);
+--   ALTER TABLE usage_records DROP COLUMN api_key;
+--   CREATE INDEX IF NOT EXISTS idx_usage_records_api_key_id ON usage_records(api_key_id);
 
 CREATE TABLE IF NOT EXISTS request_logs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    api_key         TEXT DEFAULT '',
+    api_key_id      INTEGER NOT NULL DEFAULT 0,  -- 关联 api_keys.id，不存 key 原文
     format          TEXT NOT NULL,
     provider        TEXT NOT NULL DEFAULT '',
     path            TEXT NOT NULL,
@@ -112,6 +119,11 @@ CREATE TABLE IF NOT EXISTS request_logs (
     latency_ms      INTEGER DEFAULT 0,
     created_at      DATETIME DEFAULT (datetime('now', 'localtime'))
 );
+
+-- request_logs 迁移：api_key（明文）→ api_key_id（存量库手动执行，需 SQLite ≥ 3.35）
+--   ALTER TABLE request_logs ADD COLUMN api_key_id INTEGER NOT NULL DEFAULT 0;
+--   UPDATE request_logs SET api_key_id = COALESCE((SELECT id FROM api_keys WHERE api_keys.key = request_logs.api_key), 0);
+--   ALTER TABLE request_logs DROP COLUMN api_key;
 
 CREATE TABLE IF NOT EXISTS models (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,

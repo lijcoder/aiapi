@@ -5,11 +5,9 @@
 
 ## 零、生产环境公网部署前必做（2026-07 安全走查）
 
-### 0.2 API Key 明文落库
-- **现状**：`api_keys.key` 全文明文；`request_logs.api_key`、`usage_records.api_key` 也存完整 key。DB 泄露 = 全部 key 泄露 + 完整调用记录。
-- **方案**：
-  - `api_keys` 改存 SHA-256 哈希 + 展示前缀（代理鉴权只需比对，不需要原文转发；上游 key 在 provider 配置里）。涉及鉴权链路改造 + 存量迁移，需设计
-  - 日志/用量表中的 key 至少脱敏（前 6 后 4）
+### 0.2 API Key 明文落库（api_keys 表，剩余部分）
+- **现状**：`api_keys.key` 仍全文明文（鉴权需要比对）。~~`request_logs`/`usage_records` 存完整 key~~ ✅ 已改为存 `api_key_id`。
+- **方案**：`api_keys` 改存 SHA-256 哈希 + 展示前缀（代理鉴权只需比对，不需要原文转发；上游 key 在 provider 配置里）。创建时明文只返回一次，鉴权改 `WHERE key_hash = :hash`。涉及鉴权链路改造 + 存量迁移，需设计。
 
 ### 0.3 登录/2FA 接口限流（公网后升级为必须）
 - 见本文档「一、3」，公网部署前必须落地，不再可缓。

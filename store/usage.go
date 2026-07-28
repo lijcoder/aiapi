@@ -20,8 +20,8 @@ type UsageStore struct {
 // Insert 插入用量记录
 func (us *UsageStore) Insert(usage *model.UsageRecord) error {
 	res, err := us.s.Query(
-		`INSERT INTO usage_records (user_id, api_key, provider, model, input_tokens, output_tokens, total_tokens, request_id, stream, cached_tokens, reasoning_tokens, cost, unlimited)
-		 VALUES (:user_id, :api_key, :provider, :model, :input_tokens, :output_tokens, :total_tokens, :request_id, :stream, :cached_tokens, :reasoning_tokens, :cost, :unlimited)`,
+		`INSERT INTO usage_records (user_id, api_key_id, provider, model, input_tokens, output_tokens, total_tokens, request_id, stream, cached_tokens, reasoning_tokens, cost, unlimited)
+		 VALUES (:user_id, :api_key_id, :provider, :model, :input_tokens, :output_tokens, :total_tokens, :request_id, :stream, :cached_tokens, :reasoning_tokens, :cost, :unlimited)`,
 		usage,
 	).Exec()
 	if err != nil {
@@ -54,7 +54,7 @@ type UsageStatRow struct {
 }
 
 // StatsByUser 统计汇总：按时间（天/月）或按维度（模型/提供商/api_key）分组
-func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate, apiKey, mdl, provider, groupBy, orderDir string) ([]UsageStatRow, error) {
+func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate string, apiKeyID int64, mdl, provider, groupBy, orderDir string) ([]UsageStatRow, error) {
 	var labelExpr string
 	switch groupBy {
 	case "model":
@@ -62,7 +62,7 @@ func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate, apiKey
 	case "provider":
 		labelExpr = "provider"
 	case "api_key":
-		labelExpr = "api_key"
+		labelExpr = "CAST(api_key_id AS TEXT)" // label 为 TEXT，key 分组输出 id 字符串
 	default:
 		// 按时间分组
 		switch mode {
@@ -73,9 +73,12 @@ func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate, apiKey
 		}
 	}
 
-	where, params := buildUsageWhere(userID, startDate, endDate, apiKey, mdl, provider)
+	where, params := buildUsageWhere(userID, startDate, endDate, apiKeyID, mdl, provider)
 
-	groupExpr := labelExpr
+	groupExpr := "api_key_id"
+	if groupBy != "api_key" {
+		groupExpr = labelExpr
+	}
 
 	query := fmt.Sprintf(
 		`SELECT %s AS label, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, SUM(cached_tokens) AS cached_tokens, SUM(input_tokens) - SUM(cached_tokens) AS cache_miss_tokens, SUM(reasoning_tokens) AS reasoning_tokens, SUM(total_tokens) AS total_tokens, ROUND(CAST(SUM(cached_tokens) AS REAL) / NULLIF(SUM(input_tokens), 0), 4) AS cache_hit_rate, SUM(cost) AS cost, COUNT(*) AS request_count FROM usage_records %s GROUP BY %s ORDER BY label %s`,
@@ -88,16 +91,16 @@ func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate, apiKey
 }
 
 // buildUsageWhere 构造通用 WHERE 子句与参数
-func buildUsageWhere(userID int64, startDate, endDate string, apiKey, mdl, provider string) (string, map[string]any) {
+func buildUsageWhere(userID int64, startDate, endDate string, apiKeyID int64, mdl, provider string) (string, map[string]any) {
 	where := "WHERE user_id = :user_id AND created_at >= :start_date AND created_at <= :end_date"
 	params := map[string]any{
 		"user_id":    userID,
 		"start_date": startDate,
 		"end_date":   endDate,
 	}
-	if apiKey != "" {
-		where += " AND api_key = :api_key"
-		params["api_key"] = apiKey
+	if apiKeyID > 0 {
+		where += " AND api_key_id = :api_key_id"
+		params["api_key_id"] = apiKeyID
 	}
 	if mdl != "" {
 		where += " AND model = :model"
@@ -133,7 +136,7 @@ func (us *UsageStore) DistinctProvidersByUser(userID int64) ([]string, error) {
 // ===== Admin 版（不限定 user_id） =====
 
 // StatsByAdmin 全局统计汇总，可按 user_id 筛选，支持 group_by=user
-func (us *UsageStore) StatsByAdmin(userID int64, mode, startDate, endDate, apiKey, mdl, provider, groupBy, orderDir string) ([]UsageStatRow, error) {
+func (us *UsageStore) StatsByAdmin(userID int64, mode, startDate, endDate string, apiKeyID int64, mdl, provider, groupBy, orderDir string) ([]UsageStatRow, error) {
 	var labelExpr, groupExpr, join string
 	switch groupBy {
 	case "model":
@@ -143,8 +146,8 @@ func (us *UsageStore) StatsByAdmin(userID int64, mode, startDate, endDate, apiKe
 		labelExpr = "u.provider"
 		groupExpr = "u.provider"
 	case "api_key":
-		labelExpr = "u.api_key"
-		groupExpr = "u.api_key"
+		labelExpr = "CAST(u.api_key_id AS TEXT)" // label 为 TEXT，key 分组输出 id 字符串
+		groupExpr = "u.api_key_id"
 	case "user":
 		labelExpr = "users.name"
 		groupExpr = "u.user_id"
@@ -159,7 +162,7 @@ func (us *UsageStore) StatsByAdmin(userID int64, mode, startDate, endDate, apiKe
 		groupExpr = labelExpr
 	}
 
-	where, params := buildUsageAdminWhere(userID, startDate, endDate, apiKey, mdl, provider)
+	where, params := buildUsageAdminWhere(userID, startDate, endDate, apiKeyID, mdl, provider)
 
 	query := fmt.Sprintf(
 		`SELECT %s AS label, SUM(u.input_tokens) AS input_tokens, SUM(u.output_tokens) AS output_tokens, SUM(u.cached_tokens) AS cached_tokens, SUM(u.input_tokens) - SUM(u.cached_tokens) AS cache_miss_tokens, SUM(u.reasoning_tokens) AS reasoning_tokens, SUM(u.total_tokens) AS total_tokens, ROUND(CAST(SUM(u.cached_tokens) AS REAL) / NULLIF(SUM(u.input_tokens), 0), 4) AS cache_hit_rate, SUM(u.cost) AS cost, COUNT(*) AS request_count FROM usage_records u %s %s GROUP BY %s ORDER BY label %s`,
@@ -172,7 +175,7 @@ func (us *UsageStore) StatsByAdmin(userID int64, mode, startDate, endDate, apiKe
 }
 
 // buildUsageAdminWhere 构造 admin 版 WHERE 子句，user_id<=0 时不筛选
-func buildUsageAdminWhere(userID int64, startDate, endDate string, apiKey, mdl, provider string) (string, map[string]any) {
+func buildUsageAdminWhere(userID int64, startDate, endDate string, apiKeyID int64, mdl, provider string) (string, map[string]any) {
 	where := "WHERE u.created_at >= :start_date AND u.created_at <= :end_date"
 	params := map[string]any{
 		"start_date": startDate,
@@ -182,9 +185,9 @@ func buildUsageAdminWhere(userID int64, startDate, endDate string, apiKey, mdl, 
 		where += " AND u.user_id = :user_id"
 		params["user_id"] = userID
 	}
-	if apiKey != "" {
-		where += " AND u.api_key = :api_key"
-		params["api_key"] = apiKey
+	if apiKeyID > 0 {
+		where += " AND u.api_key_id = :api_key_id"
+		params["api_key_id"] = apiKeyID
 	}
 	if mdl != "" {
 		where += " AND u.model = :model"

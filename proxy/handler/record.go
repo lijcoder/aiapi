@@ -26,7 +26,7 @@ func Record(ctx *types.Context) {
 	// 2. 记录用量（始终写入）
 	rec := &model.UsageRecord{
 		UserID:          ctx.UserID,
-		ApiKey:          ctx.ApiKey,
+		ApiKeyID:        ctx.ApiKeyID,
 		Provider:        ctx.ProviderType,
 		Model:           ctx.Model,
 		InputTokens:     ctx.Usage.InputTokens,

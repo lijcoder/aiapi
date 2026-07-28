@@ -116,7 +116,7 @@ type Model struct {
 type UsageRecord struct {
 	ID              int64     `db:"id" json:"id"`
 	UserID          int64     `db:"user_id" json:"user_id"`
-	ApiKey          string    `db:"api_key" json:"api_key"`
+	ApiKeyID        int64     `db:"api_key_id" json:"api_key_id"` // 关联 api_keys.id，不存 key 原文
 	Provider        string    `db:"provider" json:"provider"`
 	Model           string    `db:"model" json:"model"`
 	InputTokens     int       `db:"input_tokens" json:"input_tokens"`
@@ -134,7 +134,7 @@ type UsageRecord struct {
 // RequestLog 请求日志
 type RequestLog struct {
 	ID             int64     `db:"id" json:"id"`
-	ApiKey         string    `db:"api_key" json:"api_key"`
+	ApiKeyID       int64     `db:"api_key_id" json:"api_key_id"` // 关联 api_keys.id，不存 key 原文
 	Format         string    `db:"format" json:"format"`
 	Provider       string    `db:"provider" json:"provider"`
 	Path           string    `db:"path" json:"path"`

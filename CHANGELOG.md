@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+- `request_logs` / `usage_records` 不再存储完整 API Key，改存 `api_key_id`（DB 泄露不再暴露 key 原文与调用记录的关联）。统计接口对外契约不变（筛选传 `api_key_id`、按 key 分组展示脱敏 key + 名称）；已删除的 key 在分组统计中展示为 `#id + 已删除`。存量库需手动迁移（加列 → 回填 → DROP 旧列，SQL 见 `sql/sqlite.sql` 注释，需 SQLite ≥ 3.35）。
+
 - 密钥管理重构：签名密钥（JWT/2FA 票据）与加密密钥（TOTP/Provider 配置落库加密）拆分为两把独立密钥。加载优先级为环境变量（新增 `AIAPI_CRYPTO_SECRET`）> 密钥文件（`<DataDir>/keys/*.key`，0600 权限）> 自动生成并写文件——不设置环境变量也可启动（旧版本缺失环境变量会启动失败，行为变更）。旧部署升级时加密密钥自动从 `AIAPI_JWT_SECRET` 播种，历史密文（2FA 密钥、provider 配置）保持可解，请保持原环境变量至少完成一次启动。
 
 - 安全加固：Provider 配置（含上游 API Key）落库改为 AES-256-GCM 加密（加密密钥独立于签名密钥按用途派生，新增 `service/crypto.go` 通用加密模块，与 TOTP 密钥加密用途隔离）。存量明文配置读取时自动兼容，管理端重新保存后转为密文（渐进迁移，无需 DDL）。

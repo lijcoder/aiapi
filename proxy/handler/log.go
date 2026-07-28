@@ -39,7 +39,7 @@ func Log(ctx *types.Context) {
 	}
 	latency := time.Since(ctx.StartTime).Milliseconds()
 	if err := store.C().Log().Insert(&model.RequestLog{
-		ApiKey:         ctx.ApiKey,
+		ApiKeyID:       ctx.ApiKeyID,
 		Format:         ctx.Format,
 		Provider:       ctx.ProviderType,
 		Path:           ctx.Path,

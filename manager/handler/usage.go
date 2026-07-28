@@ -3,11 +3,13 @@ package handler
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/lijcoder/aiapi/manager/base"
 	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
+	"github.com/lijcoder/aiapi/store/model"
 )
 
 // ===== 请求结构体 =====
@@ -59,19 +61,25 @@ type UsageStatsSelfResp struct {
 
 // ===== 辅助函数 =====
 
-// resolveApiKey 根据 api_key_id 查出完整 key；id<=0 返回空串（不筛选）
-func resolveApiKey(userID int64, apiKeyID int64) (string, error) {
-	if apiKeyID <= 0 {
-		return "", nil
+// fillKeyLabels 按 api_key 分组时，把行中的 key id label 替换为脱敏 key，
+// 并填充名称（SubLabel）与是否存在（KeyExists）。已删除的 key 展示为 #id。
+func fillKeyLabels(rows []store.UsageStatRow, apiKeys []model.ApiKey) {
+	keyByID := make(map[int64]model.ApiKey, len(apiKeys))
+	for _, k := range apiKeys {
+		keyByID[k.ID] = k
 	}
-	k, err := store.C().ApiKey().GetByID(apiKeyID)
-	if err != nil {
-		return "", err
+	for i := range rows {
+		id, _ := strconv.ParseInt(rows[i].Label, 10, 64)
+		if k, ok := keyByID[id]; ok {
+			rows[i].Label = maskApiKey(k.Key)
+			rows[i].SubLabel = k.Name
+			rows[i].KeyExists = ptrBool(true)
+		} else {
+			rows[i].Label = "#" + rows[i].Label
+			rows[i].SubLabel = "已删除"
+			rows[i].KeyExists = ptrBool(false)
+		}
 	}
-	if k == nil || k.UserID != userID {
-		return "", nil // 不属于当前用户，忽略
-	}
-	return k.Key, nil
 }
 
 // parseDateRangeDay 按天模式解析日期；返回 (start含, end含, error)
@@ -142,39 +150,20 @@ func UsageStatsSelf(ctx context.Context, req *UsageStatsSelfReq) (*UsageStatsSel
 		return nil, base.ErrBadReq(err.Error())
 	}
 
-	apiKey, err := resolveApiKey(cur.ID, req.ApiKeyId)
-	if err != nil {
-		slog.Error("resolve api key failed", "err", err, "api_key_id", req.ApiKeyId)
-		return nil, base.ErrInternal
-	}
-
-	rows, err := service.NewUsageService().StatsByUser(cur.ID, mode, startDate, endDate, apiKey, req.Model, req.Provider, req.GroupBy)
+	rows, err := service.NewUsageService().StatsByUser(cur.ID, mode, startDate, endDate, req.ApiKeyId, req.Model, req.Provider, req.GroupBy)
 	if err != nil {
 		slog.Error("usage stats failed", "err", err, "user_id", cur.ID)
 		return nil, base.ErrInternal
 	}
 
-	// 按 api_key 分组时：脱敏 + 填充名称 + 标记是否已删除
+	// 按 api_key 分组时：key id → 脱敏 key + 填充名称 + 标记是否已删除
 	if req.GroupBy == "api_key" {
 		apiKeys, err := store.C().ApiKey().ListByUser(cur.ID)
 		if err != nil {
 			slog.Error("list api keys for stats failed", "err", err, "user_id", cur.ID)
 			return nil, base.ErrInternal
 		}
-		keyNameMap := make(map[string]string, len(apiKeys))
-		for _, k := range apiKeys {
-			keyNameMap[k.Key] = k.Name
-		}
-		for i := range rows {
-			if name, ok := keyNameMap[rows[i].Label]; ok {
-				rows[i].SubLabel = name
-				rows[i].KeyExists = ptrBool(true)
-			} else {
-				rows[i].SubLabel = "已删除"
-				rows[i].KeyExists = ptrBool(false)
-			}
-			rows[i].Label = maskApiKey(rows[i].Label)
-		}
+		fillKeyLabels(rows, apiKeys)
 	}
 
 	// 汇总顶部指标
@@ -301,40 +290,20 @@ func UsageStatsAdmin(ctx context.Context, req *UsageStatsAdminReq) (*UsageStatsA
 		return nil, base.ErrBadReq(err.Error())
 	}
 
-	// api_key_id → 完整 key（admin 版不校验归属）
-	apiKey, err := resolveApiKeyAdmin(req.ApiKeyId)
-	if err != nil {
-		slog.Error("resolve api key failed", "err", err, "api_key_id", req.ApiKeyId)
-		return nil, base.ErrInternal
-	}
-
-	rows, err := service.NewUsageService().StatsByAdmin(req.UserID, mode, startDate, endDate, apiKey, req.Model, req.Provider, req.GroupBy)
+	rows, err := service.NewUsageService().StatsByAdmin(req.UserID, mode, startDate, endDate, req.ApiKeyId, req.Model, req.Provider, req.GroupBy)
 	if err != nil {
 		slog.Error("usage stats admin failed", "err", err)
 		return nil, base.ErrInternal
 	}
 
-	// 按 api_key 分组：填充名称 + 脱敏 + 标记是否已删除
+	// 按 api_key 分组：key id → 脱敏 key + 填充名称 + 标记是否已删除
 	if req.GroupBy == "api_key" {
 		allKeys, err := store.C().ApiKey().ListAll()
 		if err != nil {
 			slog.Error("list all api keys for stats failed", "err", err)
 			return nil, base.ErrInternal
 		}
-		keyNameMap := make(map[string]string, len(allKeys))
-		for _, k := range allKeys {
-			keyNameMap[k.Key] = k.Name
-		}
-		for i := range rows {
-			if name, ok := keyNameMap[rows[i].Label]; ok {
-				rows[i].SubLabel = name
-				rows[i].KeyExists = ptrBool(true)
-			} else {
-				rows[i].SubLabel = ""
-				rows[i].KeyExists = ptrBool(false)
-			}
-			rows[i].Label = maskApiKey(rows[i].Label)
-		}
+		fillKeyLabels(rows, allKeys)
 	}
 
 	// 汇总顶部指标
@@ -403,19 +372,4 @@ func UsageFiltersAdmin(ctx context.Context) (*UsageFiltersAdminResp, *base.BizEr
 		Models:    models,
 		Providers: providers,
 	}, nil
-}
-
-// resolveApiKeyAdmin admin 版：id<=0 返回空串，否则查 key 不校验归属
-func resolveApiKeyAdmin(apiKeyID int64) (string, error) {
-	if apiKeyID <= 0 {
-		return "", nil
-	}
-	k, err := store.C().ApiKey().GetByID(apiKeyID)
-	if err != nil {
-		return "", err
-	}
-	if k == nil {
-		return "", nil
-	}
-	return k.Key, nil
 }
