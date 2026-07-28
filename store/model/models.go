@@ -36,6 +36,7 @@ type User struct {
 	Name      string    `db:"name" json:"name"`
 	Account   string    `db:"account" json:"account"`
 	Password  string    `db:"password" json:"-"` // bcrypt 哈希，不对外输出
+	TotpSecret string   `db:"totp_secret" json:"-"` // TOTP 密钥（AES-GCM 加密存储，空=未开启 2FA），不对外输出
 	Email     string    `db:"email" json:"email"`
 	Budget    float64   `db:"budget" json:"budget"`
 	Unlimited bool      `db:"unlimited" json:"unlimited"`

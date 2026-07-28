@@ -58,6 +58,15 @@ func (us *UserStore) UpdatePassword(userID int64, passwordHash string) error {
 	return err
 }
 
+// UpdateTOTPSecret 更新用户 TOTP 密钥（加密后的密文，空串=关闭 2FA）
+func (us *UserStore) UpdateTOTPSecret(userID int64, encSecret string) error {
+	_, err := us.s.Query(
+		`UPDATE users SET totp_secret = :totp_secret WHERE id = :user_id`,
+		map[string]any{"user_id": userID, "totp_secret": encSecret},
+	).Exec()
+	return err
+}
+
 // SetEnabled 启用/禁用用户
 func (us *UserStore) SetEnabled(userID int64, enabled bool) error {
 	_, err := us.s.Query(

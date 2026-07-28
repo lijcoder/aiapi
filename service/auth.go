@@ -23,6 +23,7 @@ import (
 	"github.com/lijcoder/aiapi/manager/base"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ===== 对外哨兵错误 =====
@@ -43,6 +44,25 @@ var (
 	ErrUserDisabled    = errors.New("user disabled")
 	ErrUserNotFound    = errors.New("user not found")
 )
+
+// ===== 密码哈希与校验（统一收口）=====
+//
+// 所有「生成密码哈希」与「校验密码」的场景必须走这里，不直接调 bcrypt——
+// 避免散点调用导致策略调整时漏改（如调整 cost、加 pepper、换 argon2 等只需改这一处）。
+
+// HashPassword 生成密码的 bcrypt 哈希（默认 cost）。
+func HashPassword(password string) (string, error) {
+	h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(h), nil
+}
+
+// CheckPassword 校验明文密码与 bcrypt 哈希是否匹配。
+func CheckPassword(passwordHash, password string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)) == nil
+}
 
 // ===== 对外类型 =====
 

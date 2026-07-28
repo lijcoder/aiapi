@@ -24,6 +24,9 @@ INSERT OR IGNORE INTO role_permission (role_id, entity, action, value) VALUES
   (2, 'API', '*', '/manager/apikeys/models/set/self'),
   (2, 'API', '*', '/manager/profile/update/self'),
   (2, 'API', '*', '/manager/profile/password/self'),
+  (2, 'API', '*', '/manager/2fa/setup/self'),
+  (2, 'API', '*', '/manager/2fa/confirm/self'),
+  (2, 'API', '*', '/manager/2fa/disable/self'),
   (2, 'API', '*', '/manager/usage/stats/self'),
   (2, 'API', '*', '/manager/usage/filters/self');
 

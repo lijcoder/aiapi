@@ -14,6 +14,7 @@ import (
 //   - 其余挂 Auth + Require（需登录态 + 接口授权）
 func Register(g *echo.Group) {
 	g.POST("/login", handler.Login)
+	g.POST("/login/2fa", handler.Login2FA) // 登录第二步：凭 pending 票据 + TOTP 码，不挂 Auth
 	g.POST("/refresh", handler.Refresh)
 
 	g.Use(middleware.Auth)
@@ -43,6 +44,11 @@ func Register(g *echo.Group) {
 	// 个人设置
 	g.POST("/profile/update/self", base.Wrap(handler.UpdateProfileSelf))
 	g.POST("/profile/password/self", base.Wrap(handler.UpdatePasswordSelf))
+
+	// 两步验证（2FA）自助绑定 / 确认 / 关闭
+	g.POST("/2fa/setup/self", base.Wrap(handler.Setup2FASelf))
+	g.POST("/2fa/confirm/self", base.Wrap(handler.Confirm2FASelf))
+	g.POST("/2fa/disable/self", base.Wrap(handler.Disable2FASelf))
 
 	// 超管：用户管理
 	g.POST("/users/list", base.Wrap(handler.ListUsers))

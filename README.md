@@ -11,7 +11,7 @@
 - **请求日志**：保存每次请求的参数、响应状态、耗时与错误信息
 - **Provider 管理**：内置 CRUD 接口动态管理上游配置
 - **API Key 管理**：校验调用方身份，支持启用/禁用
-- **管理台**：内置 Web 管理界面，支持双 token 安全登录、充值、流水查询
+- **管理台**：内置 Web 管理界面，支持双 token 安全登录、TOTP 两步验证（2FA）、充值、流水查询
 
 ## 架构概览
 
@@ -99,6 +99,25 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
 ### 管理台
 
 `frontend/` 是 Vue 3 + Vite + Naive UI 管理台前端，编译后通过 Go `embed` 嵌进二进制。
+
+#### 两步验证（2FA / TOTP）
+
+管理台支持 TOTP 两步验证（Google Authenticator / 1Password / 微软 Authenticator 等），在个人设置页自助开启：
+
+1. 点击「开启」→ 用 Authenticator App 扫描二维码（或手动输入 Base32 密钥）
+2. 输入 App 显示的 6 位验证码完成绑定
+3. 之后登录需在密码验证后再输入一次验证码
+
+安全设计：
+- TOTP 密钥经 AES-256-GCM 加密后入库（密钥派生自 `AIAPI_JWT_SECRET`），数据库泄露不直接暴露 2FA
+- 密码验证通过后只签发 5 分钟有效的 pending 票据，同一票据验证码连续错 5 次即作废
+- 关闭 2FA 需重新校验登录密码
+
+存量数据库迁移：
+```bash
+sqlite3 ~/.aiapi/aiapi.db "ALTER TABLE users ADD COLUMN totp_secret TEXT NOT NULL DEFAULT '';"
+sqlite3 ~/.aiapi/aiapi.db < sql/init-data.sql   # 补普通用户角色的 2FA 接口权限
+```
 
 ```bash
 # 开发模式（前端热更新）

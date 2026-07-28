@@ -9,7 +9,7 @@ let refreshPromise = null // 并发请求合并：多个请求同时 401 时只�
 const CODE_TOKEN_EXPIRED = 1016
 
 function isAuthPath(path) {
-  return path === '/login' || path === '/refresh'
+  return path === '/login' || path === '/login/2fa' || path === '/refresh'
 }
 
 // 静默刷新：带 refresh cookie，不带 access
@@ -64,8 +64,19 @@ async function request(path, body) {
 
 // ===== 鉴权接口 =====
 
+// 登录第一步：账号密码。若用户已开启 2FA，返回 { need_2fa: true, pending_ticket }，
+// 不设置 accessToken，前端进入验证码步骤后调 login2fa。
 export function login(account, password) {
   return request('/login', { account, password }).then(data => {
+    if (data.need_2fa) return data
+    accessToken = data.access_token
+    return data
+  })
+}
+
+// 登录第二步：pending 票据 + TOTP 验证码，通过则拿到 token
+export function login2fa(pendingTicket, code) {
+  return request('/login/2fa', { pending_ticket: pendingTicket, code }).then(data => {
     accessToken = data.access_token
     return data
   })
@@ -162,6 +173,23 @@ export function updateProfileSelf(name, email) {
 
 export function updatePasswordSelf(oldPassword, newPassword) {
   return request('/profile/password/self', { old_password: oldPassword, new_password: newPassword })
+}
+
+// ===== 两步验证（2FA）=====
+
+// 生成 TOTP 密钥与二维码（未生效，确认后落库）
+export function setup2faSelf() {
+  return request('/2fa/setup/self')
+}
+
+// 校验首个验证码，确认绑定
+export function confirm2faSelf(setupTicket, code) {
+  return request('/2fa/confirm/self', { setup_ticket: setupTicket, code })
+}
+
+// 校验密码后关闭 2FA
+export function disable2faSelf(password) {
+  return request('/2fa/disable/self', { password })
 }
 
 // ===== 超管：用户管理 =====

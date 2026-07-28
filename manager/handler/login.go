@@ -11,19 +11,18 @@ import (
 	"github.com/lijcoder/aiapi/manager/base"
 	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // sessionService 登录会话业务（签发/刷新/吊销）。进程内单例，无状态。
 var sessionService = service.NewSessionService()
 
-// dummyPasswordHash 账号不存在时用于 bcrypt 比对的哑 hash（见 Login 注释）。
+// dummyPasswordHash 账号不存在时用于密码比对的哑 hash（见 Login 注释）。
 // init 时生成一次（约 100ms 启动开销），成本参数与真实密码一致；
 // 对应明文无人知晓，任何输入都不会匹配成功。
-var dummyPasswordHash []byte
+var dummyPasswordHash string
 
 func init() {
-	h, err := bcrypt.GenerateFromPassword([]byte("dummy-password-for-timing"), bcrypt.DefaultCost)
+	h, err := service.HashPassword("dummy-password-for-timing")
 	if err != nil {
 		panic("generate dummy password hash failed: " + err.Error())
 	}
@@ -63,11 +62,25 @@ func Login(c echo.Context) error {
 	//    账号禁用则用真实 hash 比对，同样保持时序一致。
 	passwordHash := dummyPasswordHash
 	if user != nil {
-		passwordHash = []byte(user.Password)
+		passwordHash = user.Password
 	}
-	pwdErr := bcrypt.CompareHashAndPassword(passwordHash, []byte(req.Password))
-	if user == nil || !user.Enabled || pwdErr != nil {
+	pwdOK := service.CheckPassword(string(passwordHash), req.Password)
+	if user == nil || !user.Enabled || !pwdOK {
 		return base.Fail(c, base.CodeBadRequest, "账号或密码错误")
+	}
+
+	// 已开启 2FA → 不直接签发 token，返回 pending 票据，前端进入验证码步骤
+	if user.TotpSecret != "" {
+		ticket, err := totpService.SignPending(user.ID)
+		if err != nil {
+			slog.Error("sign 2fa pending ticket failed", "err", err, "user_id", user.ID)
+			return base.Fail(c, base.ErrInternal.Code, base.ErrInternal.Msg)
+		}
+		return base.Ok(c, map[string]any{
+			"need_2fa":      true,
+			"pending_ticket": ticket,
+			"expires_in":     int((5 * time.Minute).Seconds()),
+		})
 	}
 
 	// 签发 token 对
@@ -79,6 +92,64 @@ func Login(c echo.Context) error {
 
 	setRefreshCookie(c, pair.RefreshToken, pair.RefreshExp)
 
+	return base.Ok(c, map[string]any{
+		"access_token": pair.AccessToken,
+		"expires_in":   int(base.AccessTTL.Seconds()),
+	})
+}
+
+type login2FAReq struct {
+	PendingTicket string `json:"pending_ticket"`
+	Code          string `json:"code"`
+}
+
+// Login2FA 登录第二步：校验 pending 票据 + TOTP 验证码，通过则签发 token 对。
+// 与 Login 一样不挂 Auth 中间件——此时用户尚无登录态，凭 pending 票据证明「已过密码验证」。
+// 本函数与 Login/Refresh/Logout 同属会话生命周期，cookie 操作统一集中在 login.go。
+func Login2FA(c echo.Context) error {
+	var req login2FAReq
+	if err := base.BindJSON(c, &req); err != nil {
+		return base.Fail(c, base.CodeBadRequest, "请求体格式错误")
+	}
+	if req.PendingTicket == "" || req.Code == "" {
+		return base.Fail(c, base.CodeBadRequest, "验证码不能为空")
+	}
+
+	// 先解析票据拿 userID 查出加密密钥，VerifyLogin 内部再做全量校验
+	userID, err := totpService.PeekPendingUser(req.PendingTicket)
+	if err != nil {
+		return base.Fail(c, base.CodeUnauthorized, "验证已过期，请重新登录")
+	}
+	user, err := store.C().User().GetByIDAny(userID)
+	if err != nil {
+		slog.Error("[2FA] login get user failed", "err", err, "user_id", userID)
+		return base.Fail(c, base.ErrInternal.Code, base.ErrInternal.Msg)
+	}
+	if user == nil || !user.Enabled || user.TotpSecret == "" {
+		return base.Fail(c, base.CodeUnauthorized, "验证已过期，请重新登录")
+	}
+
+	uid, err := totpService.VerifyLogin(req.PendingTicket, req.Code, user.TotpSecret)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrTOTPTooManyFails):
+			return base.Fail(c, base.CodeUnauthorized, "失败次数过多，请重新登录")
+		case errors.Is(err, service.ErrTOTPCodeWrong):
+			return base.Fail(c, base.CodeBadRequest, "验证码错误")
+		case errors.Is(err, service.ErrTOTPInvalidTicket):
+			return base.Fail(c, base.CodeUnauthorized, "验证已过期，请重新登录")
+		default:
+			slog.Error("[2FA] verify login failed", "err", err, "user_id", userID)
+			return base.Fail(c, base.ErrInternal.Code, base.ErrInternal.Msg)
+		}
+	}
+
+	pair, err := sessionService.Issue(uid, summarizeUA(c.Request().UserAgent()), c.RealIP())
+	if err != nil {
+		slog.Error("[2FA] issue tokens failed", "err", err, "user_id", uid)
+		return base.Fail(c, base.ErrInternal.Code, base.ErrInternal.Msg)
+	}
+	setRefreshCookie(c, pair.RefreshToken, pair.RefreshExp)
 	return base.Ok(c, map[string]any{
 		"access_token": pair.AccessToken,
 		"expires_in":   int(base.AccessTTL.Seconds()),

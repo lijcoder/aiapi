@@ -11,11 +11,12 @@ import (
 
 // userInfo 用户基本信息
 type userInfo struct {
-	ID      int64   `json:"id"`
-	Name    string  `json:"name"`
-	Account string  `json:"account"`
-	Email   string  `json:"email"`
-	Budget  float64 `json:"budget"`
+	ID          int64   `json:"id"`
+	Name        string  `json:"name"`
+	Account     string  `json:"account"`
+	Email       string  `json:"email"`
+	Budget      float64 `json:"budget"`
+	TotpEnabled bool    `json:"totp_enabled"` // 是否已开启两步验证
 }
 
 // menuItem 菜单项（含子菜单）
@@ -66,11 +67,12 @@ func Self(ctx context.Context) (*SelfResp, *base.BizError) {
 
 	return &SelfResp{
 		User: userInfo{
-			ID:      user.ID,
-			Name:    user.Name,
-			Account: user.Account,
-			Email:   user.Email,
-			Budget:  user.Budget,
+			ID:          user.ID,
+			Name:        user.Name,
+			Account:     user.Account,
+			Email:       user.Email,
+			Budget:      user.Budget,
+			TotpEnabled: user.TotpSecret != "",
 		},
 		Menus:      buildMenuTree(menus),
 		Permissions: base.CurrentPermissions(ctx),

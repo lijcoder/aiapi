@@ -10,7 +10,6 @@ import (
 	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // ===== 请求/响应结构 =====
@@ -172,10 +171,10 @@ func CreateUser(ctx context.Context, req *CreateUserReq) (*userItem, *base.BizEr
 		return nil, base.ErrBadReq("账号已存在")
 	}
 
-	// bcrypt 加密
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	// 密码哈希（统一走 service 收口）
+	hash, err := service.HashPassword(req.Password)
 	if err != nil {
-		slog.Error("[User] bcrypt failed", "err", err)
+		slog.Error("[User] hash password failed", "err", err)
 		return nil, base.ErrInternal
 	}
 
@@ -299,12 +298,12 @@ func ResetPassword(ctx context.Context, req *ResetPasswordReq) (*struct{}, *base
 	if u == nil {
 		return nil, base.ErrNotFound("用户不存在")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := service.HashPassword(req.Password)
 	if err != nil {
-		slog.Error("[User] bcrypt failed", "err", err)
+		slog.Error("[User] hash password failed", "err", err)
 		return nil, base.ErrInternal
 	}
-	if err := store.C().User().UpdatePassword(req.ID, string(hash)); err != nil {
+	if err := store.C().User().UpdatePassword(req.ID, hash); err != nil {
 		slog.Error("[User] UpdatePassword failed", "err", err, "id", req.ID)
 		return nil, base.ErrInternal
 	}

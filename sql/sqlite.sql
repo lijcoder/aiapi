@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS users (
     name       TEXT NOT NULL,
     account    TEXT NOT NULL,
     password   TEXT NOT NULL,           -- 存 bcrypt 哈希
+    totp_secret TEXT NOT NULL DEFAULT '', -- TOTP 密钥（AES-GCM 加密存储，空=未开启 2FA）
     email      TEXT NOT NULL DEFAULT '', -- 邮箱（可空，不唯一）
     budget     REAL NOT NULL DEFAULT 0,
     unlimited  INTEGER NOT NULL DEFAULT 0,
@@ -41,6 +42,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_users_account ON users(account);
 -- users 扩展：增加 email 列
 -- 新建库直接用上方定义；存量库需手动迁移：
 --   ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT '';
+
+-- users 扩展：增加 totp_secret 列（2FA TOTP 密钥，AES-GCM 加密存储）
+-- 新建库直接用上方定义；存量库需手动迁移：
+--   ALTER TABLE users ADD COLUMN totp_secret TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS api_keys (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,

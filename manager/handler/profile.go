@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/lijcoder/aiapi/manager/base"
+	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // ===== 请求/响应结构 =====
@@ -73,17 +73,17 @@ func UpdatePasswordSelf(ctx context.Context, req *UpdatePasswordSelfReq) (*struc
 	}
 
 	// 校验旧密码
-	if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.OldPassword)); err != nil {
+	if !service.CheckPassword(u.Password, req.OldPassword) {
 		return nil, base.ErrBadReq("旧密码错误")
 	}
 
-	// 新密码哈希
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	// 新密码哈希（统一走 service 收口）
+	hash, err := service.HashPassword(req.NewPassword)
 	if err != nil {
-		slog.Error("[Profile] bcrypt failed", "err", err)
+		slog.Error("[Profile] hash password failed", "err", err)
 		return nil, base.ErrInternal
 	}
-	if err := store.C().User().UpdatePassword(cur.ID, string(hash)); err != nil {
+	if err := store.C().User().UpdatePassword(cur.ID, hash); err != nil {
 		slog.Error("[Profile] UpdatePassword failed", "err", err, "user_id", cur.ID)
 		return nil, base.ErrInternal
 	}
