@@ -5,10 +5,6 @@
 
 ## 零、生产环境公网部署前必做（2026-07 安全走查）
 
-### 0.1 日志打印完整 API Key（一行修复，高优先）
-- **位置**：`proxy/handler/budget.go` — `fmt.Errorf("insufficient key balance: key=%s ...", ctx.ApiKey, ...)` 把完整 key 写入日志文件，违反 AGENTS.md 第 10 节。
-- **方案**：日志中 key 脱敏（前 6 后 4，复用 `maskKey` 思路）。
-
 ### 0.2 API Key 明文落库
 - **现状**：`api_keys.key` 全文明文；`request_logs.api_key`、`usage_records.api_key` 也存完整 key。DB 泄露 = 全部 key 泄露 + 完整调用记录。
 - **方案**：
@@ -17,9 +13,6 @@
 
 ### 0.3 登录/2FA 接口限流（公网后升级为必须）
 - 见本文档「一、3」，公网部署前必须落地，不再可缓。
-
-### 0.4 Provider 上游 Key 明文存 providers.config
-- **方案**：用 TOTP 同款 AES-GCM 加密（密钥派生自 `AIAPI_JWT_SECRET`，模式现成），读取时解密。
 
 ### 0.5 部署文档：HTTPS 反代 + 安全响应头
 - 服务为明文 HTTP，公网必须 nginx/Caddy 终结 TLS。

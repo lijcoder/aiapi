@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lijcoder/aiapi/manager/base"
+	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
 )
@@ -59,10 +60,17 @@ func ListProviders(ctx context.Context, req *ListProvidersReq) (*base.PageResult
 	}
 	items := make([]providerItem, 0, len(list))
 	for _, p := range list {
-		cfg, _ := parseProviderConfig(p.Config)
+		// 解密+解析统一走 service；配置损坏的行降级为空配置展示，不拖垮整页
+		cfg, err := service.ParseProviderConfig(&p)
+		if err != nil {
+			slog.Error("[Provider] parse config failed", "err", err, "type", p.Type)
+		}
+		if cfg == nil {
+			cfg = &model.ProviderConfig{}
+		}
 		items = append(items, providerItem{
 			Type:      p.Type,
-			Config:    cfg,
+			Config:    providerConfig{Domain: cfg.Domain, Headers: cfg.Headers},
 			Enabled:   p.Enabled,
 			CreatedAt: p.CreatedAt,
 		})
@@ -85,20 +93,16 @@ func CreateProvider(ctx context.Context, req *CreateProviderReq) (*providerItem,
 		return nil, base.ErrBadReq("Provider 类型已存在")
 	}
 
-	cfg := model.ProviderConfig{
-		Domain:  req.Domain,
-		Headers: req.Headers,
-	}
-	cfgJSON, err := json.Marshal(cfg)
+	cfgJSON, err := json.Marshal(model.ProviderConfig{Domain: req.Domain, Headers: req.Headers})
 	if err != nil {
 		slog.Error("[Provider] marshal config failed", "err", err)
 		return nil, base.ErrInternal
 	}
-
-	p := &model.Provider{
-		Type:    req.Type,
-		Config:  string(cfgJSON),
-		Enabled: true,
+	p := &model.Provider{Type: req.Type, Config: string(cfgJSON), Enabled: true}
+	// 敏感字段（config 含上游 Key）加密后落库
+	if err := service.EncryptProvider(p); err != nil {
+		slog.Error("[Provider] encrypt config failed", "err", err)
+		return nil, base.ErrInternal
 	}
 	if err := store.C().Provider().Create(p); err != nil {
 		if store.IsUniqueConstraintErr(err) {
@@ -110,7 +114,7 @@ func CreateProvider(ctx context.Context, req *CreateProviderReq) (*providerItem,
 
 	return &providerItem{
 		Type:    p.Type,
-		Config:  providerConfig{Domain: cfg.Domain, Headers: cfg.Headers},
+		Config:  providerConfig{Domain: req.Domain, Headers: req.Headers},
 		Enabled: true,
 	}, nil
 }
@@ -129,16 +133,17 @@ func UpdateProvider(ctx context.Context, req *UpdateProviderReq) (*providerItem,
 		return nil, base.ErrNotFound("Provider 不存在")
 	}
 
-	cfg := model.ProviderConfig{
-		Domain:  req.Domain,
-		Headers: req.Headers,
-	}
-	cfgJSON, err := json.Marshal(cfg)
+	cfgJSON, err := json.Marshal(model.ProviderConfig{Domain: req.Domain, Headers: req.Headers})
 	if err != nil {
 		slog.Error("[Provider] marshal config failed", "err", err)
 		return nil, base.ErrInternal
 	}
 	p.Config = string(cfgJSON)
+	// 敏感字段（config 含上游 Key）加密后落库
+	if err := service.EncryptProvider(p); err != nil {
+		slog.Error("[Provider] encrypt config failed", "err", err)
+		return nil, base.ErrInternal
+	}
 	if err := store.C().Provider().Update(p); err != nil {
 		slog.Error("[Provider] Update failed", "err", err)
 		return nil, base.ErrInternal
@@ -146,7 +151,7 @@ func UpdateProvider(ctx context.Context, req *UpdateProviderReq) (*providerItem,
 
 	return &providerItem{
 		Type:    p.Type,
-		Config:  providerConfig{Domain: cfg.Domain, Headers: cfg.Headers},
+		Config:  providerConfig{Domain: req.Domain, Headers: req.Headers},
 		Enabled: p.Enabled,
 	}, nil
 }
@@ -171,13 +176,3 @@ func ToggleProvider(ctx context.Context, req *ToggleProviderReq) (*struct{}, *ba
 	return &struct{}{}, nil
 }
 
-// ===== 工具函数 =====
-
-// parseProviderConfig 解析 config JSON 为脱敏结构
-func parseProviderConfig(cfgStr string) (providerConfig, error) {
-	var cfg model.ProviderConfig
-	if err := json.Unmarshal([]byte(cfgStr), &cfg); err != nil {
-		return providerConfig{}, err
-	}
-	return providerConfig{Domain: cfg.Domain, Headers: cfg.Headers}, nil
-}

@@ -42,7 +42,7 @@ func BudgetCheck(ctx *types.Context) {
 
 	// Key 有限额且花完了 → 拒绝
 	if !key.Unlimited && key.Budget <= 0 {
-		ctx.Err = log.WithStack(fmt.Errorf("insufficient key balance: key=%s budget=%.4f", ctx.ApiKey, key.Budget))
+		ctx.Err = log.WithStack(fmt.Errorf("insufficient key balance: apiKeyId=%d budget=%.4f", ctx.ApiKeyID, key.Budget))
 		ctx.ErrorMessage = "insufficient api key balance"
 		ctx.Code = types.CodeInsufficientBalance
 		return

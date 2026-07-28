@@ -9,15 +9,11 @@ package service
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"image/png"
 	"strings"
 	"sync"
@@ -246,62 +242,14 @@ func parseTicket(token string) (*ticketClaims, error) {
 	return &c, nil
 }
 
-// ===== 密钥加解密（AES-256-GCM，密钥由 JWTSecret 派生）=====
+// ===== 密钥加解密（通用能力在 crypto.go，此处仅绑定 TOTP 用途）=====
 
-// totpKey 派生加密密钥：SHA-256(JWTSecret + 用途后缀)，与 JWT 签名密钥隔离。
-func totpKey() ([]byte, error) {
-	if len(base.JWTSecret) == 0 {
-		return nil, errors.New("jwt secret not loaded")
-	}
-	h := sha256.Sum256(append([]byte(base.JWTSecret), ":totp-secret"...))
-	return h[:], nil
-}
-
-// encryptSecret 加密 TOTP 明文密钥，输出 base64(nonce + ciphertext)。
+// encryptSecret 加密 TOTP 明文密钥。
 func encryptSecret(plain string) (string, error) {
-	key, err := totpKey()
-	if err != nil {
-		return "", err
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(gcm.Seal(nonce, nonce, []byte(plain), nil)), nil
+	return encryptWithPurpose(plain, purposeTOTPSecret)
 }
 
 // decryptSecret 解密落库的 TOTP 密钥。
 func decryptSecret(enc string) (string, error) {
-	key, err := totpKey()
-	if err != nil {
-		return "", err
-	}
-	raw, err := base64.StdEncoding.DecodeString(enc)
-	if err != nil {
-		return "", fmt.Errorf("decode totp secret: %w", err)
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", err
-	}
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-	if len(raw) < gcm.NonceSize() {
-		return "", errors.New("totp secret too short")
-	}
-	plain, err := gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], nil)
-	if err != nil {
-		return "", fmt.Errorf("decrypt totp secret: %w", err)
-	}
-	return string(plain), nil
+	return decryptWithPurpose(enc, purposeTOTPSecret)
 }
