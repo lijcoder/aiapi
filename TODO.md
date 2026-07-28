@@ -12,7 +12,7 @@
 ### 0.5 部署文档：HTTPS 反代 + 安全响应头
 - 服务为明文 HTTP，公网必须 nginx/Caddy 终结 TLS。
 - **坑**：refresh cookie 的 `Secure` 跟随 `c.Scheme()`（依赖 `X-Forwarded-Proto`），反代必须配置该头，否则 HTTPS 下 cookie 不带 Secure。
-- 建议在 `ServeFrontend` 统一加安全响应头：`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、CSP。
+- 安全响应头（决定由 nginx 配置，代码方案已评审暂缓）：`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、CSP（注意 `style-src 'unsafe-inline'` 兼容 naive-ui、`img-src data:` 兼容 2FA 二维码、`add_header ... always` 覆盖非 2xx 响应）。如后续要内置到应用：挂在 `framework/echo.go` 全局中间件（勿挂 manager/router，前端静态页面不在 /manager 下），`/proxy` 路径跳过。
 
 ### 0.6 部署文档：AIAPI_JWT_SECRET 运维要求
 - 每环境独立、真随机（≥32 字节，代码已强制长度）。
