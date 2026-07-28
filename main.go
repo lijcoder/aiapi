@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"runtime/debug"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -42,7 +41,6 @@ func main() {
 	e.HideBanner = true
 	framework.EchoInit(e)
 	ServeFrontend(e)
-	registerRuntime()
 	e.Logger.Fatal(e.StartServer(&http.Server{
 		Addr:              constant.Address(),
 		ReadTimeout:       time.Second * 10, // 客户端请求 body 需在 10s 内发完（仅约束读取阶段，不影响响应流）
@@ -88,7 +86,3 @@ func initLogger() {
 	slog.SetDefault(slog.New(aiapiLog.NewFormatter(w, slog.LevelInfo)))
 }
 
-func registerRuntime() {
-	debug.SetMemoryLimit(int64(constant.MEMLIMIT * 1024 * 1024))
-	debug.SetGCPercent(constant.GCPERCENT)
-}
