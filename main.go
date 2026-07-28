@@ -27,11 +27,6 @@ func main() {
 	initStore()
 	defer store.Close()
 
-	// 清理过期登录会话
-	if err := store.C().UserSession().DeleteExpired(); err != nil {
-		slog.Warn("cleanup expired sessions failed", "err", err)
-	}
-
 	slog.Info("server starting",
 		"port", constant.PORT,
 		"data-dir", constant.DataDir,

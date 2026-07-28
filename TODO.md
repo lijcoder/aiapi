@@ -66,9 +66,12 @@
 
 ## 三、健壮性（小改动，随时可做）
 
+
+
 ### 9. 过期会话定时清理
-- **现状**：`main.go` 只在启动时 `DeleteExpired` 一次
-- **方案**：`time.Ticker` 每日清理（可顺带清理第 1 项的 `totp_attempts`）
+- **现状**：启动时的 `DeleteExpired` 已移除（启动即清意义不大），过期会话目前无清理机制，长期运行 `user_sessions` 会缓慢堆积
+- **影响**：仅表体积膨胀，无安全风险（过期会话刷新时会被校验拒绝）
+- **方案**：后台 goroutine + `time.Ticker`（如每日）调用 `UserSession().DeleteExpired`，随进程退出无需显式停止
 
 ### 10. 用量记录与扣费合并到同一事务
 - **位置**：`proxy/handler/record.go`（当前 Insert 与扣费分离，可能账实不一致）
