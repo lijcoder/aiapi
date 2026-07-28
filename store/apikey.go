@@ -18,13 +18,13 @@ type ApiKeyStore struct {
 	s *Session
 }
 
-// GetByKey 按 key 查询启用的 API Key（仅查 api_keys 表）。
+// GetByKeyHash 按 key 哈希查询启用的 API Key（仅查 api_keys 表）。
 // key 不存在或未启用时返回 (nil, nil)。
-func (ks *ApiKeyStore) GetByKey(key string) (*model.ApiKey, error) {
+func (ks *ApiKeyStore) GetByKeyHash(keyHash string) (*model.ApiKey, error) {
 	var k model.ApiKey
 	err := ks.s.Query(
-		`SELECT * FROM api_keys WHERE key = :key AND enabled = 1`,
-		map[string]any{"key": key},
+		`SELECT * FROM api_keys WHERE key_hash = :key_hash AND enabled = 1`,
+		map[string]any{"key_hash": keyHash},
 	).Get(&k)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -87,8 +87,8 @@ func (ks *ApiKeyStore) Count() (int64, error) {
 // Create 创建 API Key，回填 ID
 func (ks *ApiKeyStore) Create(k *model.ApiKey) error {
 	res, err := ks.s.Query(
-		`INSERT INTO api_keys (user_id, key, name, budget, unlimited, enabled)
-		 VALUES (:user_id, :key, :name, :budget, :unlimited, :enabled)`,
+		`INSERT INTO api_keys (user_id, key_hash, key_show, name, budget, unlimited, enabled)
+		 VALUES (:user_id, :key_hash, :key_show, :name, :budget, :unlimited, :enabled)`,
 		k,
 	).Exec()
 	if err != nil {

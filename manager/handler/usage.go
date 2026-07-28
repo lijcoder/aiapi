@@ -71,7 +71,7 @@ func fillKeyLabels(rows []store.UsageStatRow, apiKeys []model.ApiKey) {
 	for i := range rows {
 		id, _ := strconv.ParseInt(rows[i].Label, 10, 64)
 		if k, ok := keyByID[id]; ok {
-			rows[i].Label = maskApiKey(k.Key)
+			rows[i].Label = displayKey(k)
 			rows[i].SubLabel = k.Name
 			rows[i].KeyExists = ptrBool(true)
 		} else {
@@ -205,7 +205,7 @@ func UsageFiltersSelf(ctx context.Context) (*UsageFiltersResp, *base.BizError) {
 		keyOpts = append(keyOpts, UsageFilterOption{
 			ID:   k.ID,
 			Name: k.Name,
-			Key:  maskApiKey(k.Key),
+			Key:  displayKey(k),
 		})
 	}
 
@@ -226,13 +226,6 @@ func UsageFiltersSelf(ctx context.Context) (*UsageFiltersResp, *base.BizError) {
 		Models:    models,
 		Providers: providers,
 	}, nil
-}
-
-func maskApiKey(k string) string {
-	if len(k) <= 10 {
-		return k
-	}
-	return k[:6] + "****" + k[len(k)-4:]
 }
 
 func ptrBool(v bool) *bool { return &v }
@@ -350,7 +343,7 @@ func UsageFiltersAdmin(ctx context.Context) (*UsageFiltersAdminResp, *base.BizEr
 		keyOpts = append(keyOpts, UsageFilterOption{
 			ID:   k.ID,
 			Name: k.Name,
-			Key:  maskApiKey(k.Key),
+			Key:  displayKey(k),
 		})
 	}
 

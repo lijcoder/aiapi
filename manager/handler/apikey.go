@@ -87,19 +87,17 @@ func newApiKey() (string, error) {
 	return "sk-" + hex.EncodeToString(b), nil
 }
 
-// maskKey 对外展示的脱敏 key：保留前 6 与后 4 位，中间用 **** 替换。
-func maskKey(k string) string {
-	if len(k) <= 10 {
-		return k
-	}
-	return k[:6] + "****" + k[len(k)-4:]
+// displayKey 对外展示的脱敏 key：直接返回落库的展示串（sk-abc****xyz）。
+func displayKey(k model.ApiKey) string {
+	return k.KeyShow
 }
 
 // toApiKeyItem 将模型转为视图对象。mask 控制是否对 key 脱敏。
-func toApiKeyItem(k model.ApiKey, mask bool) apiKeyItem {
-	key := k.Key
-	if mask {
-		key = maskKey(k.Key)
+// plainKey 仅创建场景传入（明文只在该响应中返回一次），其余场景传空。
+func toApiKeyItem(k model.ApiKey, plainKey string) apiKeyItem {
+	key := displayKey(k)
+	if plainKey != "" {
+		key = plainKey
 	}
 	created := ""
 	if !k.CreatedAt.IsZero() {
@@ -119,15 +117,17 @@ func toApiKeyItem(k model.ApiKey, mask bool) apiKeyItem {
 
 // createApiKeyRetry 在 unique index 冲突时重试生成。实际碰撞概率极低，3 次足够。
 // 调用方应已在前面校验过总额度。
-func createApiKeyRetry(userID int64, name string, budget float64, unlimited bool) (*model.ApiKey, error) {
+// 返回记录与明文 key（明文不落库，仅用于创建响应返回给用户一次）。
+func createApiKeyRetry(userID int64, name string, budget float64, unlimited bool) (*model.ApiKey, string, error) {
 	for i := 0; i < 3; i++ {
 		plain, err := newApiKey()
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		k := &model.ApiKey{
 			UserID:    userID,
-			Key:       plain,
+			KeyHash:   service.ApiKeyHash(plain),
+			KeyShow:   service.ApiKeyShow(plain),
 			Name:      name,
 			Budget:    budget,
 			Unlimited: unlimited,
@@ -138,11 +138,11 @@ func createApiKeyRetry(userID int64, name string, budget float64, unlimited bool
 			if store.IsUniqueConstraintErr(err) {
 				continue
 			}
-			return nil, err
+			return nil, "", err
 		}
-		return k, nil
+		return k, plain, nil
 	}
-	return nil, errors.New("api key generation failed after retries")
+	return nil, "", errors.New("api key generation failed after retries")
 }
 
 // checkBudgetWithinUserLimit 校验“有限额 key 的 budget 之和”不超过用户余额。
@@ -188,7 +188,7 @@ func ListApiKeySelf(ctx context.Context, req *ApiKeyListSelfReq) (*base.PageResu
 	}
 	items := make([]apiKeyItem, 0, len(keys))
 	for _, k := range keys {
-		items = append(items, toApiKeyItem(k, true))
+		items = append(items, toApiKeyItem(k, ""))
 	}
 	return &base.PageResult[apiKeyItem]{Items: items, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
@@ -196,8 +196,12 @@ func ListApiKeySelf(ctx context.Context, req *ApiKeyListSelfReq) (*base.PageResu
 // CreateApiKeySelf 创建 API Key，明文 key 仅在本响应中返回一次
 func CreateApiKeySelf(ctx context.Context, req *CreateApiKeyReq) (*CreateApiKeyResp, *base.BizError) {
 	cur := base.CurrentUser(ctx)
-	// 名称允许为空，但过长会撑爆前端；这里只做长度上限。
-	if name := strings.TrimSpace(req.Name); len(name) > 64 {
+	// 名称必填：key 原文不再落库，名称是识别 key 用途的唯一途径
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return nil, base.ErrBadReq("名称不能为空")
+	}
+	if len(name) > 64 {
 		return nil, base.ErrBadReq("名称过长")
 	}
 	if req.Budget < 0 {
@@ -208,12 +212,12 @@ func CreateApiKeySelf(ctx context.Context, req *CreateApiKeyReq) (*CreateApiKeyR
 		return nil, berr
 	}
 
-	k, err := createApiKeyRetry(cur.ID, strings.TrimSpace(req.Name), req.Budget, req.Unlimited)
+	k, plain, err := createApiKeyRetry(cur.ID, name, req.Budget, req.Unlimited)
 	if err != nil {
 		slog.Error("create api key failed", "err", err, "user_id", cur.ID)
 		return nil, base.ErrInternal
 	}
-	return &CreateApiKeyResp{ApiKey: toApiKeyItem(*k, false)}, nil
+	return &CreateApiKeyResp{ApiKey: toApiKeyItem(*k, plain)}, nil
 }
 
 // ToggleApiKeySelf 启用/禁用 API Key。先校验归属当前用户，防止越权。
@@ -235,7 +239,7 @@ func ToggleApiKeySelf(ctx context.Context, req *ApiKeyIdReq) (*apiKeyItem, *base
 		return nil, base.ErrInternal
 	}
 	k.Enabled = !k.Enabled
-	item := toApiKeyItem(*k, true)
+	item := toApiKeyItem(*k, "")
 	return &item, nil
 }
 
@@ -286,7 +290,7 @@ func RenameApiKeySelf(ctx context.Context, req *RenameApiKeyReq) (*apiKeyItem, *
 		return nil, base.ErrInternal
 	}
 	k.Name = name
-	item := toApiKeyItem(*k, true)
+	item := toApiKeyItem(*k, "")
 	return &item, nil
 }
 
@@ -319,7 +323,7 @@ func UpdateBudgetApiKeySelf(ctx context.Context, req *UpdateBudgetApiKeyReq) (*a
 	}
 	k.Budget = req.Budget
 	k.Unlimited = req.Unlimited
-	item := toApiKeyItem(*k, true)
+	item := toApiKeyItem(*k, "")
 	return &item, nil
 }
 
@@ -338,7 +342,7 @@ func ListApiKeyAdmin(ctx context.Context, req *ApiKeyListReq) (*base.PageResult[
 	}
 	items := make([]apiKeyItem, 0, len(keys))
 	for _, k := range keys {
-		items = append(items, toApiKeyItem(k, true))
+		items = append(items, toApiKeyItem(k, ""))
 	}
 	return &base.PageResult[apiKeyItem]{Items: items, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
@@ -361,7 +365,7 @@ func ToggleApiKeyAdmin(ctx context.Context, req *ApiKeyIdReq) (*apiKeyItem, *bas
 		return nil, base.ErrInternal
 	}
 	k.Enabled = !k.Enabled
-	item := toApiKeyItem(*k, true)
+	item := toApiKeyItem(*k, "")
 	return &item, nil
 }
 
@@ -410,7 +414,7 @@ func RenameApiKeyAdmin(ctx context.Context, req *RenameApiKeyReq) (*apiKeyItem, 
 		return nil, base.ErrInternal
 	}
 	k.Name = name
-	item := toApiKeyItem(*k, true)
+	item := toApiKeyItem(*k, "")
 	return &item, nil
 }
 
@@ -446,7 +450,7 @@ func UpdateBudgetApiKeyAdmin(ctx context.Context, req *UpdateBudgetApiKeyReq) (*
 	}
 	k.Budget = req.Budget
 	k.Unlimited = req.Unlimited
-	item := toApiKeyItem(*k, true)
+	item := toApiKeyItem(*k, "")
 	return &item, nil
 }
 

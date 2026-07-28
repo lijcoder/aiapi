@@ -10,7 +10,7 @@
 - **Token 用量统计**：自动记录 input / output tokens
 - **请求日志**：保存每次请求的参数、响应状态、耗时与错误信息
 - **Provider 管理**：内置 CRUD 接口动态管理上游配置
-- **API Key 管理**：校验调用方身份，支持启用/禁用
+- **API Key 管理**：校验调用方身份，支持启用/禁用；key 原文不落库（SHA-256 哈希存储，展示为 `sk-abc****xyz` 头尾片段），明文仅创建时返回一次
 - **管理台**：内置 Web 管理界面，支持双 token 安全登录、TOTP 两步验证（2FA）、充值、流水查询
 
 ## 架构概览
@@ -214,7 +214,7 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
 ### 核心数据表
 
 - `providers`：上游提供商配置
-- `api_keys`：调用方 API Key
+- `api_keys`：调用方 API Key（存 `key_hash` + `key_show`，不存原文）
 - `usage_records`：Token 用量记录
 - `request_logs`：请求日志与错误信息
 - `users` / `roles` / `user_roles` / `role_permission` / `user_sessions`：用户/角色/权限/会话

@@ -26,10 +26,10 @@ func (cs *ChargeStore) DeductUserBudget(userID int64, amount float64) error {
 }
 
 // DeductKeyBudget 扣减 API Key 余额（amount 为正）
-func (cs *ChargeStore) DeductKeyBudget(key string, amount float64) error {
+func (cs *ChargeStore) DeductKeyBudget(id int64, amount float64) error {
 	_, err := cs.s.Query(
-		`UPDATE api_keys SET budget = budget - :amount WHERE key = :key`,
-		map[string]any{"key": key, "amount": amount},
+		`UPDATE api_keys SET budget = budget - :amount WHERE id = :id`,
+		map[string]any{"id": id, "amount": amount},
 	).Exec()
 	return err
 }

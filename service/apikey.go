@@ -1,9 +1,39 @@
 package service
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
 )
+
+// ApiKeyHash 计算 API Key 的存储哈希（SHA-256 hex）。
+// 鉴权、创建、迁移统一用本函数，保证哈希口径一致。
+func ApiKeyHash(key string) string {
+	h := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(h[:])
+}
+
+// key 展示片段的截取长度：前缀 sk- + 3 位 hex，后缀 3 位 hex。
+const (
+	apiKeyPrefixLen = 6 // sk- + 3 位 hex
+	apiKeySuffixLen = 3 // 末尾 3 位 hex
+)
+
+// ApiKeyShow 从明文 key 生成展示串（形态 sk-abc****xyz），落库存储。
+// key 原文不落库，此展示串是用户辨认 key 的唯一线索，创建与迁移统一口径。
+// 过短的 key 防御性处理：直接返回原文（本就不会发生，key 为 sk-+64hex）。
+func ApiKeyShow(key string) string {
+	if len(key) <= apiKeyPrefixLen {
+		return key
+	}
+	show := key[:apiKeyPrefixLen] + "****"
+	if len(key) > apiKeyPrefixLen+apiKeySuffixLen {
+		show += key[len(key)-apiKeySuffixLen:]
+	}
+	return show
+}
 
 // ApiKeyService 封装 API Key 相关业务逻辑（事务编排）。
 type ApiKeyService struct{}
@@ -59,9 +89,9 @@ func (s *ApiKeyService) Delete(apiKeyID int64) error {
 }
 
 // GetKeyAndUser 按 API Key 查询 key 及其关联用户（两步查询）。
-// key 不存在或未启用、用户不存在时返回 nil。
+// key 原文不落库，先算哈希再比对；key 不存在或未启用、用户不存在时返回 nil。
 func (s *ApiKeyService) GetKeyAndUser(apiKey string) (*model.ApiKey, *model.User, error) {
-	k, err := store.C().ApiKey().GetByKey(apiKey)
+	k, err := store.C().ApiKey().GetByKeyHash(ApiKeyHash(apiKey))
 	if err != nil {
 		return nil, nil, err
 	}

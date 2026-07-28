@@ -84,10 +84,13 @@ type UserSession struct {
 }
 
 // ApiKey API 密钥
+// key 原文不落库：KeyHash 用于鉴权比对，KeyPrefix 用于展示识别（如 sk-abcdef1）。
+// 明文 key 仅在创建时返回给用户一次，此后无法找回。
 type ApiKey struct {
 	ID          int64     `db:"id" json:"id"`
 	UserID      int64     `db:"user_id" json:"user_id"`
-	Key         string    `db:"key" json:"key"`
+	KeyHash     string    `db:"key_hash" json:"-"` // SHA-256(hex)，不对外输出
+	KeyShow     string    `db:"key_show" json:"-"`  // 展示串（sk-abc****xyz），由 store.ApiKeyShow 生成
 	Name        string    `db:"name" json:"name"`
 	Budget      float64   `db:"budget" json:"budget"`
 	Unlimited   bool      `db:"unlimited" json:"unlimited"`

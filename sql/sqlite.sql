@@ -50,7 +50,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_users_account ON users(account);
 CREATE TABLE IF NOT EXISTS api_keys (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL,
-    key        TEXT NOT NULL,
+    key_hash   TEXT NOT NULL,              -- key 原文不落库：SHA-256(hex)，鉴权比对用
+    key_show   TEXT NOT NULL DEFAULT '',   -- 展示串（sk-abc****xyz），创建后仅存此片段
     name       TEXT DEFAULT '',
     budget     REAL NOT NULL DEFAULT 0,
     unlimited  INTEGER NOT NULL DEFAULT 0,
@@ -58,7 +59,18 @@ CREATE TABLE IF NOT EXISTS api_keys (
     model_policy TEXT NOT NULL DEFAULT 'all',  -- 'all'=全量放行 | 'whitelist'=按 apikey_model_access 白名单
     created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_key ON api_keys(key);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_key_hash ON api_keys(key_hash);
+
+-- api_keys 迁移：key（明文）→ key_hash + key_show（存量库手动迁移）
+-- SQLite 无 SHA-256 函数，哈希需在外部计算（如 Python hashlib / shasum -a 256）。
+-- 步骤：
+--   1. ALTER TABLE api_keys RENAME COLUMN key TO key_hash;
+--   2. ALTER TABLE api_keys ADD COLUMN key_show TEXT NOT NULL DEFAULT '';
+--   3. 对每行明文 key 计算 sha256 hex 与展示串（sk- + 前3位hex + '****' + 后3位hex），逐行：
+--      UPDATE api_keys SET key_hash = '<sha256hex>', key_show = 'sk-abc****xyz' WHERE id = <id>;
+--   4. DROP INDEX IF EXISTS uq_api_keys_key;
+--      CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_key_hash ON api_keys(key_hash);
+-- 迁移完成后重启应用即可（鉴权按 key_hash 比对）。
 
 -- api_keys 扩展：增加 model_policy 列（模型访问策略）
 -- 新建库直接用上方定义；存量库需手动迁移：

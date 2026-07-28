@@ -56,7 +56,7 @@ func Record(ctx *types.Context) {
 		}
 		// 4.2 Key 有限额 → 额外扣 Key
 		if !ctx.KeyUnlimited {
-			if err := s.Charge().DeductKeyBudget(ctx.ApiKey, cost); err != nil {
+			if err := s.Charge().DeductKeyBudget(ctx.ApiKeyID, cost); err != nil {
 				return err
 			}
 		}

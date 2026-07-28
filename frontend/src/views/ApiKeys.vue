@@ -11,8 +11,8 @@
     <n-modal v-model:show="showCreate" preset="card" title="创建 API 密钥" style="width:460px" :mask-closable="false">
       <div style="display:flex;flex-direction:column;gap:14px">
         <div>
-          <div style="font-size:13px;margin-bottom:6px">名称（选填）</div>
-          <n-input v-model:value="form.name" placeholder="例如：测试环境" maxlength="64" />
+          <div style="font-size:13px;margin-bottom:6px">名称 <span style="color:#d03050">*</span></div>
+          <n-input v-model:value="form.name" placeholder="例如：测试环境（密钥不再可查看，名称是识别用途的唯一途径）" maxlength="64" />
         </div>
         <div>
           <div style="font-size:13px;margin-bottom:6px">额度模式</div>
@@ -222,6 +222,10 @@ function closeCreate() {
 
 async function doCreate() {
   createMsg.value = ''
+  if (!form.value.name.trim()) {
+    createMsg.value = '请填写名称'
+    return
+  }
   if (form.value.mode === 'limited' && (form.value.budget == null || form.value.budget < 0)) {
     createMsg.value = '金额不能小于 0'
     return
