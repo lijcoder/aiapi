@@ -238,7 +238,7 @@ type UsageStatsAdminReq struct {
 	Mode      string `json:"mode"`
 	StartDate string `json:"start_date"`
 	EndDate   string `json:"end_date"`
-	UserID    int64  `json:"user_id"`   // 可选，0=不限
+	UserID    int64  `json:"user_id"` // 可选，0=不限
 	ApiKeyId  int64  `json:"api_key_id"`
 	Model     string `json:"model"`
 	Provider  string `json:"provider"`

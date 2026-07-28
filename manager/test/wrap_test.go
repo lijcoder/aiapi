@@ -42,8 +42,8 @@ func respBody(c echo.Context) string {
 func decodeData(t *testing.T, body string) any {
 	t.Helper()
 	var out struct {
-		Code int    `json:"code"`
-		Data any    `json:"data"`
+		Code int `json:"code"`
+		Data any `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(body), &out); err != nil {
 		t.Fatalf("unmarshal %q: %v", body, err)

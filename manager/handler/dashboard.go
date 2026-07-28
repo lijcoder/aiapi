@@ -11,7 +11,7 @@ import (
 
 // DashboardResp 仪表盘响应
 type DashboardResp struct {
-	Summary service.DashboardSummary   `json:"summary"`
+	Summary service.DashboardSummary  `json:"summary"`
 	Trend   []store.DashboardTrendRow `json:"trend"`
 }
 

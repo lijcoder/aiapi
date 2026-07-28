@@ -33,14 +33,14 @@ type ListProvidersReq struct {
 }
 
 type CreateProviderReq struct {
-	Type    string             `json:"type"`
-	Domain  string             `json:"domain"`
+	Type    string              `json:"type"`
+	Domain  string              `json:"domain"`
 	Headers map[string][]string `json:"headers"`
 }
 
 type UpdateProviderReq struct {
-	Type    string             `json:"type"`
-	Domain  string             `json:"domain"`
+	Type    string              `json:"type"`
+	Domain  string              `json:"domain"`
 	Headers map[string][]string `json:"headers"`
 }
 
@@ -175,4 +175,3 @@ func ToggleProvider(ctx context.Context, req *ToggleProviderReq) (*struct{}, *ba
 	}
 	return &struct{}{}, nil
 }
-

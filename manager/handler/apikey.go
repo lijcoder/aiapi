@@ -457,19 +457,19 @@ func UpdateBudgetApiKeyAdmin(ctx context.Context, req *UpdateBudgetApiKeyReq) (*
 // ===== API Key 模型访问策略 =====
 
 // ApiKeyModelAccessReq 查询 Key 模型策略的请求
- type ApiKeyModelAccessReq struct {
+type ApiKeyModelAccessReq struct {
 	ApiKeyID int64 `json:"api_key_id"`
 }
 
 // SetApiKeyModelAccessReq 设置 Key 模型策略的请求
- type SetApiKeyModelAccessReq struct {
+type SetApiKeyModelAccessReq struct {
 	ApiKeyID    int64   `json:"api_key_id"`
 	ModelPolicy string  `json:"model_policy"` // all | whitelist
 	ModelIDs    []int64 `json:"model_ids"`    // whitelist 策略下生效
 }
 
 // ApiKeyModelAccessResp Key 模型策略响应
- type ApiKeyModelAccessResp struct {
+type ApiKeyModelAccessResp struct {
 	ModelPolicy string  `json:"model_policy"`
 	ModelIDs    []int64 `json:"model_ids"`
 }

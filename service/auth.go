@@ -68,7 +68,7 @@ func CheckPassword(passwordHash, password string) bool {
 
 // TokenPair 是签发/刷新后返回给 handler 的 token 组合。
 type TokenPair struct {
-	AccessToken  string    // access JWT，放响应体，前端存内存
+	AccessToken  string // access JWT，放响应体，前端存内存
 	AccessExp    time.Time
 	RefreshToken string    // 明文 refresh token，仅写 HttpOnly cookie
 	RefreshExp   time.Time // cookie 过期时间

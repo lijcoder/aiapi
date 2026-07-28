@@ -179,7 +179,7 @@ func buildUsageAdminWhere(userID int64, startDate, endDate string, apiKeyID int6
 	where := "WHERE u.created_at >= :start_date AND u.created_at <= :end_date"
 	params := map[string]any{
 		"start_date": startDate,
-		"end_date": endDate,
+		"end_date":   endDate,
 	}
 	if userID > 0 {
 		where += " AND u.user_id = :user_id"

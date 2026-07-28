@@ -77,7 +77,7 @@ func Login(c echo.Context) error {
 			return base.Fail(c, base.ErrInternal.Code, base.ErrInternal.Msg)
 		}
 		return base.Ok(c, map[string]any{
-			"need_2fa":      true,
+			"need_2fa":       true,
 			"pending_ticket": ticket,
 			"expires_in":     int((5 * time.Minute).Seconds()),
 		})

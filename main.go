@@ -10,8 +10,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/lijcoder/aiapi/constant"
 	"github.com/lijcoder/aiapi/framework"
-	"github.com/lijcoder/aiapi/manager/base"
 	aiapiLog "github.com/lijcoder/aiapi/log"
+	"github.com/lijcoder/aiapi/manager/base"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/driver"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -80,4 +80,3 @@ func initLogger() {
 	w := io.MultiWriter(os.Stdout, fileWriter)
 	slog.SetDefault(slog.New(aiapiLog.NewFormatter(w, slog.LevelInfo)))
 }
-

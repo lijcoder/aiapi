@@ -20,3 +20,6 @@ run:
 
 clean:
 	rm -rf aiapi frontend/dist/assets
+
+fmt:                                                                                                                                        
+	go fmt ./...

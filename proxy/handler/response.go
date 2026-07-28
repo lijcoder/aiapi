@@ -30,6 +30,7 @@ func Response(ctx *types.Context) {
 		writeResponse(ctx)
 	}
 }
+
 // hopByHopHeaders RFC 7230 §6.1 定义的逐跳头（key 为 Canonical 形式）。
 // 它们只描述「上游 → aiapi」这一段连接的传输状态，对「aiapi → 客户端」
 // 这段连接无意义，转发时必须剥掉，由 Go http.Server 自行重新协商。

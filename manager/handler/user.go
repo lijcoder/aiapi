@@ -15,15 +15,15 @@ import (
 // ===== 请求/响应结构 =====
 
 type userItem struct {
-	ID        int64   `json:"id"`
-	Name      string  `json:"name"`
-	Account   string  `json:"account"`
-	Budget    float64 `json:"budget"`
-	Unlimited bool    `json:"unlimited"`
-	Enabled   bool    `json:"enabled"`
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Account   string    `json:"account"`
+	Budget    float64   `json:"budget"`
+	Unlimited bool      `json:"unlimited"`
+	Enabled   bool      `json:"enabled"`
 	CreatedAt time.Time `json:"created_at"`
-	RoleNames []string `json:"role_names"`
-	RoleIDs   []int64  `json:"role_ids"`
+	RoleNames []string  `json:"role_names"`
+	RoleIDs   []int64   `json:"role_ids"`
 }
 
 type ListUsersReq struct {
@@ -333,4 +333,3 @@ func AssignRoles(ctx context.Context, req *AssignRolesReq) (*struct{}, *base.Biz
 	}
 	return &struct{}{}, nil
 }
-

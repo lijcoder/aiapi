@@ -134,5 +134,3 @@ func (ms *ModelStore) Delete(id int64) error {
 	).Exec()
 	return err
 }
-
-

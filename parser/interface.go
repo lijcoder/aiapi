@@ -23,10 +23,10 @@ type Usage struct {
 
 // StreamEvent 流式 SSE 事件
 type StreamEvent struct {
-	EventType string  // content / usage / done / error
-	Content   string  // delta 文本
-	Usage     *Usage  // 仅在最后一条事件中有
-	Model     string  // 模型名
+	EventType string // content / usage / done / error
+	Content   string // delta 文本
+	Usage     *Usage // 仅在最后一条事件中有
+	Model     string // 模型名
 }
 
 // Parser 各 Provider 的请求/响应解析器接口

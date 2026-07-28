@@ -5,8 +5,8 @@ import "github.com/jmoiron/sqlx"
 // Session 是数据库会话，保存事务连接与分页状态。
 // 每次查询经 store.C() 新建，请求级临时对象，不共享。
 type Session struct {
-	tx   *sqlx.Tx       // 事务连接，nil 则用默认 DB
-	page *PageContext   // 分页参数，nil 则不分页
+	tx   *sqlx.Tx     // 事务连接，nil 则用默认 DB
+	page *PageContext // 分页参数，nil 则不分页
 }
 
 // WithContext 返回一个空 Session（非事务、无分页）。

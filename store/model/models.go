@@ -32,16 +32,16 @@ func (p *Provider) ParseConfig() (*ProviderConfig, error) {
 
 // User 用户
 type User struct {
-	ID        int64     `db:"id" json:"id"`
-	Name      string    `db:"name" json:"name"`
-	Account   string    `db:"account" json:"account"`
-	Password  string    `db:"password" json:"-"` // bcrypt 哈希，不对外输出
-	TotpSecret string   `db:"totp_secret" json:"-"` // TOTP 密钥（AES-GCM 加密存储，空=未开启 2FA），不对外输出
-	Email     string    `db:"email" json:"email"`
-	Budget    float64   `db:"budget" json:"budget"`
-	Unlimited bool      `db:"unlimited" json:"unlimited"`
-	Enabled   bool      `db:"enabled" json:"enabled"`
-	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	ID         int64     `db:"id" json:"id"`
+	Name       string    `db:"name" json:"name"`
+	Account    string    `db:"account" json:"account"`
+	Password   string    `db:"password" json:"-"`    // bcrypt 哈希，不对外输出
+	TotpSecret string    `db:"totp_secret" json:"-"` // TOTP 密钥（AES-GCM 加密存储，空=未开启 2FA），不对外输出
+	Email      string    `db:"email" json:"email"`
+	Budget     float64   `db:"budget" json:"budget"`
+	Unlimited  bool      `db:"unlimited" json:"unlimited"`
+	Enabled    bool      `db:"enabled" json:"enabled"`
+	CreatedAt  time.Time `db:"created_at" json:"created_at"`
 }
 
 // Role 角色
@@ -73,13 +73,13 @@ type RolePermission struct {
 // UserSession 用户登录会话（refresh token 存储）
 type UserSession struct {
 	ID                int64     `db:"id" json:"id"`
-	Token             string    `db:"token" json:"-"`              // refresh token 的 SHA-256 哈希
-	FamilyID          string    `db:"family_id" json:"-"`         // 登录链标识，重用检测用
+	Token             string    `db:"token" json:"-"`     // refresh token 的 SHA-256 哈希
+	FamilyID          string    `db:"family_id" json:"-"` // 登录链标识，重用检测用
 	UserID            int64     `db:"user_id" json:"user_id"`
-	ExpiresAt         time.Time `db:"expires_at" json:"expires_at"`          // 滑动过期时间
+	ExpiresAt         time.Time `db:"expires_at" json:"expires_at"`                   // 滑动过期时间
 	AbsoluteExpiresAt time.Time `db:"absolute_expires_at" json:"absolute_expires_at"` // 绝对过期上限
-	UA                string    `db:"ua" json:"ua"`                // User-Agent 摘要
-	IP                string    `db:"ip" json:"ip"`                // 登录 IP
+	UA                string    `db:"ua" json:"ua"`                                   // User-Agent 摘要
+	IP                string    `db:"ip" json:"ip"`                                   // 登录 IP
 	CreatedAt         time.Time `db:"created_at" json:"created_at"`
 }
 
@@ -90,7 +90,7 @@ type ApiKey struct {
 	ID          int64     `db:"id" json:"id"`
 	UserID      int64     `db:"user_id" json:"user_id"`
 	KeyHash     string    `db:"key_hash" json:"-"` // SHA-256(hex)，不对外输出
-	KeyShow     string    `db:"key_show" json:"-"`  // 展示串（sk-abc****xyz），由 store.ApiKeyShow 生成
+	KeyShow     string    `db:"key_show" json:"-"` // 展示串（sk-abc****xyz），由 store.ApiKeyShow 生成
 	Name        string    `db:"name" json:"name"`
 	Budget      float64   `db:"budget" json:"budget"`
 	Unlimited   bool      `db:"unlimited" json:"unlimited"`

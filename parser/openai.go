@@ -27,9 +27,9 @@ func (p *OpenAIParser) ParseApiKey(headers map[string][]string) string {
 
 // openaiUsage 非流式/流式通用的 usage 结构
 type openaiUsage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens        int `json:"prompt_tokens"`
+	CompletionTokens    int `json:"completion_tokens"`
+	TotalTokens         int `json:"total_tokens"`
 	PromptTokensDetails *struct {
 		CachedTokens int `json:"cached_tokens"`
 	} `json:"prompt_tokens_details"`
@@ -54,7 +54,7 @@ type openaiStreamChunk struct {
 	Model   string `json:"model"`
 	Object  string `json:"object"`
 	Choices []struct {
-		Index int    `json:"index"`
+		Index int `json:"index"`
 		Delta struct {
 			Role    string `json:"role"`
 			Content string `json:"content"`

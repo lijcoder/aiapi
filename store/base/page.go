@@ -17,7 +17,7 @@ type PageReq struct {
 
 const (
 	defaultPageSize = 20
-	maxPageSize    = 100
+	maxPageSize     = 100
 )
 
 // Normalize 规范化分页参数，返回合法的 page/size 与计算好的 offset。

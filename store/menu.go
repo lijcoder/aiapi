@@ -149,5 +149,3 @@ func (ms *MenuStore) DeleteRoleMenus(roleID int64) error {
 	).Exec()
 	return err
 }
-
-

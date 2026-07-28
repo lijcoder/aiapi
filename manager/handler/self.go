@@ -32,7 +32,7 @@ type menuItem struct {
 // SelfResp /manager/self 响应
 type SelfResp struct {
 	User        userInfo               `json:"user"`
-	Menus      []*menuItem             `json:"menus"`
+	Menus       []*menuItem            `json:"menus"`
 	Permissions []model.RolePermission `json:"permissions"`
 }
 
@@ -74,7 +74,7 @@ func Self(ctx context.Context) (*SelfResp, *base.BizError) {
 			Budget:      user.Budget,
 			TotpEnabled: user.TotpSecret != "",
 		},
-		Menus:      buildMenuTree(menus),
+		Menus:       buildMenuTree(menus),
 		Permissions: base.CurrentPermissions(ctx),
 	}, nil
 }

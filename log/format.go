@@ -56,4 +56,4 @@ func (h *Formatter) Handle(_ context.Context, r slog.Record) error {
 }
 
 func (h *Formatter) WithAttrs(_ []slog.Attr) slog.Handler { return h }
-func (h *Formatter) WithGroup(_ string) slog.Handler     { return h }
+func (h *Formatter) WithGroup(_ string) slog.Handler      { return h }
