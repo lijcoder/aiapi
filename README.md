@@ -71,14 +71,22 @@ go build -o aiapi .
 
 ### 启动
 
-双 token 登录机制需要通过环境变量 `AIAPI_JWT_SECRET` 提供 access JWT 签名密钥（≥32 字节），缺失或过短启动会失败。
+密钥加载优先级：**环境变量 > 密钥文件 > 自动生成**。
+不设置任何环境变量也能启动——首次启动自动生成随机密钥写入 `<数据目录>/keys/`（0600 权限），后续启动直接复用：
 
 ```bash
-# 设置 JWT 密钥（示例，生产请用强随机串）
-export AIAPI_JWT_SECRET="your-super-secret-at-least-32-bytes-long"
-
 # 默认端口 8888，数据目录 ~/.aiapi
 ./aiapi
+
+# 如需显式管理密钥（生产推荐），通过环境变量提供（≥32 字节）：
+export AIAPI_JWT_SECRET="your-jwt-secret-at-least-32-bytes"       # 签名密钥（access JWT / 2FA 票据）
+export AIAPI_CRYPTO_SECRET="your-crypto-secret-at-least-32-bytes" # 加密密钥（TOTP / Provider 配置落库加密）
+```
+
+密钥说明：
+- **两把钥匙职责分离**：签名密钥轮换代价低（用户重登即可）；加密密钥轮换会使历史密文（2FA 密钥、provider 配置）无法解密，需重新绑定/保存
+- 密钥文件为 `<数据目录>/keys/jwt.key` 与 `crypto.key`；**备份数据库时必须排除 `keys/` 目录**，且不要将数据目录提交到任何仓库/网盘
+- 旧版本升级：首次启动时加密密钥自动从 `AIAPI_JWT_SECRET` 播种（历史密文保持可解），此后两把钥匙独立演进；请保持原环境变量至少完成一次启动
 
 # 指定端口
 ./aiapi --port 8888
@@ -109,7 +117,7 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
 3. 之后登录需在密码验证后再输入一次验证码
 
 安全设计：
-- TOTP 密钥经 AES-256-GCM 加密后入库（密钥派生自 `AIAPI_JWT_SECRET`），数据库泄露不直接暴露 2FA
+- TOTP 密钥经 AES-256-GCM 加密后入库（加密密钥独立于签名密钥，见「启动」一节密钥说明），数据库泄露不直接暴露 2FA
 - 密码验证通过后只签发 5 分钟有效的 pending 票据，同一票据验证码连续错 5 次即作废
 - 关闭 2FA 需重新校验登录密码
 
@@ -201,7 +209,7 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
 
 默认使用 SQLite，数据库文件位于 `~/.aiapi/aiapi.db`。
 
-> 双 token 登录机制上线后，存量库需迁移 `user_sessions` 表（加 `family_id` / `absolute_expires_at` / `ua` / `ip` 列、建 family 索引、清空旧 session），详见 `sql/sqlite.sql` 内注释。同时需设置环境变量 `AIAPI_JWT_SECRET`（≥32 字节）才能启动。
+> 双 token 登录机制上线后，存量库需迁移 `user_sessions` 表（加 `family_id` / `absolute_expires_at` / `ua` / `ip` 列、建 family 索引、清空旧 session），详见 `sql/sqlite.sql` 内注释。
 
 ### 核心数据表
 
@@ -250,7 +258,7 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
 - 重用检测：旧 refresh token 再次被使用时吊销整个 family，强制重登。
 - 改密 / 禁用用户 / 重置密码后吊销该用户所有会话，即时失效。
 - 账号不存在 / 禁用 / 密码错统一返回相同文案，防账号枚举。
-- access JWT 签名密钥由环境变量 `AIAPI_JWT_SECRET`（≥32 字节）提供，启动校验。
+- 签名密钥（JWT/票据）与加密密钥（落库敏感字段）分离，支持环境变量或 `<数据目录>/keys/` 密钥文件（0600）提供，未配置时自动生成。
 - **HTTPS 反代部署**：refresh cookie 的 `Secure` 标记由后端根据请求 scheme 动态判定。若用 nginx 终止 TLS、HTTP 反代到后端，需转发 `X-Forwarded-Proto` 头（或 `X-Forwarded-Protocol` / `X-Forwarded-Ssl: on` / `X-Url-Scheme` 任一），后端据此识别为 HTTPS 并设置 `Secure`，否则会被误判为 HTTP：
   ```nginx
   location / {

@@ -1,11 +1,12 @@
 // crypto.go 提供「敏感配置落库加密」的通用能力（AES-256-GCM）。
 //
-// 加密密钥由 AIAPI_JWT_SECRET 按用途派生：SHA-256(JWTSecret + purpose)，
-// 不同业务用不同 purpose 实现密钥隔离（互不能解密对方的密文）。
-// 输出格式：base64(nonce + ciphertext)，密文可区分于明文 JSON（明文以 '{' 开头）。
+// 加密密钥由 CryptoSecret（见 manager/base/secret.go）按用途派生：
+// SHA-256(CryptoSecret + purpose)，不同业务用不同 purpose 实现密钥隔离
+// （互不能解密对方的密文）。输出格式：base64(nonce + ciphertext)，
+// 密文可区分于明文 JSON（明文以 '{' 开头）。
 //
-// 注意：轮换 AIAPI_JWT_SECRET 会导致所有密文无法解密（TOTP 密钥、provider 配置等），
-// 运维文档需明确该影响。
+// 注意：轮换加密密钥会导致所有密文无法解密（TOTP 密钥、provider 配置等），
+// 轮换需配套 re-encrypt 迁移，运维文档需明确该影响。
 package service
 
 import (
@@ -28,12 +29,12 @@ const (
 	purposeProviderConfig = ":provider-config" // Provider 配置（providers.config，含上游 Key）
 )
 
-// deriveKey 按用途派生 AES-256 密钥：SHA-256(JWTSecret + purpose)。
+// deriveKey 按用途派生 AES-256 密钥：SHA-256(CryptoSecret + purpose)。
 func deriveKey(purpose string) ([]byte, error) {
-	if len(base.JWTSecret) == 0 {
-		return nil, errors.New("jwt secret not loaded")
+	if len(base.CryptoSecret) == 0 {
+		return nil, errors.New("crypto secret not loaded")
 	}
-	h := sha256.Sum256(append([]byte(base.JWTSecret), purpose...))
+	h := sha256.Sum256(append([]byte(base.CryptoSecret), purpose...))
 	return h[:], nil
 }
 

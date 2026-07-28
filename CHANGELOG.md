@@ -5,7 +5,9 @@
 
 ## [Unreleased]
 
-- 安全加固：Provider 配置（含上游 API Key）落库改为 AES-256-GCM 加密（密钥派生自 `AIAPI_JWT_SECRET`，新增 `service/crypto.go` 通用加密模块，与 TOTP 密钥加密用途隔离）。存量明文配置读取时自动兼容，管理端重新保存后转为密文（渐进迁移，无需 DDL）。
+- 密钥管理重构：签名密钥（JWT/2FA 票据）与加密密钥（TOTP/Provider 配置落库加密）拆分为两把独立密钥。加载优先级为环境变量（新增 `AIAPI_CRYPTO_SECRET`）> 密钥文件（`<DataDir>/keys/*.key`，0600 权限）> 自动生成并写文件——不设置环境变量也可启动（旧版本缺失环境变量会启动失败，行为变更）。旧部署升级时加密密钥自动从 `AIAPI_JWT_SECRET` 播种，历史密文（2FA 密钥、provider 配置）保持可解，请保持原环境变量至少完成一次启动。
+
+- 安全加固：Provider 配置（含上游 API Key）落库改为 AES-256-GCM 加密（加密密钥独立于签名密钥按用途派生，新增 `service/crypto.go` 通用加密模块，与 TOTP 密钥加密用途隔离）。存量明文配置读取时自动兼容，管理端重新保存后转为密文（渐进迁移，无需 DDL）。
 - 修复代理日志泄露完整 API Key：`budget.go` 余额不足错误不再打印 key 原文，改为打印 `apiKeyId`（Auth 阶段已注入 ctx，可定位问题且不落任何 key 材料）。
 
 - 新增 TOTP 两步验证（2FA）：管理台用户可在个人设置页自助绑定 Authenticator（扫码/手动密钥 + 首个验证码确认），开启后登录需密码 + 6 位动态码两步。TOTP 密钥 AES-256-GCM 加密入库（密钥派生自 `AIAPI_JWT_SECRET`）；密码验证通过后仅签发 5 分钟 pending 票据，同一票据验证码连续错 5 次作废；关闭 2FA 需校验密码。新增接口 `/manager/login/2fa`、`/manager/2fa/{setup,confirm,disable}/self`；`users` 表新增 `totp_secret` 列（存量库需 `ALTER TABLE` 迁移，并重跑 `sql/init-data.sql` 补普通用户角色的 2FA 接口权限）；新依赖 `github.com/pquerna/otp`。

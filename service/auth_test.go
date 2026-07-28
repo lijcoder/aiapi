@@ -14,6 +14,7 @@ import (
 
 func setSecretForTest() {
 	base.JWTSecret = []byte("test-secret-must-be-at-least-32-bytes-long!!")
+	base.CryptoSecret = []byte("test-crypto-secret-at-least-32-bytes!")
 }
 
 func TestSignAndParseAccess(t *testing.T) {

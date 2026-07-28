@@ -43,3 +43,33 @@ func LogDir() string {
 func LogFilePath() string {
 	return filepath.Join(LogDir(), "app.log")
 }
+
+// ===== 密钥基础设施（跨业务共享）=====
+//
+// 环境变量名、密钥文件名、长度下限是部署契约：未来新业务配置密钥时
+// 必须复用这套定义，不各自造一套（避免配置重复/不当）。变更需同步文档。
+
+const (
+	MinSecretLen = 32 // 密钥长度下限（字节）
+
+	EnvJWTSecret    = "AIAPI_JWT_SECRET"    // 签名密钥环境变量（JWT / 2FA 票据）
+	EnvCryptoSecret = "AIAPI_CRYPTO_SECRET" // 加密密钥环境变量（落库敏感字段加密派生）
+
+	jwtKeyFile    = "jwt.key"    // 签名密钥文件名
+	cryptoKeyFile = "crypto.key" // 加密密钥文件名
+)
+
+// KeysDir 返回密钥文件目录（<DataDir>/keys，权限 0700）
+func KeysDir() string {
+	return filepath.Join(DataDir, "keys")
+}
+
+// JWTKeyFilePath 返回签名密钥文件完整路径
+func JWTKeyFilePath() string {
+	return filepath.Join(KeysDir(), jwtKeyFile)
+}
+
+// CryptoKeyFilePath 返回加密密钥文件完整路径
+func CryptoKeyFilePath() string {
+	return filepath.Join(KeysDir(), cryptoKeyFile)
+}

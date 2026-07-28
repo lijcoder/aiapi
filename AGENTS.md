@@ -27,7 +27,7 @@
 | 业务服务层 | 跨 handler 复用的业务逻辑、多表事务编排，不依赖 echo | `service/*.go` |
 | 后台中间件层 | 登录态校验、接口级权限判定，只做 HTTP 适配 | `manager/middleware/*.go` |
 | 数据持久层 | 数据库访问、模型定义、查询构造 | `store/*.go` |
-| 通用工具层 | 常量、日志格式化、SSE 包装等 | `constant/`、`log/`、`proxy/sse/` |
+| 通用工具层 | 跨包共享常量、日志格式化、SSE 包装等 | `constant/`、`log/`、`proxy/sse/` |
 
 ### 2.2 关键边界
 
@@ -77,7 +77,9 @@
 - 新增管理接口 → `manager/handler/`（HTTP 适配）+ `service/`（业务逻辑）
 - 新增业务逻辑（事务编排、跨表组装、业务判断）→ `service/`
 - 新增数据表或查询 → `store/` 与 `sql/`
-- 新增通用常量或工具 → `constant/` 或 `log/`
+- 新增常量按归属分流：**跨业务复用的基础设施常量**（环境变量名、密钥长度下限等，未来新业务也可能用到，散写会导致配置重复/不当）→ 根目录 `constant/constant.go`；**业务域自用常量**（如 manager 的会话 TTL、cookie 名）→ 留在本业务包（如 `manager/base/constant.go`），不堆进 constant 形成上帝包
+- 数据目录下的文件路径（DB、日志、密钥文件等）统一由 `constant` 的路径方法提供（`DBFilePath`/`LogFilePath`/`JWTKeyFilePath` 等），业务代码不自行拼接路径；密钥加载（env > 密钥文件 > 自动生成）统一走 `constant.LoadSecret`，业务层只做编排（参考 `manager/base/secret.go`），不各自实现加载逻辑
+- 新增通用工具 → `log/`
 
 ### 3.2 目录命名规则
 
@@ -231,7 +233,7 @@
 - 管理接口应考虑访问控制，避免任意用户修改 Provider 配置。
 - `manager/` 下所有需登录态的接口必须经过 `manager/middleware.Auth` 中间件（access JWT 校验 + 接口级权限 `role_permission(entity=API, value=path)` 判定 + 注入登录态），业务函数由 `base.Wrap` 做参数包装与响应输出。
 - 登录态采用双 token 机制：access JWT（HS256 自实现，15min 无状态，经 `Authorization: Bearer` 头传递，前端存内存）+ refresh token（随机串哈希存 `user_sessions` 表，HttpOnly Secure cookie `refresh_token` 传递，滑动 7 天 / 绝对 30 天，带轮换与重用检测）。`/manager/login`、`/manager/login/2fa`、`/manager/refresh` 不挂 Auth 中间件（login 无需登录态；login/2fa 凭 5 分钟 pending 票据；refresh 靠 refresh cookie 续期，不依赖 access JWT）。
-- 两步验证（2FA/TOTP）为可选开启：`users.totp_secret` 存 AES-256-GCM 加密的 TOTP 密钥（加密密钥派生自 `AIAPI_JWT_SECRET`），空串=未开启。开启后登录分两步：密码通过 → 签发 pending 票据（HS256 JWT，5min，purpose=2fa_pending）→ `/manager/login/2fa` 验票 + 验证码后才发 token 对；同一票据验证码连续错 5 次作废（内存计数）。绑定用 setup 票据（purpose=2fa_setup，内含密钥，确认首个验证码后才落库）。业务封装在 `service/totp.go`（TOTPService）。
-- access JWT 签名密钥走环境变量 `AIAPI_JWT_SECRET`（≥32 字节），启动时由 `base.LoadJWTSecret` 校验；登录会话业务封装在 `service` 的 `SessionService`，改密 / 禁用用户 / 重置密码后吊销该用户所有会话。
+- 两步验证（2FA/TOTP）为可选开启：`users.totp_secret` 存 AES-256-GCM 加密的 TOTP 密钥（加密密钥由 `CryptoSecret` 派生，见密钥管理条目），空串=未开启。开启后登录分两步：密码通过 → 签发 pending 票据（HS256 JWT，5min，purpose=2fa_pending）→ `/manager/login/2fa` 验票 + 验证码后才发 token 对；同一票据验证码连续错 5 次作废（内存计数）。绑定用 setup 票据（purpose=2fa_setup，内含密钥，确认首个验证码后才落库）。业务封装在 `service/totp.go`（TOTPService）。
+- 密钥管理（`manager/base/secret.go`）：签名密钥 `JWTSecret`（JWT/2FA 票据签名）与加密密钥 `CryptoSecret`（`service/crypto.go` 派生 AES 密钥，加密 TOTP 密钥 / Provider 配置等落库敏感字段）分离。加载优先级：环境变量（`AIAPI_JWT_SECRET` / `AIAPI_CRYPTO_SECRET`）> 密钥文件（`<DataDir>/keys/*.key`，0600）> 自动生成写文件；crypto.key 缺失且签名密钥来自环境变量时从其播种（旧部署兼容）。密钥与 DB 分离存放，备份 DB 须排除 keys/ 目录。登录会话业务封装在 `service` 的 `SessionService`，改密 / 禁用用户 / 重置密码后吊销该用户所有会话。
 - 登录态不复用 proxy 的 header 鉴权字段；账号不存在 / 禁用 / 密码错统一返回相同文案防枚举。
 - `manager` 自有业务码定义在 `manager/base/bizcode.go`，与 `proxy/types/bizcode.go` 解耦，两套独立编号。manager 侧只保留 7 个通用码：有消费方按 code 分支的（前端唯一依赖 `CodeTokenExpired` 1016 触发 refresh，编号不可变）或 HTTP 状态语义不同的；**业务错误不为每种业务定义独立码**，handler 统一用 `base.ErrBadReq(中文消息)` / `base.ErrNotFound(中文消息)` 返回，错误信息必须中文；DB 等内部错误统一返回预置实例 `base.ErrInternal`。

@@ -21,8 +21,8 @@ import (
 func main() {
 	constant.ParseArgs()
 	initLogger()
-	if err := base.LoadJWTSecret(); err != nil {
-		slog.Error("jwt secret load failed", "err", err)
+	if err := base.LoadSecrets(); err != nil {
+		slog.Error("secret load failed", "err", err)
 		panic(err)
 	}
 	initStore()
