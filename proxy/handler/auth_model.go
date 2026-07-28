@@ -1,51 +1,15 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
-	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
 )
 
-var (
-	errMissingKey   = errors.New("missing api key")
-	errInvalidKey   = errors.New("invalid api key")
-	errUserDisabled = errors.New("user is disabled")
-)
-
-// Auth 校验 API Key
-func Auth(ctx *types.Context) {
-	if ctx.ApiKey == "" {
-		ctx.Err = log.WithStack(errMissingKey)
-		ctx.ErrorMessage = "missing api key"
-		ctx.Code = types.CodeUnauthorized
-		return
-	}
-	key, user, err := service.NewApiKeyService().GetKeyAndUser(ctx.ApiKey)
-	if err != nil {
-		ctx.Err = log.WithStack(err)
-		ctx.ErrorMessage = types.InternalServerError
-		ctx.Code = types.CodeUnknown
-		return
-	}
-	if key == nil {
-		ctx.Err = log.WithStack(errInvalidKey)
-		ctx.ErrorMessage = "invalid api key"
-		ctx.Code = types.CodeUnauthorized
-		return
-	}
-	if user == nil {
-		ctx.Err = log.WithStack(errUserDisabled)
-		ctx.ErrorMessage = "user is disabled"
-		ctx.Code = types.CodeUnauthorized
-		return
-	}
-	ctx.UserID = user.ID
-	ctx.ApiKeyID = key.ID
-
+// AuthModel 校验模型定价配置存在、且当前 API Key 有权访问该模型，设置 ctx.ModelInfo
+func AuthModel(ctx *types.Context) {
 	// 校验模型定价配置是否存在
 	pvd, err := store.C().Model().Get(ctx.ProviderType, ctx.Model)
 	if err != nil {

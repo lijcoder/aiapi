@@ -59,6 +59,32 @@ func (ms *ModelStore) List(providerKw, modelKw string) ([]model.Model, error) {
 	return models, nil
 }
 
+// ListByProvider 查询指定 provider 下的全部模型（按 model 排序）
+func (ms *ModelStore) ListByProvider(provider string) ([]model.Model, error) {
+	var models []model.Model
+	err := ms.s.Query(
+		`SELECT * FROM models WHERE provider = :provider ORDER BY model`,
+		map[string]any{"provider": provider},
+	).Select(&models)
+	if err != nil {
+		return nil, err
+	}
+	return models, nil
+}
+
+// ListByIDs 按 ID 列表批量查询模型（按 model 排序）
+func (ms *ModelStore) ListByIDs(ids []int64) ([]model.Model, error) {
+	var models []model.Model
+	err := ms.s.Query(
+		`SELECT * FROM models WHERE id IN (:ids) ORDER BY model`,
+		map[string]any{"ids": ids},
+	).Select(&models)
+	if err != nil {
+		return nil, err
+	}
+	return models, nil
+}
+
 // GetByID 按 ID 查询模型
 func (ms *ModelStore) GetByID(id int64) (*model.Model, error) {
 	var m model.Model

@@ -1,6 +1,9 @@
 package parser
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 // API 协议格式常量
 const (
@@ -43,6 +46,30 @@ type Parser interface {
 	// ParseStreamEvent 解析单条 SSE data 行
 	// 返回 nil, nil 表示当前行不包含需要处理的事件
 	ParseStreamEvent(data []byte) (*StreamEvent, error)
+}
+
+// ModelItem 协议中立的模型条目，用于「列出模型」端点的响应序列化。
+// 由业务层从 store 模型映射而来，parser 不反向依赖 store。
+type ModelItem struct {
+	ID        string    // 模型名
+	CreatedAt time.Time // 创建时间
+	OwnedBy   string    // 所属方（provider 标识）
+}
+
+// ModelsFormatter 可选接口：支持「列出模型」端点响应序列化的 Parser 实现它。
+// 各协议响应形状不同（OpenAI 为 {object:"list",data:[...]}），通过类型断言使用，
+// 不影响未实现的 Parser（如 Gemini TODO）。
+type ModelsFormatter interface {
+	FormatModels(items []ModelItem) ([]byte, error)
+}
+
+// FormatModelList 序列化模型列表响应：优先用给定 Parser 的 ModelsFormatter 实现，
+// 未实现时回退 OpenAI 格式（调用方最常见的协议形态）。
+func FormatModelList(p Parser, items []ModelItem) ([]byte, error) {
+	if f, ok := p.(ModelsFormatter); ok {
+		return f.FormatModels(items)
+	}
+	return OpenAI.(ModelsFormatter).FormatModels(items)
 }
 
 // 无状态 Parser，包级单例

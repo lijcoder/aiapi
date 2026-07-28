@@ -1,6 +1,9 @@
 package parser
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // AnthropicParser Anthropic 请求/响应解析器
 type AnthropicParser struct{}
@@ -23,6 +26,44 @@ func (p *AnthropicParser) ParseApiKey(headers map[string][]string) string {
 		return k
 	}
 	return extractBearerToken(headers)
+}
+
+// 编译期断言：AnthropicParser 实现 ModelsFormatter
+var _ ModelsFormatter = (*AnthropicParser)(nil)
+
+// anthropicModelList Anthropic「列出模型」响应结构
+type anthropicModelList struct {
+	Data    []anthropicModelObj `json:"data"`
+	FirstID *string             `json:"first_id"`
+	LastID  *string             `json:"last_id"`
+	HasMore bool                `json:"has_more"`
+}
+
+type anthropicModelObj struct {
+	Type        string `json:"type"`
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name"`
+	CreatedAt   string `json:"created_at"`
+}
+
+// FormatModels 序列化为 Anthropic List Models 响应格式。
+// 本地全量返回：不支持 limit/before_id/after_id 分页参数，has_more 恒为 false；
+// 本地无展示名配置，display_name 以模型名代替。
+func (p *AnthropicParser) FormatModels(items []ModelItem) ([]byte, error) {
+	list := anthropicModelList{Data: make([]anthropicModelObj, 0, len(items))}
+	for _, it := range items {
+		list.Data = append(list.Data, anthropicModelObj{
+			Type:        "model",
+			ID:          it.ID,
+			DisplayName: it.ID,
+			CreatedAt:   it.CreatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+	if len(items) > 0 {
+		first, last := items[0].ID, items[len(items)-1].ID
+		list.FirstID, list.LastID = &first, &last
+	}
+	return json.Marshal(list)
 }
 
 // anthropicNonStreamResp 非流式响应结构

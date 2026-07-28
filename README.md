@@ -205,6 +205,42 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
   }'
 ```
 
+### 列出可用模型（v1/models）
+
+`GET v1/models` 为本地元数据端点（不经上游转发、不计费），返回当前 Provider 下、且当前 API Key 有权访问的模型列表（与代理鉴权的可用性口径一致）：
+
+```bash
+curl http://localhost:8888/proxy/openai/openai/v1/models \
+  -H "Authorization: Bearer sk-xxx"
+```
+
+```json
+{
+  "object": "list",
+  "data": [
+    {"id": "gpt-4o-mini", "object": "model", "created": 1715000000, "owned_by": "openai"}
+  ]
+}
+```
+
+Anthropic 协议同路径可用（响应为 Anthropic 格式，鉴权走 `x-api-key` 头）：
+
+```bash
+curl http://localhost:8888/proxy/anthropic/anthropic/v1/models \
+  -H "x-api-key: sk-xxx"
+```
+
+```json
+{
+  "data": [
+    {"type": "model", "id": "claude-sonnet-4-5", "display_name": "claude-sonnet-4-5", "created_at": "2026-07-28T00:00:00Z"}
+  ],
+  "first_id": "claude-sonnet-4-5",
+  "last_id": "claude-sonnet-4-5",
+  "has_more": false
+}
+```
+
 ### 数据存储
 
 默认使用 SQLite，数据库文件位于 `~/.aiapi/aiapi.db`。

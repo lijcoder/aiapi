@@ -19,7 +19,7 @@
 | 层次 | 职责 | 代表位置 |
 |------|------|----------|
 | 入口层 | 参数解析、日志/数据库初始化、启动服务 | `main.go` |
-| 框架适配层 | HTTP 路由注册、请求参数提取、响应写入 | `framework/echo.go` |
+| 框架适配层 | 创建路由组与全局中间件；各业务在自己的 router 文件注册路由、做请求参数提取与响应写入 | `framework/echo.go`、`proxy/router/`、`manager/router/` |
 | 业务编排层 | 组装并执行请求处理 Pipeline | `proxy/direct.go` |
 | 业务处理层 | 单一职责的 handler，完成具体业务逻辑 | `proxy/handler/*.go` |
 | 协议解析层 | 不同厂商的请求/响应解析与 Key 提取 | `parser/*.go` |
@@ -31,7 +31,7 @@
 
 ### 2.2 关键边界
 
-- `framework/echo.go` 只做 HTTP 参数解析和响应适配，不写业务逻辑。
+- `framework/echo.go` 只创建路由组与挂全局中间件，不写业务逻辑；路由注册与 echo 适配（参数提取、响应写入）下沉到各业务自己的 router 文件（`proxy/router/`、`manager/router/`），路由组根路径（`/proxy`、`/manager`）由 `framework/echo.go` 直写。
 - `proxy/direct.go` 只负责 Pipeline 组装，不实现具体业务。
 - `proxy/handler/` 是代理业务逻辑唯一入口，每个 handler 应尽量独立、可测试。
 - `parser/` 只负责协议相关的解析与提取，不直接操作数据库或写响应。
@@ -107,6 +107,13 @@
 - 无副作用：失败时只设置错误，不写入响应体。
 - 可测试：handler 应能独立于 Echo 和真实数据库进行单元测试。
 
+### 4.3 元数据端点（非转发请求）
+
+- `GET v1/models` 等不依赖上游的端点，**由 `proxy/router` 注册具体路由区分入口**（echo 静态段优先于通配符 `*`：`GET /:format/:provider/v1/models` → `proxy.HandleModels`，其余 → `proxy.Handle`），proxy 不在运行时按 path 判定；具体路由无通配参数时由 router 适配层补写 `req.Path`（供日志记录）。
+- 每个入口在 `proxy/direct.go` 组装自己的 Pipeline（如 models 链路 `ParseRequest → AuthKey → ListModels`），不经 Forward、不计费、不写 `request_logs`（不挂 `Log`）；错误日志打印收敛在共享的 `logErrors`。
+- 鉴权拆分：`AuthKey`（Key/用户校验，所有链路共用）与 `AuthModel`（模型定价+白名单，仅转发链路）是两个独立 handler，新链路按需取用。
+- 协议相关的响应序列化（如模型列表的 OpenAI 格式）归 `parser`：无法放进 `Parser` 主接口的能力用可选接口 + 类型断言（参考 `ModelsFormatter` / `FormatModelList`），parser 不反向依赖 store，业务层负责映射为 parser 中立结构。
+
 ## 5. 错误处理规则
 
 - 所有业务错误通过 `ctx.Err` + `ctx.Code` 向上传递。
@@ -124,7 +131,7 @@
 
 ### 6.2 请求日志
 
-- 所有请求无论成败都记录到 `request_logs`。
+- 转发链路的请求无论成败都记录到 `request_logs`；元数据端点（如 `v1/models`）不记录。
 - 保存请求头前必须对敏感头（如 `Authorization`）脱敏。
 - 日志字段应能支撑问题排查、用量审计与性能分析。
 

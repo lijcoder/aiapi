@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+- 代理路由组织调整：proxy 的路由注册与 echo 适配（参数提取、响应写入）从 `framework/echo.go` 下沉到 `proxy/router/router.go`（与 `manager/router` 同构），`framework/echo.go` 只保留路由组创建与全局中间件；`EchoProxyDirectResponseWrite` 改为包内未导出的 `echoResponseWrite`。行为不变。
+
+- 新增 `GET v1/models` 模型列表端点：返回当前 Provider 下、且当前 API Key 有权访问的模型列表（数据源为本地 `models` 表，与代理鉴权口径一致，不透传上游、不计费）。框架层注册具体路由（`GET /proxy/:format/:provider/v1/models`，静态段优先于通配符）进入独立入口 `proxy.HandleModels`，链路为 `ParseRequest → AuthKey → ListModels`；非 GET 的同路径请求仍落回转发链路。该端点不写 `request_logs`。响应按路径中的协议格式序列化：OpenAI 为 `{object:"list"}`，Anthropic 为 `{data,first_id,last_id,has_more}`（本地全量返回，不支持分页参数）。配套重构：原 `Auth` handler 拆分为 `AuthKey`（Key/用户校验，两条链路共用）+ `AuthModel`（模型定价 + 白名单校验，仅转发链路），鉴权行为不变。
+
 - 请求头脱敏规则加强：`request_logs.request_headers` 的敏感头识别由精确名单（5 个）改为关键词包含匹配（auth/cookie/key/token/secret/password），覆盖 Azure `api-key`、`X-Auth-Token` 等各类自定义凭证头，防止漏脱。
 
 - API Key 哈希化：`api_keys` 表不再存 key 原文，改存 `key_hash`（SHA-256，鉴权比对）+ `key_show`（展示串 `sk-abc****xyz`，创建时由 `service.ApiKeyShow` 生成）。明文 key 仅创建时返回一次。存量库需手动迁移（RENAME 列 → 逐行回填哈希/展示串 → 重建唯一索引，哈希需外部计算，步骤见 `sql/sqlite.sql` 注释）。鉴权链路（Auth/BudgetCheck/扣费）全部改为哈希或 ID 比对。同步调整：创建 API Key 时名称改为必填（key 不再可查看，名称是识别用途的唯一途径）。

@@ -25,6 +25,36 @@ func (p *OpenAIParser) ParseApiKey(headers map[string][]string) string {
 	return extractBearerToken(headers)
 }
 
+// 编译期断言：OpenAIParser 实现 ModelsFormatter
+var _ ModelsFormatter = (*OpenAIParser)(nil)
+
+// openaiModelList 「列出模型」响应结构
+type openaiModelList struct {
+	Object string           `json:"object"`
+	Data   []openaiModelObj `json:"data"`
+}
+
+type openaiModelObj struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Created int64  `json:"created"`
+	OwnedBy string `json:"owned_by"`
+}
+
+// FormatModels 序列化为 OpenAI List Models 响应格式
+func (p *OpenAIParser) FormatModels(items []ModelItem) ([]byte, error) {
+	list := openaiModelList{Object: "list", Data: make([]openaiModelObj, 0, len(items))}
+	for _, it := range items {
+		list.Data = append(list.Data, openaiModelObj{
+			ID:      it.ID,
+			Object:  "model",
+			Created: it.CreatedAt.Unix(),
+			OwnedBy: it.OwnedBy,
+		})
+	}
+	return json.Marshal(list)
+}
+
 // openaiUsage 非流式/流式通用的 usage 结构
 type openaiUsage struct {
 	PromptTokens        int `json:"prompt_tokens"`
