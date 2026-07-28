@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+- 请求头脱敏规则加强：`request_logs.request_headers` 的敏感头识别由精确名单（5 个）改为关键词包含匹配（auth/cookie/key/token/secret/password），覆盖 Azure `api-key`、`X-Auth-Token` 等各类自定义凭证头，防止漏脱。
+
 - API Key 哈希化：`api_keys` 表不再存 key 原文，改存 `key_hash`（SHA-256，鉴权比对）+ `key_show`（展示串 `sk-abc****xyz`，创建时由 `service.ApiKeyShow` 生成）。明文 key 仅创建时返回一次。存量库需手动迁移（RENAME 列 → 逐行回填哈希/展示串 → 重建唯一索引，哈希需外部计算，步骤见 `sql/sqlite.sql` 注释）。鉴权链路（Auth/BudgetCheck/扣费）全部改为哈希或 ID 比对。同步调整：创建 API Key 时名称改为必填（key 不再可查看，名称是识别用途的唯一途径）。
 
 - `request_logs` / `usage_records` 不再存储完整 API Key，改存 `api_key_id`（DB 泄露不再暴露 key 原文与调用记录的关联）。统计接口对外契约不变（筛选传 `api_key_id`、按 key 分组展示脱敏 key + 名称）；已删除的 key 在分组统计中展示为 `#id + 已删除`。存量库需手动迁移（加列 → 回填 → DROP 旧列，SQL 见 `sql/sqlite.sql` 注释，需 SQLite ≥ 3.35）。
