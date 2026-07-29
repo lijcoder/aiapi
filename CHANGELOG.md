@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+- API Key 模型访问弹窗改为搜索式选择：不再一次性加载全量模型，候选列表默认只展示前 10 条，输入关键词走服务端模糊搜索（300ms 防抖），匹配超过 10 条时提示精确查找；已选模型以可关闭标签常驻顶部展示，勾选状态与搜索结果解耦。配套接口调整：`/manager/apikeys/models/get(/self)` 响应新增 `models` 字段（白名单模型的 id/provider/model 简要信息，供前端常驻展示已选模型）。
+
 - 代理路由组织调整：proxy 的路由注册与 echo 适配（参数提取、响应写入）从 `framework/echo.go` 下沉到 `proxy/router/router.go`（与 `manager/router` 同构），`framework/echo.go` 只保留路由组创建与全局中间件；`EchoProxyDirectResponseWrite` 改为包内未导出的 `echoResponseWrite`。行为不变。
 
 - 新增 `GET v1/models` 模型列表端点：返回当前 Provider 下、且当前 API Key 有权访问的模型列表（数据源为本地 `models` 表，与代理鉴权口径一致，不透传上游、不计费）。框架层注册具体路由（`GET /proxy/:format/:provider/v1/models`，静态段优先于通配符）进入独立入口 `proxy.HandleModels`，链路为 `ParseRequest → AuthKey → ListModels`；非 GET 的同路径请求仍落回转发链路。该端点不写 `request_logs`。响应按路径中的协议格式序列化：OpenAI 为 `{object:"list"}`，Anthropic 为 `{data,first_id,last_id,has_more}`（本地全量返回，不支持分页参数）。配套重构：原 `Auth` handler 拆分为 `AuthKey`（Key/用户校验，两条链路共用）+ `AuthModel`（模型定价 + 白名单校验，仅转发链路），鉴权行为不变。

@@ -92,7 +92,6 @@
       v-model:visible="showModelAccess"
       :api-key-id="modelAccessKeyId"
       :admin="false"
-      :models="allModels"
       title="模型访问权限"
       @saved="loadKeys"
     />
@@ -103,7 +102,7 @@
 import { ref, h, onMounted, computed } from 'vue'
 import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NAlert, NTag, NIcon, NTooltip, NDropdown, NRadioGroup, NRadio, useMessage, useDialog } from 'naive-ui'
 import { CreateOutline } from '@vicons/ionicons5'
-import { listMyApiKeys, createApiKey, toggleApiKey, deleteApiKey, renameApiKey, updateApiKeyBudget, listModels } from '../api'
+import { listMyApiKeys, createApiKey, toggleApiKey, deleteApiKey, renameApiKey, updateApiKeyBudget } from '../api'
 import { usePagination } from '../composables/usePagination'
 import ModelAccessDialog from '../components/ModelAccessDialog.vue'
 import { useUser } from '../stores/user'
@@ -156,7 +155,6 @@ const savingBudget = ref(false)
 // 模型权限弹窗
 const showModelAccess = ref(false)
 const modelAccessKeyId = ref(0)
-const allModels = ref([])
 
 // 限制模式下是否超额（实时校验，用于输入框变红 + 禁用保存）
 const budgetOver = computed(() => {
@@ -330,13 +328,6 @@ function openModelAccess(r) {
   showModelAccess.value = true
 }
 
-async function loadModels() {
-  try {
-    const res = await listModels('', '', 1, 1000)
-    allModels.value = res?.items || []
-  } catch {}
-}
-
 async function doSaveBudget() {
   if (budgetMode.value === 'limited' && (budgetVal.value == null || budgetVal.value < 0)) {
     message.warning('金额不能小于 0')
@@ -377,6 +368,5 @@ async function loadKeys() {
 
 onMounted(() => {
   loadKeys()
-  loadModels()
 })
 </script>

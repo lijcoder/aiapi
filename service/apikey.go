@@ -78,6 +78,21 @@ func (s *ApiKeyService) GetModelAccess(apiKeyID int64) (policy string, modelIDs 
 	return
 }
 
+// GetModelAccessDetail 查询某 API Key 的模型访问策略与白名单模型详情。
+// 供管理端展示「已选模型」：白名单 ID 换为模型信息，policy 非 whitelist 或无白名单时返回空切片。
+func (s *ApiKeyService) GetModelAccessDetail(apiKeyID int64) (policy string, models []model.Model, err error) {
+	policy, modelIDs, err := s.GetModelAccess(apiKeyID)
+	if err != nil {
+		return
+	}
+	models = []model.Model{}
+	if len(modelIDs) == 0 {
+		return
+	}
+	models, err = store.C().Model().ListByIDs(modelIDs)
+	return
+}
+
 // Delete 删除 API Key（事务内同时清理模型白名单）。
 func (s *ApiKeyService) Delete(apiKeyID int64) error {
 	return store.C().T(func(ss *store.Session) error {

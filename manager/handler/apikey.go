@@ -468,10 +468,29 @@ type SetApiKeyModelAccessReq struct {
 	ModelIDs    []int64 `json:"model_ids"`    // whitelist 策略下生效
 }
 
+// ApiKeyModelBrief 模型简要信息（只暴露展示字段，不含价格）
+type ApiKeyModelBrief struct {
+	ID       int64  `json:"id"`
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+}
+
 // ApiKeyModelAccessResp Key 模型策略响应
 type ApiKeyModelAccessResp struct {
-	ModelPolicy string  `json:"model_policy"`
-	ModelIDs    []int64 `json:"model_ids"`
+	ModelPolicy string             `json:"model_policy"`
+	ModelIDs    []int64            `json:"model_ids"`
+	Models      []ApiKeyModelBrief `json:"models"` // 白名单模型详情，供前端常驻展示已选模型
+}
+
+// toModelBriefs 模型列表转简要信息，同时收集 ID 列表
+func toModelBriefs(models []model.Model) ([]ApiKeyModelBrief, []int64) {
+	briefs := make([]ApiKeyModelBrief, 0, len(models))
+	ids := make([]int64, 0, len(models))
+	for _, m := range models {
+		briefs = append(briefs, ApiKeyModelBrief{ID: m.ID, Provider: m.Provider, Model: m.Model})
+		ids = append(ids, m.ID)
+	}
+	return briefs, ids
 }
 
 // validateModelPolicy 校验策略值
@@ -496,15 +515,13 @@ func GetApiKeyModelAccessSelf(ctx context.Context, req *ApiKeyModelAccessReq) (*
 	if k == nil || k.UserID != cur.ID {
 		return nil, base.ErrNotFound("API Key 不存在")
 	}
-	policy, modelIDs, err := service.NewApiKeyService().GetModelAccess(req.ApiKeyID)
+	policy, models, err := service.NewApiKeyService().GetModelAccessDetail(req.ApiKeyID)
 	if err != nil {
 		slog.Error("get api key model access failed", "err", err, "id", req.ApiKeyID)
 		return nil, base.ErrInternal
 	}
-	if modelIDs == nil {
-		modelIDs = []int64{}
-	}
-	return &ApiKeyModelAccessResp{ModelPolicy: policy, ModelIDs: modelIDs}, nil
+	briefs, modelIDs := toModelBriefs(models)
+	return &ApiKeyModelAccessResp{ModelPolicy: policy, ModelIDs: modelIDs, Models: briefs}, nil
 }
 
 // SetApiKeyModelAccessSelf 普通用户设置自己 Key 的模型策略
@@ -548,15 +565,13 @@ func GetApiKeyModelAccessAdmin(ctx context.Context, req *ApiKeyModelAccessReq) (
 	if k == nil {
 		return nil, base.ErrNotFound("API Key 不存在")
 	}
-	policy, modelIDs, err := service.NewApiKeyService().GetModelAccess(req.ApiKeyID)
+	policy, models, err := service.NewApiKeyService().GetModelAccessDetail(req.ApiKeyID)
 	if err != nil {
 		slog.Error("get api key model access failed", "err", err, "id", req.ApiKeyID)
 		return nil, base.ErrInternal
 	}
-	if modelIDs == nil {
-		modelIDs = []int64{}
-	}
-	return &ApiKeyModelAccessResp{ModelPolicy: policy, ModelIDs: modelIDs}, nil
+	briefs, modelIDs := toModelBriefs(models)
+	return &ApiKeyModelAccessResp{ModelPolicy: policy, ModelIDs: modelIDs, Models: briefs}, nil
 }
 
 // SetApiKeyModelAccessAdmin 超管设置指定 Key 的模型策略
