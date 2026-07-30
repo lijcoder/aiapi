@@ -27,6 +27,7 @@ import (
 const (
 	purposeTOTPSecret     = ":totp-secret"     // TOTP 密钥（users.totp_secret）
 	purposeProviderConfig = ":provider-config" // Provider 配置（providers.config，含上游 Key）
+	purposeAPIKey         = ":api-key"         // API Key 原文（api_keys.key_enc，可还原查看）
 )
 
 // deriveKey 按用途派生 AES-256 密钥：SHA-256(CryptoSecret + purpose)。

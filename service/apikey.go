@@ -15,6 +15,17 @@ func ApiKeyHash(key string) string {
 	return hex.EncodeToString(h[:])
 }
 
+// EncryptApiKey 用 AES-256-GCM 加密 API Key 原文，输出 base64(nonce+ciphertext)。
+// 用于 api_keys.key_enc 落库，查看接口解密还原明文。
+func EncryptApiKey(plain string) (string, error) {
+	return encryptWithPurpose(plain, purposeAPIKey)
+}
+
+// DecryptApiKey 解密 api_keys.key_enc 还原明文 key。
+func DecryptApiKey(enc string) (string, error) {
+	return decryptWithPurpose(enc, purposeAPIKey)
+}
+
 // key 展示片段的截取长度：前缀 sk- + 3 位 hex，后缀 3 位 hex。
 const (
 	apiKeyPrefixLen = 6 // sk- + 3 位 hex

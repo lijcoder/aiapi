@@ -87,8 +87,8 @@ func (ks *ApiKeyStore) Count() (int64, error) {
 // Create 创建 API Key，回填 ID
 func (ks *ApiKeyStore) Create(k *model.ApiKey) error {
 	res, err := ks.s.Query(
-		`INSERT INTO api_keys (user_id, key_hash, key_show, name, budget, unlimited, enabled)
-		 VALUES (:user_id, :key_hash, :key_show, :name, :budget, :unlimited, :enabled)`,
+		`INSERT INTO api_keys (user_id, key_hash, key_enc, key_show, name, budget, unlimited, enabled)
+		 VALUES (:user_id, :key_hash, :key_enc, :key_show, :name, :budget, :unlimited, :enabled)`,
 		k,
 	).Exec()
 	if err != nil {

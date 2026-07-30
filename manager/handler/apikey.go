@@ -124,9 +124,14 @@ func createApiKeyRetry(userID int64, name string, budget float64, unlimited bool
 		if err != nil {
 			return nil, "", err
 		}
+		enc, err := service.EncryptApiKey(plain)
+		if err != nil {
+			return nil, "", err
+		}
 		k := &model.ApiKey{
 			UserID:    userID,
 			KeyHash:   service.ApiKeyHash(plain),
+			KeyEnc:    enc,
 			KeyShow:   service.ApiKeyShow(plain),
 			Name:      name,
 			Budget:    budget,
@@ -143,6 +148,64 @@ func createApiKeyRetry(userID int64, name string, budget float64, unlimited bool
 		return k, plain, nil
 	}
 	return nil, "", errors.New("api key generation failed after retries")
+}
+
+// RevealApiKeyReq 查看 API Key 明文请求
+type RevealApiKeyReq struct {
+	ID int64 `json:"id"`
+}
+
+// RevealApiKeyResp 查看 API Key 明文响应
+// 旧版本创建的 key（key_enc 为空）无法还原，返回 revealable=false 提示前端。
+type RevealApiKeyResp struct {
+	Key        string `json:"key"`
+	Revealable bool   `json:"revealable"`
+}
+
+// revealApiKey 解密 key_enc 还原明文。key_enc 为空表示旧版本 key，不可还原。
+func revealApiKey(k *model.ApiKey) (*RevealApiKeyResp, *base.BizError) {
+	if k.KeyEnc == "" {
+		return &RevealApiKeyResp{Revealable: false}, nil
+	}
+	plain, err := service.DecryptApiKey(k.KeyEnc)
+	if err != nil {
+		slog.Error("decrypt api key failed", "err", err, "id", k.ID)
+		return nil, base.ErrInternal
+	}
+	return &RevealApiKeyResp{Key: plain, Revealable: true}, nil
+}
+
+// RevealApiKeySelf 普通用户查看自己 API Key 明文。先校验归属当前用户，防止越权。
+func RevealApiKeySelf(ctx context.Context, req *RevealApiKeyReq) (*RevealApiKeyResp, *base.BizError) {
+	cur := base.CurrentUser(ctx)
+	if req.ID <= 0 {
+		return nil, base.ErrBadReq("id 不能为空")
+	}
+	k, err := store.C().ApiKey().GetByID(req.ID)
+	if err != nil {
+		slog.Error("get api key failed", "err", err, "id", req.ID)
+		return nil, base.ErrInternal
+	}
+	if k == nil || k.UserID != cur.ID {
+		return nil, base.ErrNotFound("API Key 不存在")
+	}
+	return revealApiKey(k)
+}
+
+// RevealApiKeyAdmin 超管查看指定 API Key 明文。
+func RevealApiKeyAdmin(ctx context.Context, req *RevealApiKeyReq) (*RevealApiKeyResp, *base.BizError) {
+	if req.ID <= 0 {
+		return nil, base.ErrBadReq("id 不能为空")
+	}
+	k, err := store.C().ApiKey().GetByID(req.ID)
+	if err != nil {
+		slog.Error("get api key failed", "err", err, "id", req.ID)
+		return nil, base.ErrInternal
+	}
+	if k == nil {
+		return nil, base.ErrNotFound("API Key 不存在")
+	}
+	return revealApiKey(k)
 }
 
 // checkBudgetWithinUserLimit 校验“有限额 key 的 budget 之和”不超过用户余额。

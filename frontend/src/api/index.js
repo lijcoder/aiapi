@@ -152,6 +152,10 @@ export function updateApiKeyBudget(id, budget, unlimited) {
   return request('/apikeys/budget/self', { id, budget, unlimited })
 }
 
+export function revealApiKey(id) {
+  return request('/apikeys/reveal/self', { id })
+}
+
 export function rechargeRecords(userId, page = 1, pageSize = 20) {
   if (userId) return request('/recharge/records', { userId, page, page_size: pageSize })
   return request('/recharge/records/self', { page, page_size: pageSize })
@@ -282,6 +286,10 @@ export function renameUserApiKey(id, name) {
 
 export function updateUserApiKeyBudget(id, budget, unlimited) {
   return request('/apikeys/budget', { id, budget, unlimited })
+}
+
+export function revealUserApiKey(id) {
+  return request('/apikeys/reveal', { id })
 }
 
 // ===== API Key 模型访问策略 =====

@@ -101,8 +101,8 @@
 <script setup>
 import { ref, h, onMounted, computed } from 'vue'
 import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NAlert, NTag, NIcon, NTooltip, NDropdown, NRadioGroup, NRadio, useMessage, useDialog } from 'naive-ui'
-import { CreateOutline } from '@vicons/ionicons5'
-import { listMyApiKeys, createApiKey, toggleApiKey, deleteApiKey, renameApiKey, updateApiKeyBudget } from '../api'
+import { CreateOutline, CopyOutline } from '@vicons/ionicons5'
+import { listMyApiKeys, createApiKey, toggleApiKey, deleteApiKey, renameApiKey, updateApiKeyBudget, revealApiKey } from '../api'
 import { usePagination } from '../composables/usePagination'
 import ModelAccessDialog from '../components/ModelAccessDialog.vue'
 import { useUser } from '../stores/user'
@@ -178,7 +178,17 @@ const columns = [
       ])
     }
   },
-  { title: 'Key', key: 'key', width: 200, render(r){ return h('code', { style:'font-size:12px;color:#555' }, r.key) } },
+  { title: 'Key', key: 'key', width: 220, render(r){
+      const copyIcon = h(NIcon, {
+        size: 15, color: '#1677ff', style: 'cursor:pointer;vertical-align:middle;flex-shrink:0',
+        onClick: (e) => { e.stopPropagation(); onReveal(r) }
+      }, () => h(CopyOutline))
+      const tip = h(NTooltip, null, { trigger: () => copyIcon, default: () => '复制明文' })
+      return h('div', { style: 'display:flex;align-items:center;gap:6px' }, [
+        h('code', { style:'font-size:12px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, r.key),
+        tip
+      ])
+  } },
   { title: '额度', key: 'budget', width: 110, render(r){ return r.unlimited ? h(NTag,{size:'small',type:'success'},{default:()=>'无限'}) : '¥ ' + fix4(r.budget) } },
   { title: '状态', key: 'enabled', width: 90, render(r){ return r.enabled ? h(NTag,{size:'small',type:'success'},{default:()=>'启用'}) : h(NTag,{size:'small',type:'error'},{default:()=>'禁用'}) } },
   { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) } },
@@ -256,6 +266,24 @@ async function copyPlain() {
     message.success('已复制')
   } catch {
     message.error('复制失败，请手动选中复制')
+  }
+}
+
+async function onReveal(r) {
+  try {
+    const data = await revealApiKey(r.id)
+    if (!data.revealable) {
+      message.warning('该密钥为旧版本创建，无法查看明文，请新建')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(data.key)
+      message.success('已复制明文')
+    } catch {
+      message.error('复制失败，请稍后重试')
+    }
+  } catch (e) {
+    message.error(e.msg || '复制失败')
   }
 }
 

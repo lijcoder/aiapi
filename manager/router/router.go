@@ -35,6 +35,7 @@ func Register(g *echo.Group) {
 	g.POST("/apikeys/delete/self", base.Wrap(handler.DeleteApiKeySelf))
 	g.POST("/apikeys/rename/self", base.Wrap(handler.RenameApiKeySelf))
 	g.POST("/apikeys/budget/self", base.Wrap(handler.UpdateBudgetApiKeySelf))
+	g.POST("/apikeys/reveal/self", base.Wrap(handler.RevealApiKeySelf))
 	g.POST("/apikeys/models/get/self", base.Wrap(handler.GetApiKeyModelAccessSelf))
 	g.POST("/apikeys/models/set/self", base.Wrap(handler.SetApiKeyModelAccessSelf))
 
@@ -78,6 +79,7 @@ func Register(g *echo.Group) {
 	g.POST("/apikeys/delete", base.Wrap(handler.DeleteApiKeyAdmin))
 	g.POST("/apikeys/rename", base.Wrap(handler.RenameApiKeyAdmin))
 	g.POST("/apikeys/budget", base.Wrap(handler.UpdateBudgetApiKeyAdmin))
+	g.POST("/apikeys/reveal", base.Wrap(handler.RevealApiKeyAdmin))
 	g.POST("/apikeys/models/get", base.Wrap(handler.GetApiKeyModelAccessAdmin))
 	g.POST("/apikeys/models/set", base.Wrap(handler.SetApiKeyModelAccessAdmin))
 

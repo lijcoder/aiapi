@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL,
     key_hash   TEXT NOT NULL,              -- key 原文不落库：SHA-256(hex)，鉴权比对用
+    key_enc    TEXT NOT NULL DEFAULT '',   -- key 原文 AES-256-GCM 密文（base64），空串=旧版本不可还原
     key_show   TEXT NOT NULL DEFAULT '',   -- 展示串（sk-abc****xyz），创建后仅存此片段
     name       TEXT DEFAULT '',
     budget     REAL NOT NULL DEFAULT 0,
@@ -75,6 +76,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_key_hash ON api_keys(key_hash);
 -- api_keys 扩展：增加 model_policy 列（模型访问策略）
 -- 新建库直接用上方定义；存量库需手动迁移：
 --   ALTER TABLE api_keys ADD COLUMN model_policy TEXT NOT NULL DEFAULT 'all';
+
+-- api_keys 扩展：增加 key_enc 列（key 原文 AES-256-GCM 密文，可还原）
+-- 新建库直接用上方定义；存量库需手动迁移：
+--   ALTER TABLE api_keys ADD COLUMN key_enc TEXT NOT NULL DEFAULT '';
+-- 存量 key 的明文已不可还原（仅存 SHA-256），key_enc 留空；
+-- 新建 key 由应用写入密文，查看接口对 key_enc='' 的记录提示无法还原。
 
 -- API Key 模型白名单明细（model_policy='whitelist' 时生效）
 CREATE TABLE IF NOT EXISTS apikey_model_access (

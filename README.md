@@ -10,7 +10,7 @@
 - **Token 用量统计**：自动记录 input / output tokens
 - **请求日志**：保存每次请求的参数、响应状态、耗时与错误信息
 - **Provider 管理**：内置 CRUD 接口动态管理上游配置
-- **API Key 管理**：校验调用方身份，支持启用/禁用；key 原文不落库（SHA-256 哈希存储，展示为 `sk-abc****xyz` 头尾片段），明文仅创建时返回一次
+- **API Key 管理**：校验调用方身份，支持启用/禁用；key 原文以 AES-256-GCM 密文落库（可还原查看），同时存 SHA-256 哈希用于鉴权比对，展示为 `sk-abc****xyz` 头尾片段；明文可在创建后通过查看接口还原复制
 - **管理台**：内置 Web 管理界面，支持双 token 安全登录、TOTP 两步验证（2FA）、充值、流水查询
 
 ## 架构概览
@@ -250,7 +250,7 @@ curl http://localhost:8888/proxy/anthropic/anthropic/v1/models \
 ### 核心数据表
 
 - `providers`：上游提供商配置
-- `api_keys`：调用方 API Key（存 `key_hash` + `key_show`，不存原文）
+- `api_keys`：调用方 API Key（存 `key_hash` 鉴权比对 + `key_enc` 密文可还原 + `key_show` 展示片段）
 - `usage_records`：Token 用量记录
 - `request_logs`：请求日志与错误信息
 - `users` / `roles` / `user_roles` / `role_permission` / `user_sessions`：用户/角色/权限/会话
@@ -345,6 +345,7 @@ curl http://localhost:8888/proxy/anthropic/anthropic/v1/models \
 | `POST /manager/apikeys/delete/self` | 删除 API Key，body `{id}` | 是 |
 | `POST /manager/apikeys/rename/self` | 重命名 API Key，body `{id, name}` | 是 |
 | `POST /manager/apikeys/budget/self` | 修改 API Key 额度/限额模式，body `{id, budget, unlimited}`，有限额 key 总和不能超过账户余额 | 是 |
+| `POST /manager/apikeys/reveal/self` | 查看自己 API Key 明文，body `{id}`，返回 `{key, revealable}`（旧版本 key 不可还原） | 是 |
 | `POST /manager/apikeys/models/get/self` | 查自己的 Key 的模型访问策略，body `{api_key_id}`，返回 `{model_policy, model_ids}` | 是 |
 | `POST /manager/apikeys/models/set/self` | 设置自己的 Key 的模型访问策略，body `{api_key_id, model_policy(all\|whitelist), model_ids}` | 是 |
 | `POST /manager/profile/update/self` | 修改个人资料，body `{name, email}` | 是 |
@@ -376,6 +377,7 @@ curl http://localhost:8888/proxy/anthropic/anthropic/v1/models \
 | `POST /manager/apikeys/delete` | 删除指定用户的 Key，body `{id}` |
 | `POST /manager/apikeys/rename` | 重命名指定用户的 Key，body `{id, name}` |
 | `POST /manager/apikeys/budget` | 修改指定用户 Key 额度，body `{id, budget, unlimited}` |
+| `POST /manager/apikeys/reveal` | 查看指定用户 Key 明文，body `{id}`，返回 `{key, revealable}` |
 | `POST /manager/apikeys/models/get` | 查指定 Key 的模型访问策略，body `{api_key_id}`，返回 `{model_policy, model_ids}` |
 | `POST /manager/apikeys/models/set` | 设置指定 Key 的模型访问策略，body `{api_key_id, model_policy(all\|whitelist), model_ids}` |
 | `POST /manager/recharge/records/list` | 全平台充值流水（分页），body `{keyword, page, page_size}` 按用户名/账号/备注搜索 |
