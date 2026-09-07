@@ -24,8 +24,8 @@
       />
     </n-card>
 
-    <!-- 新增/编辑弹窗 -->
-    <n-modal v-model:show="showForm" preset="card" :title="formType==='create'?'新增模型':'编辑模型'" style="width:560px" :mask-closable="false">
+    <!-- 新增/复制/编辑弹窗 -->
+    <n-modal v-model:show="showForm" preset="card" :title="formType==='create'?'新增模型':formType==='copy'?'复制模型':'编辑模型'" style="width:560px" :mask-closable="false">
       <div style="display:flex;flex-direction:column;gap:14px">
         <div>
           <div style="font-size:13px;margin-bottom:6px">提供商 provider</div>
@@ -83,7 +83,7 @@
 
 <script setup>
 import { ref, h, onMounted } from 'vue'
-import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NCheckbox, NCheckboxGroup, NTag, useMessage, useDialog } from 'naive-ui'
+import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NCheckbox, NCheckboxGroup, NTag, NDropdown, useMessage, useDialog } from 'naive-ui'
 import { listModelsAdmin, createModel, updateModel, deleteModel } from '../../api'
 import { usePagination } from '../../composables/usePagination'
 import { fix4, formatTime } from '../../utils'
@@ -152,10 +152,20 @@ const columns = [
   { title: '最大输出', key: 'max_completion_tokens', width: 90, render(r) { return fmtK(r.max_completion_tokens) } },
   { title: '能力', key: 'modal', width: 140, render: renderModal },
   { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) } },
-  { title: '操作', key: 'actions', width: 120, fixed: 'right', render(r) {
-    return h(NSpace, { size: 4 }, () => [
+  { title: '操作', key: 'actions', width: 140, fixed: 'right', render(r) {
+    const moreOptions = [
+      { label: '复制', key: 'copy' },
+      { label: '删除', key: 'delete' },
+    ]
+    function onSelect(key) {
+      if (key === 'copy') openCopy(r)
+      else if (key === 'delete') onDelete(r)
+    }
+    return h(NSpace, { size: 6 }, () => [
       h(NButton, { size: 'small', tertiary: true, type: 'info', onClick: () => openEdit(r) }, () => '编辑'),
-      h(NButton, { size: 'small', tertiary: true, type: 'error', onClick: () => onDelete(r) }, () => '删除'),
+      h(NDropdown, { options: moreOptions, trigger: 'click', onSelect: (k) => onSelect(k) }, {
+        default: () => h(NButton, { size: 'small', tertiary: true }, () => '更多')
+      }),
     ])
   }},
 ]
@@ -201,9 +211,27 @@ function openEdit(r) {
   showForm.value = true
 }
 
+// 复制：以某行为模板打开新增弹窗，用户可修改（provider/model 可编辑）后提交新增
+function openCopy(r) {
+  formType.value = 'copy'
+  form.value = {
+    id: 0,
+    provider: r.provider,
+    model: `${r.model}-copy`,
+    input_cache_hit_price: r.input_cache_hit_price,
+    input_cache_miss_price: r.input_cache_miss_price,
+    output_price: r.output_price,
+    max_context_tokens: r.max_context_tokens,
+    max_completion_tokens: r.max_completion_tokens,
+  }
+  modalFlags.value = modalToFlags(r)
+  formMsg.value = ''
+  showForm.value = true
+}
+
 async function doSubmit() {
   formMsg.value = ''
-  if (formType.value === 'create') {
+  if (formType.value !== 'edit') {
     if (!form.value.provider || !form.value.model) {
       formMsg.value = 'provider 和 model 必填'
       return
@@ -211,7 +239,7 @@ async function doSubmit() {
   }
   submitting.value = true
   try {
-    if (formType.value === 'create') {
+    if (formType.value !== 'edit') {
       await createModel({
         provider: form.value.provider,
         model: form.value.model,

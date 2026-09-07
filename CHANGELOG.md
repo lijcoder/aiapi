@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+- 超管模型管理新增「复制」功能：操作列调整为「编辑」按钮 + 「更多」下拉菜单（复制/删除），点击复制后弹出新增模型弹窗并预填该模型的全部配置（provider/model 预填为 `原模型名-copy`，可修改），提交即调用已有的 `/manager/models/create` 新增模型，名称唯一性由后端校验。纯前端改动，无接口/数据结构变化。
+
 - API Key 支持明文还原查看：`api_keys` 表新增 `key_enc` 列（AES-256-GCM 密文，复用 `service/crypto.go` 加密能力，purpose=`:api-key` 与 TOTP/Provider 隔离）。新建 key 时同时写入哈希（鉴权比对）与密文（可还原）；新增查看接口 `/manager/apikeys/reveal/self`（普通用户）与 `/manager/apikeys/reveal`（超管），解密返回明文。前端 API Key 列表 Key 列后增加复制图标，点击直接复制明文到剪贴板（不弹窗），旧版本创建的 key（`key_enc` 为空）提示无法还原。鉴权链路不变（仍走 `key_hash` 等值查找）。存量库需手动迁移 `ALTER TABLE api_keys ADD COLUMN key_enc TEXT NOT NULL DEFAULT ''`，存量 key 明文已不可还原。
 
 - API Key 模型访问弹窗改为搜索式选择：不再一次性加载全量模型，候选列表默认只展示前 10 条，输入关键词走服务端模糊搜索（300ms 防抖），匹配超过 10 条时提示精确查找；已选模型以可关闭标签常驻顶部展示，勾选状态与搜索结果解耦。配套接口调整：`/manager/apikeys/models/get(/self)` 响应新增 `models` 字段（白名单模型的 id/provider/model 简要信息，供前端常驻展示已选模型）。
