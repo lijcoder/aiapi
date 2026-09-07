@@ -217,7 +217,7 @@ function openCopy(r) {
   form.value = {
     id: 0,
     provider: r.provider,
-    model: `${r.model}-copy`,
+    model: r.model,
     input_cache_hit_price: r.input_cache_hit_price,
     input_cache_miss_price: r.input_cache_miss_price,
     output_price: r.output_price,
