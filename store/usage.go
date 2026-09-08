@@ -81,7 +81,7 @@ func (us *UsageStore) StatsByUser(userID int64, mode, startDate, endDate string,
 	}
 
 	query := fmt.Sprintf(
-		`SELECT %s AS label, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, SUM(cached_tokens) AS cached_tokens, SUM(input_tokens) - SUM(cached_tokens) AS cache_miss_tokens, SUM(reasoning_tokens) AS reasoning_tokens, SUM(total_tokens) AS total_tokens, ROUND(CAST(SUM(cached_tokens) AS REAL) / NULLIF(SUM(input_tokens), 0), 4) AS cache_hit_rate, SUM(cost) AS cost, COUNT(*) AS request_count FROM usage_records %s GROUP BY %s ORDER BY label %s`,
+		`SELECT %s AS label, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens, SUM(cached_tokens) AS cached_tokens, SUM(input_tokens) - SUM(cached_tokens) AS cache_miss_tokens, SUM(reasoning_tokens) AS reasoning_tokens, SUM(total_tokens) AS total_tokens, COALESCE(ROUND(SUM(cached_tokens) * 1.0 / NULLIF(SUM(input_tokens), 0), 4), 0) AS cache_hit_rate, SUM(cost) AS cost, COUNT(*) AS request_count FROM usage_records %s GROUP BY %s ORDER BY label %s`,
 		labelExpr, where, groupExpr, orderDir,
 	)
 
@@ -165,7 +165,7 @@ func (us *UsageStore) StatsByAdmin(userID int64, mode, startDate, endDate string
 	where, params := buildUsageAdminWhere(userID, startDate, endDate, apiKeyID, mdl, provider)
 
 	query := fmt.Sprintf(
-		`SELECT %s AS label, SUM(u.input_tokens) AS input_tokens, SUM(u.output_tokens) AS output_tokens, SUM(u.cached_tokens) AS cached_tokens, SUM(u.input_tokens) - SUM(u.cached_tokens) AS cache_miss_tokens, SUM(u.reasoning_tokens) AS reasoning_tokens, SUM(u.total_tokens) AS total_tokens, ROUND(CAST(SUM(u.cached_tokens) AS REAL) / NULLIF(SUM(u.input_tokens), 0), 4) AS cache_hit_rate, SUM(u.cost) AS cost, COUNT(*) AS request_count FROM usage_records u %s %s GROUP BY %s ORDER BY label %s`,
+		`SELECT %s AS label, SUM(u.input_tokens) AS input_tokens, SUM(u.output_tokens) AS output_tokens, SUM(u.cached_tokens) AS cached_tokens, SUM(u.input_tokens) - SUM(u.cached_tokens) AS cache_miss_tokens, SUM(u.reasoning_tokens) AS reasoning_tokens, SUM(u.total_tokens) AS total_tokens, COALESCE(ROUND(SUM(u.cached_tokens) * 1.0 / NULLIF(SUM(u.input_tokens), 0), 4), 0) AS cache_hit_rate, SUM(u.cost) AS cost, COUNT(*) AS request_count FROM usage_records u %s %s GROUP BY %s ORDER BY label %s`,
 		labelExpr, join, where, groupExpr, orderDir,
 	)
 
@@ -296,7 +296,7 @@ func (us *UsageStore) Trend7d() ([]DashboardTrendRow, error) {
 			 COALESCE(SUM(output_tokens),0) AS output_tokens,
 			 COALESCE(SUM(total_tokens),0) AS total_tokens,
 			 COALESCE(SUM(cached_tokens),0) AS cached_tokens,
-			 ROUND(CAST(SUM(cached_tokens) AS REAL) / NULLIF(SUM(input_tokens), 0), 4) AS cache_hit_rate
+			 COALESCE(ROUND(SUM(cached_tokens) * 1.0 / NULLIF(SUM(input_tokens), 0), 4), 0) AS cache_hit_rate
 		 FROM usage_records
 		 WHERE created_at >= :start
 		 GROUP BY DATE(created_at)
