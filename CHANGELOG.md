@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+- 新增 OpenAI Responses API 支持（透传）：新增 `parser/responses.go`（`ResponsesParser`）与格式常量 `FormatResponses = "openai-responses"`，客户端可经 `/proxy/openai-responses/:provider/v1/responses` 以 Responses 格式调用（含 `stream: true` 流式），请求原样透传到上游。解析器适配 responses 专用的 usage 字段（`input_tokens` / `output_tokens` / `input_tokens_details.cached_tokens` / `output_tokens_details.reasoning_tokens`，与 chat 的 `prompt_tokens` / `completion_tokens` 不同）与流式事件（`response.created` / `response.output_text.delta` / `response.completed` 等，无 `[DONE]` 标记），使用量统计与计费对 Responses 请求生效。鉴权仍为 `Authorization: Bearer`，模型名取请求体顶层 `model`。无 DB 结构与路由改动（路由即 `/:format/:provider/*`）。`GET v1/models` 在 `openai-responses` 协议下回退为 OpenAI 列表格式。
+
 - 修复用户/管理员 Token 用量统计报错：当分组内 `input_tokens` 合计为 0 时，`cache_hit_rate`（`SUM(cached_tokens) / SUM(input_tokens)`）除零得 NULL，扫描进 `float64` 报 `converting NULL to float64`。统计 SQL（`StatsByUser` / `StatsByAdmin` / `Trend7d`）中 `cache_hit_rate` 统一用 `COALESCE(..., 0)` 兜底为 0，统计接口恢复正常返回。
 
 - 超管模型管理新增「复制」功能：操作列调整为「编辑」按钮 + 「更多」下拉菜单（复制/删除），点击复制后弹出新增模型弹窗并预填该模型的全部配置（provider/model 默认为原值，可修改后再提交新增），提交即调用已有的 `/manager/models/create` 新增模型，名称唯一性由后端校验。纯前端改动，无接口/数据结构变化。

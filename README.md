@@ -31,15 +31,15 @@
 
 ### 支持的请求格式
 
-本项目当前仅代理 **OpenAI 兼容格式** 的请求与响应。`:format` 参数目前固定为 `openai`，`:provider` 为配置的上游 Provider 标识。
+本项目代理 OpenAI 兼容格式与 Anthropic 格式的请求与响应。`:format` 决定客户端协议解析器（见下表），`:provider` 为配置的上游 Provider 标识。
 
-| 客户端格式 | 上游 Provider | 说明 |
-|------------|-------------|------|
-| openai     | openai      | 转发至 OpenAI 兼容上游 |
-| openai     | azure-openai| 转发至 Azure OpenAI 兼容接口 |
-| openai     | custom      | 转发至任意 OpenAI 兼容的第三方网关 |
+| 客户端格式 | 说明 |
+|------------|------|
+| `openai` | OpenAI Chat Completions 兼容格式（`v1/chat/completions` 等） |
+| `openai-responses` | OpenAI Responses API 格式（`v1/responses`，含 `stream: true` 流式） |
+| `anthropic` | Anthropic Messages 格式（`v1/messages`，鉴权走 `x-api-key` 头） |
 
-未来如需支持其他客户端协议（如 Gemini/Anthropic），需在 `parser/` 层扩展实现转换。
+未来如需支持其他客户端协议（如 Gemini），需在 `parser/` 层扩展实现转换。
 
 ### 分层架构
 
@@ -185,12 +185,12 @@ curl -X DELETE http://localhost:8888/manager/providers/openai
 ## 反向代理路由
 
 ```
-/proxy/openai/:provider/*
+/proxy/:format/:provider/*
 ```
 
-- `:format`：当前固定为 `openai`
+- `:format`：客户端协议格式，取值见上表（`openai` / `openai-responses` / `anthropic`）
 - `:provider`：上游 Provider 的 `type` 字段
-- `*`：上游路径，例如 `v1/chat/completions`
+- `*`：上游路径，例如 `v1/chat/completions`、`v1/responses`
 
 ### 示例
 
@@ -204,6 +204,23 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
     "stream": false
   }'
 ```
+
+### OpenAI Responses（v1/responses）
+
+客户端以 OpenAI Responses API 格式调用时，`:format` 使用 `openai-responses`，上游路径为 `v1/responses`（请求原样透传到上游，鉴权为 `Authorization: Bearer`，请求体顶层 `model` 字段）：
+
+```bash
+curl http://localhost:8888/proxy/openai-responses/openai/v1/responses \
+  -H "Authorization: Bearer sk-xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "input": "hi",
+    "stream": false
+  }'
+```
+
+流式（`"stream": true`）时响应为 SSE 事件流（`response.created` / `response.output_text.delta` / `response.completed` 等），同样原样透传到客户端。
 
 ### 列出可用模型（v1/models）
 
@@ -240,6 +257,8 @@ curl http://localhost:8888/proxy/anthropic/anthropic/v1/models \
   "has_more": false
 }
 ```
+
+`openai-responses` 协议的同路径 `GET v1/models` 可用，但 Responses API 无官方模型列表格式，响应回退为 OpenAI 列表格式（`{object:"list"}`）。
 
 ### 数据存储
 

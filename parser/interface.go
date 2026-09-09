@@ -10,6 +10,8 @@ const (
 	FormatOpenAI    = "openai"
 	FormatGemini    = "gemini"
 	FormatAnthropic = "anthropic"
+	// FormatResponses OpenAI Responses API 协议格式
+	FormatResponses = "openai-responses"
 )
 
 // Usage 统一的用量结构
@@ -76,6 +78,7 @@ func FormatModelList(p Parser, items []ModelItem) ([]byte, error) {
 var (
 	OpenAI    Parser = &OpenAIParser{}
 	Anthropic Parser = &AnthropicParser{}
+	Responses Parser = &ResponsesParser{}
 	// Gemini  Parser = &GeminiParser{}     // TODO
 )
 
@@ -88,6 +91,8 @@ func GetParser(format string) Parser {
 		return nil // TODO
 	case FormatAnthropic:
 		return Anthropic
+	case FormatResponses:
+		return Responses
 	default:
 		return nil
 	}
