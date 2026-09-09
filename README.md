@@ -258,7 +258,7 @@ curl http://localhost:8888/proxy/anthropic/anthropic/v1/models \
 }
 ```
 
-`openai-responses` 协议的同路径 `GET v1/models` 可用，但 Responses API 无官方模型列表格式，响应回退为 OpenAI 列表格式（`{object:"list"}`）。
+`openai-responses` 协议的同路径 `GET v1/models` 可用，响应由 responses 解析器自行序列化（`{object:"list"}`，与 OpenAI List Models 形状一致）——responses 协议暂无官方模型列表格式，形状沿用 OpenAI 以兼容常用的模型列表解析，实现独立、各协议隔离。
 
 ### 数据存储
 

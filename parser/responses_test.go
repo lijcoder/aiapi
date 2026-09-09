@@ -1,7 +1,9 @@
 package parser
 
 import (
+	"encoding/json"
 	"testing"
+	"time"
 )
 
 func TestResponsesParser_ParseModel(t *testing.T) {
@@ -189,4 +191,42 @@ func TestResponsesParser_ParseStreamEvent(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestResponsesParser_FormatModels(t *testing.T) {
+	p := &ResponsesParser{}
+	items := []ModelItem{
+		{ID: "gpt-4o", CreatedAt: time.Unix(1715000000, 0), OwnedBy: "openai"},
+		{ID: "gpt-4o-mini", CreatedAt: time.Unix(1715000100, 0), OwnedBy: "openai"},
+	}
+
+	body, err := p.FormatModels(items)
+	if err != nil {
+		t.Fatalf("FormatModels error: %v", err)
+	}
+
+	var got struct {
+		Object string `json:"object"`
+		Data   []struct {
+			ID      string `json:"id"`
+			Object  string `json:"object"`
+			Created int64  `json:"created"`
+			OwnedBy string `json:"owned_by"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("unmarshal FormatModels result: %v", err)
+	}
+	if got.Object != "list" {
+		t.Errorf("object = %q, want list", got.Object)
+	}
+	if len(got.Data) != 2 {
+		t.Fatalf("data len = %d, want 2", len(got.Data))
+	}
+	if got.Data[0].ID != "gpt-4o" || got.Data[0].Object != "model" || got.Data[0].OwnedBy != "openai" {
+		t.Errorf("data[0] = %+v, want gpt-4o/model/openai", got.Data[0])
+	}
+	if got.Data[0].Created != 1715000000 {
+		t.Errorf("data[0].created = %d, want 1715000000", got.Data[0].Created)
+	}
 }

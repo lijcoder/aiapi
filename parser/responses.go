@@ -198,3 +198,37 @@ func extractResponsesReasoningTokens(u *responsesUsage) int {
 	}
 	return 0
 }
+
+// 编译期断言：ResponsesParser 实现 ModelsFormatter。
+// responses 自行序列化模型列表（隔离），不依赖 FormatModelList 回退到 OpenAI 格式，
+// 后续若 responses 协议推出独立的列表形状，仅需改本实现、不影响其他协议。
+var _ ModelsFormatter = (*ResponsesParser)(nil)
+
+// responsesModelList responses「列出模型」响应结构（隔离定义，形状与 OpenAI List Models 一致）。
+type responsesModelList struct {
+	Object string              `json:"object"`
+	Data   []responsesModelObj `json:"data"`
+}
+
+type responsesModelObj struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Created int64  `json:"created"`
+	OwnedBy string `json:"owned_by"`
+}
+
+// FormatModels 序列化为 responses 列表格式。
+// responses 协议暂无官方模型列表端点，沿用 OpenAI List Models 形状（object="list"）以兼容
+// OpenAI SDK 的模型列表解析；结构独立建模，便于按协议演进，而非共享 OpenAI 的结构体。
+func (p *ResponsesParser) FormatModels(items []ModelItem) ([]byte, error) {
+	list := responsesModelList{Object: "list", Data: make([]responsesModelObj, 0, len(items))}
+	for _, it := range items {
+		list.Data = append(list.Data, responsesModelObj{
+			ID:      it.ID,
+			Object:  "model",
+			Created: it.CreatedAt.Unix(),
+			OwnedBy: it.OwnedBy,
+		})
+	}
+	return json.Marshal(list)
+}
