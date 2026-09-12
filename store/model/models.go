@@ -134,6 +134,8 @@ type UsageRecord struct {
 	ReasoningTokens int       `db:"reasoning_tokens" json:"reasoning_tokens"`
 	Cost            float64   `db:"cost" json:"cost"`
 	Unlimited       bool      `db:"unlimited" json:"unlimited"`
+	FirstTokenMs    int64     `db:"first_token_ms" json:"first_token_ms"`
+	LatencyMs       int64     `db:"latency_ms" json:"latency_ms"`
 	CreatedAt       time.Time `db:"created_at" json:"created_at"`
 }
 
@@ -153,6 +155,7 @@ type RequestLog struct {
 	OutputTokens   int       `db:"output_tokens" json:"output_tokens"`
 	TotalTokens    int       `db:"total_tokens" json:"total_tokens"`
 	Error          string    `db:"error" json:"error"`
+	FirstTokenMs   int64     `db:"first_token_ms" json:"first_token_ms"`
 	LatencyMs      int64     `db:"latency_ms" json:"latency_ms"`
 	CreatedAt      time.Time `db:"created_at" json:"created_at"`
 }

@@ -107,6 +107,8 @@ CREATE TABLE IF NOT EXISTS usage_records (
     reasoning_tokens INTEGER DEFAULT 0,
     cost             REAL DEFAULT 0,
     unlimited        INTEGER DEFAULT 0,
+    first_token_ms   INTEGER DEFAULT 0,
+    latency_ms       INTEGER DEFAULT 0,
     created_at     DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_usage_records_user  ON usage_records(user_id);
@@ -135,6 +137,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     output_tokens   INTEGER DEFAULT 0,
     total_tokens    INTEGER DEFAULT 0,
     error           TEXT DEFAULT '',
+    first_token_ms  INTEGER DEFAULT 0,
     latency_ms      INTEGER DEFAULT 0,
     created_at      DATETIME DEFAULT (datetime('now', 'localtime'))
 );
@@ -143,6 +146,11 @@ CREATE TABLE IF NOT EXISTS request_logs (
 --   ALTER TABLE request_logs ADD COLUMN api_key_id INTEGER NOT NULL DEFAULT 0;
 --   UPDATE request_logs SET api_key_id = COALESCE((SELECT id FROM api_keys WHERE api_keys.key = request_logs.api_key), 0);
 --   ALTER TABLE request_logs DROP COLUMN api_key;
+
+-- 耗时字段迁移（存量库手动执行）：
+--   ALTER TABLE usage_records ADD COLUMN first_token_ms INTEGER DEFAULT 0;
+--   ALTER TABLE usage_records ADD COLUMN latency_ms INTEGER DEFAULT 0;
+--   ALTER TABLE request_logs ADD COLUMN first_token_ms INTEGER DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS models (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"time"
+
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
 	"github.com/lijcoder/aiapi/store"
@@ -16,6 +18,7 @@ func Record(ctx *types.Context) {
 	if ctx.HttpResp != nil && ctx.HttpResp.StatusCode >= 300 {
 		return
 	}
+	ctx.MarkLatency(time.Now())
 
 	// 1. 计算花费
 	inputMiss := ctx.Usage.InputTokens - ctx.Usage.CachedTokens
@@ -38,6 +41,8 @@ func Record(ctx *types.Context) {
 		ReasoningTokens: ctx.Usage.ReasoningTokens,
 		Cost:            cost,
 		Unlimited:       ctx.UserUnlimited,
+		FirstTokenMs:    ctx.FirstTokenMs,
+		LatencyMs:       ctx.LatencyMs,
 	}
 	if err := store.C().Usage().Insert(rec); err != nil {
 		ctx.OtherErrs = append(ctx.OtherErrs, log.WithStack(err))

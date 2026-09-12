@@ -56,7 +56,7 @@ func setupEchoTest(t *testing.T) *echo.Echo {
 		status_code INTEGER DEFAULT 0, request_headers TEXT DEFAULT '', request_body TEXT DEFAULT '',
 		response_body TEXT DEFAULT '', model TEXT DEFAULT '', input_tokens INTEGER DEFAULT 0,
 		output_tokens INTEGER DEFAULT 0, total_tokens INTEGER DEFAULT 0, error TEXT DEFAULT '',
-		latency_ms INTEGER DEFAULT 0, created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+		first_token_ms INTEGER DEFAULT 0, latency_ms INTEGER DEFAULT 0, created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 	)`)
 	sum := sha256.Sum256([]byte("sk-test"))
 	db.MustExec(`INSERT INTO users (name, account, password, unlimited) VALUES ('t', 't', 'x', 1)`)

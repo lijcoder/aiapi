@@ -68,11 +68,47 @@ type Context struct {
 	// ResponseCommitted 表示已向客户端写出响应状态。提交后发生传输错误时，
 	// Pipeline 不能再补写错误 JSON。
 	ResponseCommitted bool
+	// FirstTokenMs 是流式请求从开始到上游响应体首次读到字节的耗时（毫秒）；非流式请求为 0。
+	// LatencyMs 是从请求开始到响应转发完成的端到端耗时（毫秒）。
+	FirstTokenMs       int64
+	LatencyMs          int64
+	firstTokenRecorded bool
+	latencyRecorded    bool
 
 	Err          error   // 系统错误（管道中断 + 内部日志）
 	Code         BizCode // HTTP 状态码
 	ErrorMessage string  // 返回给客户端的错误描述，为空时使用固定提示
 	OtherErrs    []error // 非中断性错误（finally 阶段收集，仅用于日志）
+}
+
+// MarkFirstToken 记录首次收到上游响应字节的时间。
+func (c *Context) MarkFirstToken(now time.Time) {
+	if c.firstTokenRecorded {
+		return
+	}
+	c.firstTokenRecorded = true
+	if c.StartTime.IsZero() {
+		return
+	}
+	c.FirstTokenMs = now.Sub(c.StartTime).Milliseconds()
+	if c.FirstTokenMs < 0 {
+		c.FirstTokenMs = 0
+	}
+}
+
+// MarkLatency 记录请求端到端耗时；重复调用只保留首次收尾时间。
+func (c *Context) MarkLatency(now time.Time) {
+	if c.latencyRecorded {
+		return
+	}
+	c.latencyRecorded = true
+	if c.StartTime.IsZero() {
+		return
+	}
+	c.LatencyMs = now.Sub(c.StartTime).Milliseconds()
+	if c.LatencyMs < 0 {
+		c.LatencyMs = 0
+	}
 }
 
 // NewContext 创建管道上下文

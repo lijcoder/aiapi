@@ -30,7 +30,7 @@ func Log(ctx *types.Context) {
 	}
 	headerJSON, _ := json.Marshal(headers)
 	statusCode := requestLogStatusCode(ctx)
-	latency := time.Since(ctx.StartTime).Milliseconds()
+	ctx.MarkLatency(time.Now())
 	if err := store.C().Log().Insert(&model.RequestLog{
 		ApiKeyID:       ctx.ApiKeyID,
 		Format:         ctx.Format,
@@ -45,7 +45,8 @@ func Log(ctx *types.Context) {
 		OutputTokens:   outTokens,
 		TotalTokens:    totalTokens,
 		Error:          errMsg,
-		LatencyMs:      latency,
+		FirstTokenMs:   ctx.FirstTokenMs,
+		LatencyMs:      ctx.LatencyMs,
 	}); err != nil {
 		ctx.OtherErrs = append(ctx.OtherErrs, log.WithStack(err))
 	}

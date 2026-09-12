@@ -77,9 +77,10 @@ func Forward(ctx *types.Context) {
 
 	if strings.Contains(resp.Header.Get("Content-Type"), "event-stream") {
 		forwardStream(ctx)
-		return
+	} else {
+		forwardBuffered(ctx)
 	}
-	forwardBuffered(ctx)
+	ctx.MarkLatency(time.Now())
 }
 
 // hopByHopHeaders RFC 7230 §6.1 定义的逐跳头（key 为 Canonical 形式）。
@@ -158,6 +159,7 @@ func forwardStream(ctx *types.Context) {
 	for {
 		n, readErr := ctx.HttpResp.Body.Read(chunk)
 		if n > 0 {
+			ctx.MarkFirstToken(time.Now())
 			current := append([]byte(nil), chunk[:n]...)
 			_, _ = buf.Write(current)
 			if !firstSent {

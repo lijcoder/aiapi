@@ -161,6 +161,9 @@ func TestForwardRelaysAndCachesBufferedResponse(t *testing.T) {
 	if got, want := string(ctx.RespBody), `{"id":"response_1"}`; got != want {
 		t.Fatalf("cached body = %q, want %q", got, want)
 	}
+	if ctx.FirstTokenMs != 0 {
+		t.Fatalf("buffered response first token ms = %d, want 0", ctx.FirstTokenMs)
+	}
 }
 
 func TestForwardRelaysAndCachesStreamResponse(t *testing.T) {
