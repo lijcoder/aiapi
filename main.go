@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -36,6 +37,17 @@ func main() {
 	e.HideBanner = true
 	framework.EchoInit(e)
 	ServeFrontend(e)
+
+	// Echo 的 tcpKeepAliveListener 在 Accept 后设置 SO_KEEPALIVE；
+	// macOS 上客户端刚断开时该 setsockopt 可能返回 EINVAL，
+	// Echo 会把它当成致命监听错误。使用标准监听器可避免服务因此退出。
+	listener, err := net.Listen("tcp", constant.Address())
+	if err != nil {
+		e.Logger.Fatal(err)
+	}
+	e.Listener = listener
+	defer listener.Close()
+
 	e.Logger.Fatal(e.StartServer(&http.Server{
 		Addr:              constant.Address(),
 		ReadTimeout:       time.Second * 10, // 客户端请求 body 需在 10s 内发完（仅约束读取阶段，不影响响应流）
