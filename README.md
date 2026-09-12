@@ -54,7 +54,7 @@
 | 业务服务层 | `service/*.go` | 跨 handler 复用的业务逻辑、多表事务编排、业务判断（manager 与 proxy 共用） |
 | 后台中间件 | `manager/middleware/*.go` | 登录态校验、接口级权限判定 |
 | 数据持久层 | `store/*.go` | 纯 SQL 包装层，单表/单条数据读写，不写事务编排与业务判断 |
-| 通用工具层 | `constant/`、`log/`、`proxy/sse/` | 常量、日志格式化、SSE 包装 |
+| 通用工具层 | `constant/`、`log/` | 常量、日志格式化 |
 
 ## 快速开始
 
@@ -220,7 +220,7 @@ curl http://localhost:8888/proxy/openai-responses/openai/v1/responses \
   }'
 ```
 
-流式（`"stream": true`）时响应为 SSE 事件流（`response.created` / `response.output_text.delta` / `response.completed` 等），同样原样透传到客户端。
+流式（`"stream": true`）时响应为 SSE 事件流（`response.created` / `response.output_text.delta` / `response.completed` 等）。AIAPI 保持事件内容原样透传；为降低客户端在完成事件后立即断开导致的上游收尾取消，首个读取块直接发送，后续读取块在收到下一块后再发送，最后一块在上游 EOF 后发送。
 
 ### 列出可用模型（v1/models）
 

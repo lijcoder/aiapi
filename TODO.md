@@ -55,9 +55,6 @@
 ### 6. 热路径配置缓存（models/providers/model_policy）
 - **方案**：进程内 TTL 缓存，管理端变更时主动失效；**注意分布式下需改 Redis 或接受 TTL 内不一致**
 
-### 7. 流式透传 buffer 512 → 32KB
-- **位置**：`proxy/handler/response.go` streamResponse
-
 ### 8. request_logs 治理
 - 加 `created_at` 索引（存量库需迁移）
 - body 落库前截断（如 64KB）+ 脱敏开关

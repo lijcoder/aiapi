@@ -19,10 +19,7 @@ func Log(ctx *types.Context) {
 		outTokens = ctx.Usage.OutputTokens
 		totalTokens = ctx.Usage.TotalTokens
 	}
-	errMsg := ""
-	if ctx.Err != nil {
-		errMsg = ctx.ErrorMessage
-	}
+	errMsg := types.ErrorDetail(ctx.ErrorMessage, ctx.Err)
 	headers := make(map[string][]string)
 	for k, vs := range ctx.OrigHeaders {
 		if isSensitiveHeader(k) {
@@ -32,10 +29,7 @@ func Log(ctx *types.Context) {
 		headers[k] = vs
 	}
 	headerJSON, _ := json.Marshal(headers)
-	statusCode := 0
-	if ctx.HttpResp != nil {
-		statusCode = ctx.HttpResp.StatusCode
-	}
+	statusCode := requestLogStatusCode(ctx)
 	latency := time.Since(ctx.StartTime).Milliseconds()
 	if err := store.C().Log().Insert(&model.RequestLog{
 		ApiKeyID:       ctx.ApiKeyID,
@@ -55,6 +49,18 @@ func Log(ctx *types.Context) {
 	}); err != nil {
 		ctx.OtherErrs = append(ctx.OtherErrs, log.WithStack(err))
 	}
+}
+
+// requestLogStatusCode 返回实际已经写给客户端的状态码。
+// 响应头已提交后，即使后续传输失败，也保留客户端实际收到的状态码。
+func requestLogStatusCode(ctx *types.Context) int {
+	if ctx.ResponseStatusCode != 0 {
+		return ctx.ResponseStatusCode
+	}
+	if ctx.HttpResp != nil {
+		return ctx.HttpResp.StatusCode
+	}
+	return 0
 }
 
 // sensitiveHeaderKeys 请求头脱敏关键词（小写子串匹配）。

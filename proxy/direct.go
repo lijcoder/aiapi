@@ -19,7 +19,7 @@ func Handle(req types.ProxyRequest) error {
 		AddLast(handler.BudgetCheck).
 		AddLast(handler.LoadConfig).
 		AddLast(handler.Forward).
-		AddLast(handler.Response).
+		AddLast(handler.ParseUsage).
 		AddLast(handler.Record).
 		AddFinally(handler.Log).
 		Execute(ctx)
@@ -50,7 +50,7 @@ func logErrors(ctx *types.Context) {
 			"provider", ctx.ProviderType,
 			"path", ctx.Path,
 			"status", ctx.Code.HTTPStatus(),
-			"err", ctx.Err.Error(),
+			"err", types.ErrorDetail(ctx.ErrorMessage, ctx.Err),
 		)
 	}
 	for _, oerr := range ctx.OtherErrs {

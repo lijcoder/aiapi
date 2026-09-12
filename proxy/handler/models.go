@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"log/slog"
-
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/parser"
 	"github.com/lijcoder/aiapi/proxy/types"
@@ -37,13 +35,12 @@ func ListModels(ctx *types.Context) {
 	}
 	ctx.Writer.Header().Set("Content-Type", "application/json")
 	ctx.Writer.WriteStatusCode(200)
+	ctx.ResponseStatusCode = 200
+	ctx.ResponseCommitted = true
 	if _, err := ctx.Writer.Write(body); err != nil {
-		if isBrokenPipe(err) {
-			slog.Warn("client disconnected", "path", ctx.Path)
-			return
-		}
 		ctx.Err = log.WithStack(err)
 		ctx.ErrorMessage = "response write failed"
+		ctx.Code = types.CodeUnknown
 		return
 	}
 }

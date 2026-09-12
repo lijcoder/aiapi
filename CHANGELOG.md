@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+- 代理错误日志优化：统一按服务端错误记录 HTTP 500；`request_logs.error` 与应用日志同时保存错误类型及脱敏后的底层错误详情，便于直接在管理台定位网络异常原因。
+
+- SSE 透传调整为首个读取块直接发送、后续块延后一块发送、EOF 时发送最后暂存块；读取缓冲区设为 4KB，以降低客户端在收到完成事件后立即断开导致上游收尾读取被取消的概率。
+
+- 代理响应链路重构：合并 `Forward` 与 `Response`，由 `Forward` 统一负责上游请求、响应头过滤、流式/非流式透传及原始响应缓存；新增后置 `ParseUsage` handler，完整响应交由 `parser` 统一解析后再进入用量记录与计费。删除 `proxy/sse` 响应体包装，流式 usage 聚合下沉至 `parser.ParseStreamUsage`。新增响应完整性/客户端提交状态，避免半截流计费及错误 JSON 二次写入；请求日志改用实际客户端状态码与错误响应快照。
+
 - 新增 OpenAI Responses API 支持（透传）：新增 `parser/responses.go`（`ResponsesParser`）与格式常量 `FormatResponses = "openai-responses"`，客户端可经 `/proxy/openai-responses/:provider/v1/responses` 以 Responses 格式调用（含 `stream: true` 流式），请求原样透传到上游。解析器适配 responses 专用的 usage 字段（`input_tokens` / `output_tokens` / `input_tokens_details.cached_tokens` / `output_tokens_details.reasoning_tokens`，与 chat 的 `prompt_tokens` / `completion_tokens` 不同）与流式事件（`response.created` / `response.output_text.delta` / `response.completed` 等，无 `[DONE]` 标记），使用量统计与计费对 Responses 请求生效。鉴权仍为 `Authorization: Bearer`，模型名取请求体顶层 `model`。无 DB 结构与路由改动（路由即 `/:format/:provider/*`）。`GET v1/models` 在 `openai-responses` 协议下由 `ResponsesParser.FormatModels` 自行序列化（`{object:"list"}`，形状与 OpenAI List Models 一致；responses 暂无官方模型列表格式，实现独立于 OpenAI 结构体，各协议隔离、可独立演进）。
 
 - 修复用户/管理员 Token 用量统计报错：当分组内 `input_tokens` 合计为 0 时，`cache_hit_rate`（`SUM(cached_tokens) / SUM(input_tokens)`）除零得 NULL，扫描进 `float64` 报 `converting NULL to float64`。统计 SQL（`StatsByUser` / `StatsByAdmin` / `Trend7d`）中 `cache_hit_rate` 统一用 `COALESCE(..., 0)` 兜底为 0，统计接口恢复正常返回。

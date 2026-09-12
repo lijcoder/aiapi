@@ -2,8 +2,10 @@ package handler
 
 import (
 	"bytes"
+	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/lijcoder/aiapi/log"
@@ -37,7 +39,10 @@ var upstreamClient = &http.Client{
 	},
 }
 
-// Forward 转发请求到上游
+// Forward 发起上游请求并透传响应。
+//
+// 该 handler 只负责 HTTP 传输：构造请求、复制响应头、写回客户端，并缓存
+// 上游返回的原始 body。协议解析由后续 ParseUsage handler 负责。
 func Forward(ctx *types.Context) {
 	// 注意：body 必须直接传 *bytes.Reader，不能用 io.NopCloser 包装。
 	// NewRequest 内部对 *bytes.Reader 做类型断言以设置 ContentLength 和 GetBody；
@@ -46,8 +51,7 @@ func Forward(ctx *types.Context) {
 	// 流式阶段 body.Read 也会被取消，透传循环随之退出。
 	req, err := http.NewRequestWithContext(ctx.Ctx, ctx.Method, ctx.URL, bytes.NewReader(ctx.Body))
 	if err != nil {
-		ctx.Err = log.WithStack(err)
-		ctx.ErrorMessage = types.InternalServerError
+		setForwardError(ctx, err, types.InternalServerError)
 		return
 	}
 	req.Header = make(http.Header)
@@ -65,9 +69,142 @@ func Forward(ctx *types.Context) {
 	req.URL.RawQuery = q.Encode()
 	resp, err := upstreamClient.Do(req)
 	if err != nil {
-		ctx.Err = log.WithStack(err)
-		ctx.ErrorMessage = "upstream request failed"
+		setForwardError(ctx, err, "provider request failed")
 		return
 	}
 	ctx.HttpResp = resp
+	defer resp.Body.Close()
+
+	if strings.Contains(resp.Header.Get("Content-Type"), "event-stream") {
+		forwardStream(ctx)
+		return
+	}
+	forwardBuffered(ctx)
+}
+
+// hopByHopHeaders RFC 7230 §6.1 定义的逐跳头（key 为 Canonical 形式）。
+var hopByHopHeaders = map[string]bool{
+	"Connection":          true,
+	"Keep-Alive":          true,
+	"Proxy-Authenticate":  true,
+	"Proxy-Authorization": true,
+	"Te":                  true,
+	"Trailer":             true,
+	"Transfer-Encoding":   true,
+	"Upgrade":             true,
+}
+
+// copyUpstreamHeaders 复制上游响应头到客户端，剥掉逐跳头及 Connection 点名的头。
+func copyUpstreamHeaders(ctx *types.Context) {
+	src := ctx.HttpResp.Header
+	nominated := map[string]bool{}
+	for _, v := range src.Values("Connection") {
+		for _, name := range strings.Split(v, ",") {
+			if name = strings.TrimSpace(name); name != "" {
+				nominated[http.CanonicalHeaderKey(name)] = true
+			}
+		}
+	}
+	for k, vs := range src {
+		if hopByHopHeaders[k] || nominated[k] {
+			continue
+		}
+		for _, v := range vs {
+			ctx.Writer.Header().Add(k, v)
+		}
+	}
+}
+
+// forwardBuffered 读取完整的非流式响应后一次性写回客户端。
+func forwardBuffered(ctx *types.Context) {
+	body, err := io.ReadAll(ctx.HttpResp.Body)
+	if err != nil {
+		setForwardError(ctx, err, "provider unstream read failed")
+		return
+	}
+	ctx.RespBody = body
+	ctx.ResponseComplete = true
+
+	copyUpstreamHeaders(ctx)
+	ctx.Writer.WriteStatusCode(ctx.HttpResp.StatusCode)
+	ctx.ResponseStatusCode = ctx.HttpResp.StatusCode
+	ctx.ResponseCommitted = true
+	if len(body) == 0 {
+		return
+	}
+	if _, err := ctx.Writer.Write(body); err != nil {
+		setForwardError(ctx, err, "client unstream response write failed")
+	}
+}
+
+// forwardStream 透传 SSE 并缓存原始响应，不解析协议事件。
+//
+// 首个读取块直接写给客户端；后续每次读取到新块后，才写出上一个块，最后一个块
+// 等上游返回 EOF 后写出。这样常见的末尾完成事件会随 EOF 一并交付，客户端收到
+// 完成事件立即断开时，Forward 通常已不再进行下一次上游读取。
+func forwardStream(ctx *types.Context) {
+	ctx.Stream = true
+	copyUpstreamHeaders(ctx)
+	ctx.Writer.WriteStatusCode(ctx.HttpResp.StatusCode)
+	ctx.ResponseStatusCode = ctx.HttpResp.StatusCode
+	ctx.ResponseCommitted = true
+
+	var (
+		buf       bytes.Buffer
+		pending   []byte
+		firstSent bool
+	)
+	chunk := make([]byte, 4*1024)
+	for {
+		n, readErr := ctx.HttpResp.Body.Read(chunk)
+		if n > 0 {
+			current := append([]byte(nil), chunk[:n]...)
+			_, _ = buf.Write(current)
+			if !firstSent {
+				if !writeStreamChunk(ctx, current) {
+					ctx.RespBody = buf.Bytes()
+					return
+				}
+				firstSent = true
+			} else {
+				if len(pending) > 0 && !writeStreamChunk(ctx, pending) {
+					ctx.RespBody = buf.Bytes()
+					return
+				}
+				pending = current
+			}
+		}
+		if readErr != nil {
+			// Reader 即使返回错误也可能已给出有效字节；最后暂存块同样应尝试
+			// 交付客户端，不能因上游连接收尾异常而丢掉已读取的数据。
+			if len(pending) > 0 && !writeStreamChunk(ctx, pending) {
+				ctx.RespBody = buf.Bytes()
+				return
+			}
+			if readErr == io.EOF {
+				ctx.ResponseComplete = true
+				ctx.RespBody = buf.Bytes()
+				return
+			}
+			setForwardError(ctx, readErr, "provider stream read failed")
+			ctx.RespBody = buf.Bytes()
+			return
+		}
+	}
+}
+
+// writeStreamChunk 将一个已缓存的 SSE 块写给客户端。
+func writeStreamChunk(ctx *types.Context, chunk []byte) bool {
+	if _, err := ctx.Writer.Write(chunk); err != nil {
+		setForwardError(ctx, err, "client stream response write failed")
+		return false
+	}
+	return true
+}
+
+// setForwardError 记录转发错误，统一按服务端错误处理。
+func setForwardError(ctx *types.Context, err error, message string) {
+	ctx.Err = log.WithStack(err)
+	ctx.ErrorMessage = message
+	ctx.Code = types.CodeUnknown
 }

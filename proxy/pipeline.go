@@ -57,6 +57,9 @@ func (p *Pipeline) writeError(ctx *types.Context) {
 	if ctx.Code.IsZero() {
 		ctx.Code = types.CodeUnknown
 	}
+	if ctx.ResponseCommitted {
+		return
+	}
 
 	// 返回给客户端的消息：优先用 Message，没有则用固定提示
 	msg := ctx.ErrorMessage
@@ -75,5 +78,8 @@ func (p *Pipeline) writeError(ctx *types.Context) {
 	}
 	ctx.Writer.Header().Set("Content-Type", "application/json")
 	ctx.Writer.WriteStatusCode(ctx.Code.HTTPStatus())
+	ctx.ResponseStatusCode = ctx.Code.HTTPStatus()
+	ctx.ResponseCommitted = true
+	ctx.RespBody = body
 	ctx.Writer.Write(body)
 }

@@ -58,8 +58,16 @@ type Context struct {
 	ModelInfo  *model.Model // 模型价格配置（Auth 校验后设置）
 	HttpResp   *http.Response
 	RespBody   []byte
-	Usage      *parser.Usage // 从响应解析的用量（仅在成功请求时有值）
-	Stream     bool
+	// ResponseStatusCode 是实际写给客户端的状态码；上游未建立连接时也可用于日志。
+	ResponseStatusCode int
+	Usage              *parser.Usage // 从响应解析的用量（仅在成功请求时有值）
+	Stream             bool          // 上游是否返回 SSE
+	// ResponseComplete 表示上游响应体已完整读到 EOF。只有完整响应才允许
+	// 后续 ParseUsage/Record 消费，避免对半截流计费。
+	ResponseComplete bool
+	// ResponseCommitted 表示已向客户端写出响应状态。提交后发生传输错误时，
+	// Pipeline 不能再补写错误 JSON。
+	ResponseCommitted bool
 
 	Err          error   // 系统错误（管道中断 + 内部日志）
 	Code         BizCode // HTTP 状态码

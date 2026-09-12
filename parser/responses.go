@@ -120,7 +120,8 @@ func (p *ResponsesParser) ParseStreamEvent(data []byte) (*StreamEvent, error) {
 			return nil, nil
 		}
 		// created 事件不带 usage，仅携带 model / request id；
-		// sse.Body 的「非零字段覆盖」累加逻辑会保留这两项供后续 completed 补齐。
+		// 后置流式 usage 解析的「非零字段覆盖」逻辑会保留这两项，
+		// 供后续 completed 事件补齐。
 		return &StreamEvent{
 			EventType: "usage",
 			Usage: &Usage{
@@ -166,7 +167,7 @@ func (p *ResponsesParser) ParseStreamEvent(data []byte) (*StreamEvent, error) {
 		}, nil
 
 	case "response.failed", "response.incomplete":
-		// 异常结束：透传结束，无 usage（sse.Body 不记录不计费）
+		// 异常结束：透传结束，无 usage（后置解析器不记录、不计费）
 		return &StreamEvent{EventType: "done"}, nil
 
 	default:

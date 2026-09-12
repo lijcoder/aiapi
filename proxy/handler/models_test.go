@@ -22,7 +22,10 @@ type capWriter struct {
 
 func (w *capWriter) Header() http.Header            { return w.header }
 func (w *capWriter) WriteStatusCode(statusCode int) { w.status = statusCode }
-func (w *capWriter) Write(body []byte) (int, error) { w.body = append(w.body, body...); return len(body), nil }
+func (w *capWriter) Write(body []byte) (int, error) {
+	w.body = append(w.body, body...)
+	return len(body), nil
+}
 
 // setupModelsTestDB 初始化内存 SQLite：default 下 2 个模型，other 下 1 个；key 7 为 whitelist
 func setupModelsTestDB(t *testing.T) {
@@ -74,6 +77,9 @@ func TestListModels_WhitelistFiltered(t *testing.T) {
 	}
 	if w.status != 200 {
 		t.Fatalf("expect status 200, got %d", w.status)
+	}
+	if !ctx.ResponseCommitted || ctx.ResponseStatusCode != http.StatusOK {
+		t.Fatalf("response state = committed:%t status:%d", ctx.ResponseCommitted, ctx.ResponseStatusCode)
 	}
 
 	var resp struct {

@@ -10,7 +10,7 @@ import (
 // Record 记录 Token 用量、计算费用、扣减余额
 // 注意：Record 在响应之后执行，所有错误收集到 OtherErrs
 func Record(ctx *types.Context) {
-	if ctx.Usage == nil || ctx.ModelInfo == nil {
+	if ctx.Usage == nil || ctx.ModelInfo == nil || !ctx.ResponseComplete {
 		return
 	}
 	if ctx.HttpResp != nil && ctx.HttpResp.StatusCode >= 300 {

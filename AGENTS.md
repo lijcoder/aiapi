@@ -27,7 +27,7 @@
 | 业务服务层 | 跨 handler 复用的业务逻辑、多表事务编排，不依赖 echo | `service/*.go` |
 | 后台中间件层 | 登录态校验、接口级权限判定，只做 HTTP 适配 | `manager/middleware/*.go` |
 | 数据持久层 | 数据库访问、模型定义、查询构造 | `store/*.go` |
-| 通用工具层 | 跨包共享常量、日志格式化、SSE 包装等 | `constant/`、`log/`、`proxy/sse/` |
+| 通用工具层 | 跨包共享常量、日志格式化等 | `constant/`、`log/` |
 
 ### 2.2 关键边界
 
@@ -35,6 +35,7 @@
 - `proxy/direct.go` 只负责 Pipeline 组装，不实现具体业务。
 - `proxy/handler/` 是代理业务逻辑唯一入口，每个 handler 应尽量独立、可测试。
 - `parser/` 只负责协议相关的解析与提取，不直接操作数据库或写响应。
+- `proxy/handler/Forward` 只负责 HTTP 转发与响应透传：发起上游请求、复制安全响应头、写回客户端并缓存原始响应；不做协议解析、用量统计或计费。响应完成后由独立 handler 调用 `parser` 消费缓存数据。
 - `store/` 是纯 SQL 包装层：只做单条/单表的数据读写（`Get/Select/Exec`），不处理 HTTP 或协议细节，**不写跨表编排、不写业务判断、不写事务体、不放纯函数业务工具**（如哈希/展示串计算属于 service）；每个 Store 的命名空间入口写在自己文件内（如 `func (s *Session) Xxx() *XxxStore`），不集中到 `store/base.go`。按表/领域拆分 Store，不同表的操作不混在同一 Store（如操作 `api_keys.model_policy` + `apikey_model_access` 的 `ModelAccessStore` 独立于操作 `models` 表的 `ModelStore`）。`IN` 查询直接写 `IN (:ids)` 传 slice 参数，QueryBuilder 内置 `sqlx.In` 自动展开，不手动拼接占位符。迁移不在应用内自动执行：DDL 迁移以 `sql/sqlite.sql` 注释形式提供手动 SQL，需外部计算（如哈希）的由人工/脚本完成。
 - `manager/handler/` 是后端给前端的接口唯一入口，只做 HTTP 适配：参数校验、调 service、组装响应；**不直接写跨表事务、不写可复用业务逻辑**。
 - `service/` 是业务逻辑承载层（manager 与 proxy 共用）：跨 handler 复用、不依赖 echo 的业务逻辑、**涉及多表/带业务语义的事务编排**、跨 Store 组装、业务判断（如分组维度→排序方向）都放这里；handler 与 middleware 只调用 service 暴露的方法，不重复实现。proxy 侧无 manager 入口的场景（如鉴权、计费）也调 `service/`，不在 `proxy/handler` 自建业务逻辑。
