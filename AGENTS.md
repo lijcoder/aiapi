@@ -81,6 +81,7 @@
 - 新增常量按归属分流：**跨业务复用的基础设施常量**（环境变量名、密钥长度下限等，未来新业务也可能用到，散写会导致配置重复/不当）→ 根目录 `constant/constant.go`；**业务域自用常量**（如 manager 的会话 TTL、cookie 名）→ 留在本业务包（如 `manager/base/constant.go`），不堆进 constant 形成上帝包
 - 数据目录下的文件路径（DB、日志、密钥文件等）统一由 `constant` 的路径方法提供（`DBFilePath`/`LogFilePath`/`JWTKeyFilePath` 等），业务代码不自行拼接路径；密钥加载（env > 密钥文件 > 自动生成）统一走 `constant.LoadSecret`，业务层只做编排（参考 `manager/base/secret.go`），不各自实现加载逻辑
 - 新增通用工具 → `log/`
+- 应用日志统一输出到 stdout 与 `constant.LogFilePath()`；初始化日志后，Echo 的 `e.Logger`、`e.StdLogger` 与 HTTP Server 错误日志应复用同一个 writer，避免框架日志只出现在控制台。
 
 ### 3.2 目录命名规则
 

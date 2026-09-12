@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+- 统一应用与 Echo/HTTP 框架日志输出位置：共用 stdout 和 `logs/app.log`（含日志轮转），保留 Echo 原有日志格式。
+
 - 代理请求日志与用量记录新增 `first_token_ms`（流式请求首 token 耗时）和 `latency_ms`（端到端耗时）字段，统一以毫秒保存；流式首 token 按首次收到上游响应块计时，非流式请求的 `first_token_ms` 保持 0，请求收尾时写入两张表。存量数据库需按 `sql/sqlite.sql` 注释手动补充列。
 
 - 代理错误日志优化：统一按服务端错误记录 HTTP 500；`request_logs.error` 与应用日志同时保存错误类型及脱敏后的底层错误详情，便于直接在管理台定位网络异常原因。
