@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	stdLog "log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -20,7 +21,7 @@ import (
 
 func main() {
 	constant.ParseArgs()
-	initLogger()
+	logOutput := initLogger()
 	if err := base.LoadSecrets(); err != nil {
 		slog.Error("secret load failed", "err", err)
 		panic(err)
@@ -35,6 +36,10 @@ func main() {
 
 	e := echo.New()
 	e.HideBanner = true
+	// Echo 在 New 时默认把 logger 写到 stdout；切换到与 slog 相同的
+	// writer 后，Echo 和 http.Server 的内部日志也会落到 app.log。
+	e.Logger.SetOutput(logOutput)
+	e.StdLogger.SetOutput(logOutput)
 	framework.EchoInit(e)
 	ServeFrontend(e)
 
@@ -43,12 +48,13 @@ func main() {
 	// Echo 会把它当成致命监听错误。使用标准监听器可避免服务因此退出。
 	listener, err := net.Listen("tcp", constant.Address())
 	if err != nil {
-		e.Logger.Fatal(err)
+		slog.Error("server listen failed", "address", constant.Address(), "err", err)
+		os.Exit(1)
 	}
 	e.Listener = listener
 	defer listener.Close()
 
-	e.Logger.Fatal(e.StartServer(&http.Server{
+	if err := e.StartServer(&http.Server{
 		Addr:              constant.Address(),
 		ReadTimeout:       time.Second * 10, // 客户端请求 body 需在 10s 内发完（仅约束读取阶段，不影响响应流）
 		ReadHeaderTimeout: time.Second * 2,
@@ -57,7 +63,10 @@ func main() {
 		// 任何固定值都会切断超长 SSE 流式响应（LLM 流可能持续数分钟）。
 		// 连接生命周期改由请求 context 控制（客户端断开 → 取消上游请求）。
 		WriteTimeout: 0,
-	}))
+	}); err != nil {
+		slog.Error("server exited", "err", err)
+		os.Exit(1)
+	}
 }
 
 func initStore() {
@@ -78,7 +87,7 @@ func initStore() {
 	}
 }
 
-func initLogger() {
+func initLogger() io.Writer {
 	os.MkdirAll(constant.LogDir(), 0755)
 
 	fileWriter := &lumberjack.Logger{
@@ -91,4 +100,6 @@ func initLogger() {
 
 	w := io.MultiWriter(os.Stdout, fileWriter)
 	slog.SetDefault(slog.New(aiapiLog.NewFormatter(w, slog.LevelInfo)))
+	stdLog.SetOutput(w)
+	return w
 }
