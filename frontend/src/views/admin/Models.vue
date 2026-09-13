@@ -46,13 +46,11 @@
         </div>
         <div>
           <div style="font-size:13px;margin-bottom:6px">支持模态</div>
-          <n-checkbox-group v-model:value="modalFlags">
-            <n-space>
-              <n-checkbox value="text" label="文本" />
-              <n-checkbox value="image" label="图像" />
-              <n-checkbox value="video" label="视频" />
-            </n-space>
-          </n-checkbox-group>
+          <n-space>
+            <n-checkbox :checked="modalFlags.includes('text')" @update:checked="value => toggleModalFlag('text', value)" label="文本" />
+            <n-checkbox :checked="modalFlags.includes('image')" @update:checked="value => toggleModalFlag('image', value)" label="图像" />
+            <n-checkbox :checked="modalFlags.includes('video')" @update:checked="value => toggleModalFlag('video', value)" label="视频" />
+          </n-space>
         </div>
 
         <n-divider style="margin:2px 0 0" />
@@ -316,6 +314,13 @@ function flagsToModal(arr) {
     supports_image: arr.includes('image'),
     supports_video: arr.includes('video'),
   }
+}
+
+function toggleModalFlag(flag, checked) {
+  const next = new Set(modalFlags.value)
+  if (checked) next.add(flag)
+  else next.delete(flag)
+  modalFlags.value = [...next]
 }
 
 function renderModal(r) {

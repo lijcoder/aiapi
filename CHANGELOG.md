@@ -23,6 +23,8 @@
 
 - 统一默认价格和规则价格的展示文案为“输入（缓存命中）”“输入（缓存未命中）”“输出”，规则价格改为紧凑的价格项布局。
 
+- 修复管理员编辑、复制模型时支持模态未正确回显的问题。
+
 - 计费快照补充完整模型 `pricing_config`，并将 `request_started_at` 统一序列化为 `yyyy-MM-dd HH:mm:ss`，同时以 `matched_rule_name` 保存本次命中的规则名称和实际价格。
 
 - 模型计费升级为 v2 可组合的分段规则：`when` 支持嵌套 `and`/`or` 条件树，时间拆为 weekday、time_range、month_day 原子条件，Token 拆为 gt/gte/lt/lte 原子条件；规则仅以唯一 name 标识，命中多个规则按 priority 选择，未命中回退默认价格。读取 v1 配置时自动转换为 v2。
