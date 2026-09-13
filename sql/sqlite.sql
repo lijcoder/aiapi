@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS usage_records (
     reasoning_tokens INTEGER DEFAULT 0,
     cost             REAL DEFAULT 0,
     unlimited        INTEGER DEFAULT 0,
+    pricing_snapshot TEXT NOT NULL DEFAULT '',
     first_token_ms   INTEGER DEFAULT 0,
     latency_ms       INTEGER DEFAULT 0,
     created_at     DATETIME DEFAULT (datetime('now', 'localtime'))
@@ -151,14 +152,19 @@ CREATE TABLE IF NOT EXISTS request_logs (
 --   ALTER TABLE usage_records ADD COLUMN first_token_ms INTEGER DEFAULT 0;
 --   ALTER TABLE usage_records ADD COLUMN latency_ms INTEGER DEFAULT 0;
 --   ALTER TABLE request_logs ADD COLUMN first_token_ms INTEGER DEFAULT 0;
+--
+-- 分段计费迁移（存量库手动执行，原价格不迁移，升级后请在管理台重新配置每个模型）：
+--   ALTER TABLE models ADD COLUMN pricing_config TEXT NOT NULL DEFAULT '';
+--   ALTER TABLE usage_records ADD COLUMN pricing_snapshot TEXT NOT NULL DEFAULT '';
+--   ALTER TABLE models DROP COLUMN input_cache_hit_price;
+--   ALTER TABLE models DROP COLUMN input_cache_miss_price;
+--   ALTER TABLE models DROP COLUMN output_price;
 
 CREATE TABLE IF NOT EXISTS models (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     provider              TEXT NOT NULL,
     model                 TEXT NOT NULL,
-    input_cache_hit_price  REAL NOT NULL DEFAULT 0,
-    input_cache_miss_price REAL NOT NULL DEFAULT 0,
-    output_price           REAL NOT NULL DEFAULT 0,
+    pricing_config        TEXT NOT NULL DEFAULT '',
     max_context_tokens    INTEGER DEFAULT 0,
     max_completion_tokens INTEGER DEFAULT 0,
     supports_text         INTEGER NOT NULL DEFAULT 1,

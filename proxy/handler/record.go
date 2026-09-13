@@ -5,8 +5,7 @@ import (
 
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
-	"github.com/lijcoder/aiapi/store"
-	"github.com/lijcoder/aiapi/store/model"
+	"github.com/lijcoder/aiapi/service"
 )
 
 // Record 记录 Token 用量、计算费用、扣减余额
@@ -20,54 +19,25 @@ func Record(ctx *types.Context) {
 	}
 	ctx.MarkLatency(time.Now())
 
-	// 1. 计算花费
-	inputMiss := ctx.Usage.InputTokens - ctx.Usage.CachedTokens
-	cost := (float64(ctx.Usage.CachedTokens)*ctx.ModelInfo.InputCacheHitPrice +
-		float64(inputMiss)*ctx.ModelInfo.InputCacheMissPrice +
-		float64(ctx.Usage.OutputTokens)*ctx.ModelInfo.OutputPrice) / 1_000_000
-
-	// 2. 记录用量（始终写入）
-	rec := &model.UsageRecord{
-		UserID:          ctx.UserID,
-		ApiKeyID:        ctx.ApiKeyID,
-		Provider:        ctx.ProviderType,
-		Model:           ctx.Model,
-		InputTokens:     ctx.Usage.InputTokens,
-		OutputTokens:    ctx.Usage.OutputTokens,
-		TotalTokens:     ctx.Usage.TotalTokens,
-		RequestID:       ctx.Usage.RequestID,
-		Stream:          ctx.Stream,
-		CachedTokens:    ctx.Usage.CachedTokens,
-		ReasoningTokens: ctx.Usage.ReasoningTokens,
-		Cost:            cost,
-		Unlimited:       ctx.UserUnlimited,
-		FirstTokenMs:    ctx.FirstTokenMs,
-		LatencyMs:       ctx.LatencyMs,
-	}
-	if err := store.C().Usage().Insert(rec); err != nil {
-		ctx.OtherErrs = append(ctx.OtherErrs, log.WithStack(err))
-	}
-
-	// 3. 用户无限制 → 不扣费
-	if ctx.UserUnlimited {
-		return
-	}
-
-	// 4. 用户余额和 Key 余额扣减放在同一事务中
-	err := store.C().T(func(s *store.Session) error {
-		// 4.1 扣用户余额
-		if err := s.Charge().DeductUserBudget(ctx.UserID, cost); err != nil {
-			return err
-		}
-		// 4.2 Key 有限额 → 额外扣 Key
-		if !ctx.KeyUnlimited {
-			if err := s.Charge().DeductKeyBudget(ctx.ApiKeyID, cost); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
+	if _, err := service.NewBillingService().RecordUsage(service.UsageBillingInput{
+		Model:            ctx.ModelInfo,
+		UserID:           ctx.UserID,
+		APIKeyID:         ctx.ApiKeyID,
+		Provider:         ctx.ProviderType,
+		ModelName:        ctx.Model,
+		InputTokens:      ctx.Usage.InputTokens,
+		OutputTokens:     ctx.Usage.OutputTokens,
+		TotalTokens:      ctx.Usage.TotalTokens,
+		RequestID:        ctx.Usage.RequestID,
+		Stream:           ctx.Stream,
+		CachedTokens:     ctx.Usage.CachedTokens,
+		ReasoningTokens:  ctx.Usage.ReasoningTokens,
+		UserUnlimited:    ctx.UserUnlimited,
+		KeyUnlimited:     ctx.KeyUnlimited,
+		FirstTokenMs:     ctx.FirstTokenMs,
+		LatencyMs:        ctx.LatencyMs,
+		RequestStartedAt: ctx.StartTime,
+	}); err != nil {
 		ctx.OtherErrs = append(ctx.OtherErrs, log.WithStack(err))
 	}
 }

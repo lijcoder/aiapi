@@ -5,6 +5,7 @@ import (
 
 	"github.com/lijcoder/aiapi/log"
 	"github.com/lijcoder/aiapi/proxy/types"
+	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
 )
 
@@ -25,6 +26,12 @@ func AuthModel(ctx *types.Context) {
 		return
 	}
 	ctx.ModelInfo = pvd
+	if _, err := service.ParsePricingConfig(pvd.PricingConfig); err != nil {
+		ctx.Err = log.WithStack(fmt.Errorf("model pricing is invalid: %w", err))
+		ctx.ErrorMessage = "model pricing is not configured"
+		ctx.Code = types.CodeModelNotFound
+		return
+	}
 
 	// 校验该 API Key 是否有权访问此模型
 	// 策略为 all（或未配置）时放行；为 whitelist 时按 apikey_model_access 白名单判定

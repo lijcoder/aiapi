@@ -104,19 +104,17 @@ func (ms *ModelStore) GetByID(id int64) (*model.Model, error) {
 // Create 新增模型，回填 ID
 func (ms *ModelStore) Create(m *model.Model) error {
 	res, err := ms.s.Query(
-		`INSERT INTO models (provider, model, input_cache_hit_price, input_cache_miss_price, output_price, max_context_tokens, max_completion_tokens, supports_text, supports_image, supports_video)
-		 VALUES (:provider, :model, :input_cache_hit_price, :input_cache_miss_price, :output_price, :max_context_tokens, :max_completion_tokens, :supports_text, :supports_image, :supports_video)`,
+		`INSERT INTO models (provider, model, pricing_config, max_context_tokens, max_completion_tokens, supports_text, supports_image, supports_video)
+		 VALUES (:provider, :model, :pricing_config, :max_context_tokens, :max_completion_tokens, :supports_text, :supports_image, :supports_video)`,
 		map[string]any{
-			"provider":               m.Provider,
-			"model":                  m.Model,
-			"input_cache_hit_price":  m.InputCacheHitPrice,
-			"input_cache_miss_price": m.InputCacheMissPrice,
-			"output_price":           m.OutputPrice,
-			"max_context_tokens":     m.MaxContextTokens,
-			"max_completion_tokens":  m.MaxCompletionTokens,
-			"supports_text":          m.SupportsText,
-			"supports_image":         m.SupportsImage,
-			"supports_video":         m.SupportsVideo,
+			"provider":              m.Provider,
+			"model":                 m.Model,
+			"pricing_config":        m.PricingConfig,
+			"max_context_tokens":    m.MaxContextTokens,
+			"max_completion_tokens": m.MaxCompletionTokens,
+			"supports_text":         m.SupportsText,
+			"supports_image":        m.SupportsImage,
+			"supports_video":        m.SupportsVideo,
 		},
 	).Exec()
 	if err != nil {
@@ -133,20 +131,17 @@ func (ms *ModelStore) Create(m *model.Model) error {
 // Update 更新模型（provider+model 不可改）
 func (ms *ModelStore) Update(m *model.Model) error {
 	_, err := ms.s.Query(
-		`UPDATE models SET input_cache_hit_price=:input_cache_hit_price, input_cache_miss_price=:input_cache_miss_price,
-		 output_price=:output_price, max_context_tokens=:max_context_tokens, max_completion_tokens=:max_completion_tokens,
+		`UPDATE models SET pricing_config=:pricing_config, max_context_tokens=:max_context_tokens, max_completion_tokens=:max_completion_tokens,
 		 supports_text=:supports_text, supports_image=:supports_image, supports_video=:supports_video
 		 WHERE id=:id`,
 		map[string]any{
-			"id":                     m.ID,
-			"input_cache_hit_price":  m.InputCacheHitPrice,
-			"input_cache_miss_price": m.InputCacheMissPrice,
-			"output_price":           m.OutputPrice,
-			"max_context_tokens":     m.MaxContextTokens,
-			"max_completion_tokens":  m.MaxCompletionTokens,
-			"supports_text":          m.SupportsText,
-			"supports_image":         m.SupportsImage,
-			"supports_video":         m.SupportsVideo,
+			"id":                    m.ID,
+			"pricing_config":        m.PricingConfig,
+			"max_context_tokens":    m.MaxContextTokens,
+			"max_completion_tokens": m.MaxCompletionTokens,
+			"supports_text":         m.SupportsText,
+			"supports_image":        m.SupportsImage,
+			"supports_video":        m.SupportsVideo,
 		},
 	).Exec()
 	return err

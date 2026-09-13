@@ -20,8 +20,8 @@ type UsageStore struct {
 // Insert 插入用量记录
 func (us *UsageStore) Insert(usage *model.UsageRecord) error {
 	res, err := us.s.Query(
-		`INSERT INTO usage_records (user_id, api_key_id, provider, model, input_tokens, output_tokens, total_tokens, request_id, stream, cached_tokens, reasoning_tokens, cost, unlimited, first_token_ms, latency_ms)
-		 VALUES (:user_id, :api_key_id, :provider, :model, :input_tokens, :output_tokens, :total_tokens, :request_id, :stream, :cached_tokens, :reasoning_tokens, :cost, :unlimited, :first_token_ms, :latency_ms)`,
+		`INSERT INTO usage_records (user_id, api_key_id, provider, model, input_tokens, output_tokens, total_tokens, request_id, stream, cached_tokens, reasoning_tokens, cost, unlimited, pricing_snapshot, first_token_ms, latency_ms)
+		 VALUES (:user_id, :api_key_id, :provider, :model, :input_tokens, :output_tokens, :total_tokens, :request_id, :stream, :cached_tokens, :reasoning_tokens, :cost, :unlimited, :pricing_snapshot, :first_token_ms, :latency_ms)`,
 		usage,
 	).Exec()
 	if err != nil {

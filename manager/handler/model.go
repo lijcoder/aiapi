@@ -2,11 +2,13 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/lijcoder/aiapi/manager/base"
+	"github.com/lijcoder/aiapi/service"
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
 )
@@ -17,9 +19,7 @@ type modelItem struct {
 	ID                  int64     `json:"id"`
 	Provider            string    `json:"provider"`
 	Model               string    `json:"model"`
-	InputCacheHitPrice  float64   `json:"input_cache_hit_price"`
-	InputCacheMissPrice float64   `json:"input_cache_miss_price"`
-	OutputPrice         float64   `json:"output_price"`
+	PricingConfig       string    `json:"pricing_config"`
 	MaxContextTokens    int       `json:"max_context_tokens"`
 	MaxCompletionTokens int       `json:"max_completion_tokens"`
 	SupportsText        bool      `json:"supports_text"`
@@ -35,28 +35,24 @@ type ListModelsAdminReq struct {
 }
 
 type CreateModelReq struct {
-	Provider            string  `json:"provider"`
-	Model               string  `json:"model"`
-	InputCacheHitPrice  float64 `json:"input_cache_hit_price"`
-	InputCacheMissPrice float64 `json:"input_cache_miss_price"`
-	OutputPrice         float64 `json:"output_price"`
-	MaxContextTokens    int     `json:"max_context_tokens"`
-	MaxCompletionTokens int     `json:"max_completion_tokens"`
-	SupportsText        bool    `json:"supports_text"`
-	SupportsImage       bool    `json:"supports_image"`
-	SupportsVideo       bool    `json:"supports_video"`
+	Provider            string `json:"provider"`
+	Model               string `json:"model"`
+	PricingConfig       string `json:"pricing_config"`
+	MaxContextTokens    int    `json:"max_context_tokens"`
+	MaxCompletionTokens int    `json:"max_completion_tokens"`
+	SupportsText        bool   `json:"supports_text"`
+	SupportsImage       bool   `json:"supports_image"`
+	SupportsVideo       bool   `json:"supports_video"`
 }
 
 type UpdateModelReq struct {
-	ID                  int64   `json:"id"`
-	InputCacheHitPrice  float64 `json:"input_cache_hit_price"`
-	InputCacheMissPrice float64 `json:"input_cache_miss_price"`
-	OutputPrice         float64 `json:"output_price"`
-	MaxContextTokens    int     `json:"max_context_tokens"`
-	MaxCompletionTokens int     `json:"max_completion_tokens"`
-	SupportsText        bool    `json:"supports_text"`
-	SupportsImage       bool    `json:"supports_image"`
-	SupportsVideo       bool    `json:"supports_video"`
+	ID                  int64  `json:"id"`
+	PricingConfig       string `json:"pricing_config"`
+	MaxContextTokens    int    `json:"max_context_tokens"`
+	MaxCompletionTokens int    `json:"max_completion_tokens"`
+	SupportsText        bool   `json:"supports_text"`
+	SupportsImage       bool   `json:"supports_image"`
+	SupportsVideo       bool   `json:"supports_video"`
 }
 
 type ModelIdReq struct {
@@ -103,31 +99,22 @@ func CreateModel(ctx context.Context, req *CreateModelReq) (*modelItem, *base.Bi
 	if req.Provider == "" || req.Model == "" {
 		return nil, base.ErrBadReq("provider 和 model 不能为空")
 	}
-	// 检查唯一性
-	exist, err := store.C().Model().Get(req.Provider, req.Model)
-	if err != nil {
-		slog.Error("[Model] Get failed", "err", err)
-		return nil, base.ErrInternal
-	}
-	if exist != nil {
-		return nil, base.ErrBadReq("模型已存在")
-	}
-
 	m := &model.Model{
 		Provider:            req.Provider,
 		Model:               req.Model,
-		InputCacheHitPrice:  req.InputCacheHitPrice,
-		InputCacheMissPrice: req.InputCacheMissPrice,
-		OutputPrice:         req.OutputPrice,
+		PricingConfig:       req.PricingConfig,
 		MaxContextTokens:    req.MaxContextTokens,
 		MaxCompletionTokens: req.MaxCompletionTokens,
 		SupportsText:        req.SupportsText,
 		SupportsImage:       req.SupportsImage,
 		SupportsVideo:       req.SupportsVideo,
 	}
-	if err := store.C().Model().Create(m); err != nil {
-		if store.IsUniqueConstraintErr(err) {
+	if err := service.NewModelService().Create(m); err != nil {
+		if errors.Is(err, service.ErrModelAlreadyExists) {
 			return nil, base.ErrBadReq("模型已存在")
+		}
+		if service.IsPricingConfigError(err) {
+			return nil, base.ErrBadReq(err.Error())
 		}
 		slog.Error("[Model] Create failed", "err", err)
 		return nil, base.ErrInternal
@@ -149,16 +136,16 @@ func UpdateModel(ctx context.Context, req *UpdateModelReq) (*modelItem, *base.Bi
 	if m == nil {
 		return nil, base.ErrNotFound("模型不存在")
 	}
-
-	m.InputCacheHitPrice = req.InputCacheHitPrice
-	m.InputCacheMissPrice = req.InputCacheMissPrice
-	m.OutputPrice = req.OutputPrice
+	m.PricingConfig = req.PricingConfig
 	m.MaxContextTokens = req.MaxContextTokens
 	m.MaxCompletionTokens = req.MaxCompletionTokens
 	m.SupportsText = req.SupportsText
 	m.SupportsImage = req.SupportsImage
 	m.SupportsVideo = req.SupportsVideo
-	if err := store.C().Model().Update(m); err != nil {
+	if err := service.NewModelService().Update(m); err != nil {
+		if service.IsPricingConfigError(err) {
+			return nil, base.ErrBadReq(err.Error())
+		}
 		slog.Error("[Model] Update failed", "err", err, "id", req.ID)
 		return nil, base.ErrInternal
 	}
@@ -193,9 +180,7 @@ func toModelItem(m model.Model) modelItem {
 		ID:                  m.ID,
 		Provider:            m.Provider,
 		Model:               m.Model,
-		InputCacheHitPrice:  m.InputCacheHitPrice,
-		InputCacheMissPrice: m.InputCacheMissPrice,
-		OutputPrice:         m.OutputPrice,
+		PricingConfig:       m.PricingConfig,
 		MaxContextTokens:    m.MaxContextTokens,
 		MaxCompletionTokens: m.MaxCompletionTokens,
 		SupportsText:        m.SupportsText,

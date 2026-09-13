@@ -107,9 +107,7 @@ type Model struct {
 	ID                  int64     `db:"id" json:"id"`
 	Provider            string    `db:"provider" json:"provider"`
 	Model               string    `db:"model" json:"model"`
-	InputCacheHitPrice  float64   `db:"input_cache_hit_price" json:"input_cache_hit_price"`
-	InputCacheMissPrice float64   `db:"input_cache_miss_price" json:"input_cache_miss_price"`
-	OutputPrice         float64   `db:"output_price" json:"output_price"`
+	PricingConfig       string    `db:"pricing_config" json:"pricing_config"`
 	MaxContextTokens    int       `db:"max_context_tokens" json:"max_context_tokens"`
 	MaxCompletionTokens int       `db:"max_completion_tokens" json:"max_completion_tokens"`
 	SupportsText        bool      `db:"supports_text" json:"supports_text"`
@@ -134,6 +132,7 @@ type UsageRecord struct {
 	ReasoningTokens int       `db:"reasoning_tokens" json:"reasoning_tokens"`
 	Cost            float64   `db:"cost" json:"cost"`
 	Unlimited       bool      `db:"unlimited" json:"unlimited"`
+	PricingSnapshot string    `db:"pricing_snapshot" json:"pricing_snapshot"`
 	FirstTokenMs    int64     `db:"first_token_ms" json:"first_token_ms"`
 	LatencyMs       int64     `db:"latency_ms" json:"latency_ms"`
 	CreatedAt       time.Time `db:"created_at" json:"created_at"`

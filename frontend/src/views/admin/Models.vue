@@ -15,7 +15,6 @@
         :loading="tableLoading"
         :bordered="false"
         size="small"
-        :scroll-x="1140"
         :pagination="pagination"
         :remote="true"
         @update:page="onPage"
@@ -25,8 +24,8 @@
     </n-card>
 
     <!-- 新增/复制/编辑弹窗 -->
-    <n-modal v-model:show="showForm" preset="card" :title="formType==='create'?'新增模型':formType==='copy'?'复制模型':'编辑模型'" style="width:560px" :mask-closable="false">
-      <div style="display:flex;flex-direction:column;gap:14px">
+    <n-modal v-model:show="showForm" preset="card" :title="formType==='create'?'新增模型':formType==='copy'?'复制模型':'编辑模型'" style="width:860px" :mask-closable="false">
+      <div class="model-form">
         <div>
           <div style="font-size:13px;margin-bottom:6px">提供商 provider</div>
           <n-input v-model:value="form.provider" placeholder="如 openai" :disabled="formType==='edit'" />
@@ -34,20 +33,6 @@
         <div>
           <div style="font-size:13px;margin-bottom:6px">模型名 model</div>
           <n-input v-model:value="form.model" placeholder="如 gpt-4o-mini" :disabled="formType==='edit'" />
-        </div>
-        <div style="display:flex;gap:12px">
-          <div style="flex:1">
-            <div style="font-size:13px;margin-bottom:6px">缓存命中价（元/百万 token）</div>
-            <n-input-number v-model:value="form.input_cache_hit_price" :min="0" :step="0.01" style="width:100%" />
-          </div>
-          <div style="flex:1">
-            <div style="font-size:13px;margin-bottom:6px">缓存未命中价</div>
-            <n-input-number v-model:value="form.input_cache_miss_price" :min="0" :step="0.01" style="width:100%" />
-          </div>
-        </div>
-        <div>
-          <div style="font-size:13px;margin-bottom:6px">输出价（元/百万 token）</div>
-          <n-input-number v-model:value="form.output_price" :min="0" :step="0.01" style="width:100%" />
         </div>
         <div style="display:flex;gap:12px">
           <div style="flex:1">
@@ -69,6 +54,60 @@
             </n-space>
           </n-checkbox-group>
         </div>
+
+        <n-divider style="margin:2px 0 0" />
+
+        <!-- 计费配置放在模型基础配置之后，使用图形化表单生成 pricing_config JSON -->
+        <div class="pricing-heading">
+          <div>
+            <div style="font-size:15px;font-weight:600">分段计费</div>
+            <div class="form-help">价格单位：元/百万 Token。规则中启用的条件需同时满足，多个命中时按优先级最高的规则计费。</div>
+          </div>
+          <n-button size="small" type="primary" secondary @click="addRule">新增规则</n-button>
+        </div>
+
+        <div class="price-row">
+          <div class="price-title">默认价格（未命中规则时使用）</div>
+          <div class="price-fields">
+            <div><div class="field-label">输入（缓存命中）</div><n-input-number v-model:value="form.pricing.default_price.input_cache_hit" :min="0" :precision="6" style="width:100%" /></div>
+            <div><div class="field-label">输入（缓存未命中）</div><n-input-number v-model:value="form.pricing.default_price.input_cache_miss" :min="0" :precision="6" style="width:100%" /></div>
+            <div><div class="field-label">输出</div><n-input-number v-model:value="form.pricing.default_price.output" :min="0" :precision="6" style="width:100%" /></div>
+          </div>
+        </div>
+
+        <div class="timezone-row">
+          <div class="field-label">计费时区</div>
+          <n-input v-model:value="form.pricing.timezone" placeholder="Asia/Shanghai" style="width:240px" />
+          <span class="form-help">按请求开始时间匹配；留空时使用 Asia/Shanghai</span>
+        </div>
+
+        <n-empty v-if="!form.pricing.rules.length" description="暂无分段规则，当前只使用默认价格" size="small" />
+        <n-card v-for="(rule, index) in form.pricing.rules" :key="rule._key" size="small" class="rule-card" :bordered="true">
+          <template #header>
+            <n-space align="center"><span>规则 {{ index + 1 }}</span><n-tag v-if="rule.name" size="small" :bordered="false" type="info">{{ rule.name }}</n-tag></n-space>
+          </template>
+          <template #header-extra>
+            <n-space align="center" size="small">
+              <n-checkbox v-model:checked="rule.enabled">启用</n-checkbox>
+              <n-button size="small" tertiary type="error" @click="removeRule(index)">删除</n-button>
+            </n-space>
+          </template>
+
+          <div class="rule-grid">
+            <div><div class="field-label">规则名称（不可重复）</div><n-input v-model:value="rule.name" placeholder="如工作日高峰" /></div>
+            <div><div class="field-label">优先级</div><n-input-number v-model:value="rule.priority" :precision="0" style="width:100%" /></div>
+          </div>
+
+          <div class="rule-section-title">规则价格</div>
+          <div class="price-fields">
+            <div><div class="field-label">输入（缓存命中）</div><n-input-number v-model:value="rule.price.input_cache_hit" :min="0" :precision="6" style="width:100%" /></div>
+            <div><div class="field-label">输入（缓存未命中）</div><n-input-number v-model:value="rule.price.input_cache_miss" :min="0" :precision="6" style="width:100%" /></div>
+            <div><div class="field-label">输出</div><n-input-number v-model:value="rule.price.output" :min="0" :precision="6" style="width:100%" /></div>
+          </div>
+
+          <div class="rule-section-title">匹配条件（支持嵌套 AND / OR）</div>
+          <PricingConditionEditor v-model="rule.when" :removable="false" />
+        </n-card>
       </div>
       <p v-if="formMsg" style="color:#d03050;font-size:13px;margin-top:8px">{{ formMsg }}</p>
       <template #footer>
@@ -78,15 +117,48 @@
         </n-space>
       </template>
     </n-modal>
+
+    <n-modal v-model:show="showPricing" preset="card" title="模型计费" style="width:760px">
+      <div v-if="pricingDetail" class="pricing-detail">
+        <div class="detail-title">{{ pricingDetail.provider }} / {{ pricingDetail.model }}</div>
+        <div class="detail-meta">计费时区：{{ pricingDetail.config?.timezone || 'Asia/Shanghai' }}　·　价格单位：元/百万 Token</div>
+        <div class="detail-section-title">默认价格</div>
+        <div class="detail-price-grid">
+          <div><span>输入（缓存命中）</span><strong>¥{{ priceText(pricingDetail.config?.default_price?.input_cache_hit) }}</strong></div>
+          <div><span>输入（缓存未命中）</span><strong>¥{{ priceText(pricingDetail.config?.default_price?.input_cache_miss) }}</strong></div>
+          <div><span>输出</span><strong>¥{{ priceText(pricingDetail.config?.default_price?.output) }}</strong></div>
+        </div>
+        <div class="detail-section-title">分段规则（优先级越高越先匹配）</div>
+        <n-empty v-if="!pricingDetail.rules.length" description="暂无分段规则，所有请求使用默认价格" size="small" />
+        <n-card v-for="(rule, index) in pricingDetail.rules" :key="pricingRuleKey(rule, index)" size="small" class="detail-rule" :bordered="true">
+          <template #header>
+            <div class="detail-rule-header" @click="toggleRule(rule, index)"><n-space align="center" size="small">
+              <span>{{ rule.name || '未命名规则' }}</span>
+              <n-tag size="small" :bordered="false" type="info">优先级 {{ rule.priority }}</n-tag>
+              <n-tag size="small" :bordered="false" :type="rule.enabled === false ? 'warning' : 'success'">{{ rule.enabled === false ? '已停用' : '已启用' }}</n-tag>
+            </n-space></div>
+          </template>
+          <template #header-extra><n-button size="small" quaternary @click.stop="toggleRule(rule, index)">{{ isRuleExpanded(rule, index) ? '收起' : '展开' }}</n-button></template>
+          <div class="detail-rule-price">
+            <span><em>输入（缓存命中）</em><strong>¥{{ priceText(rule.price?.input_cache_hit) }}</strong></span>
+            <span><em>输入（缓存未命中）</em><strong>¥{{ priceText(rule.price?.input_cache_miss) }}</strong></span>
+            <span><em>输出</em><strong>¥{{ priceText(rule.price?.output) }}</strong></span>
+          </div>
+          <div v-if="isRuleExpanded(rule, index)" class="detail-condition"><PricingConditionView :condition="normalizeCondition(rule.when)" /></div>
+        </n-card>
+      </div>
+    </n-modal>
   </div>
 </template>
 
 <script setup>
 import { ref, h, onMounted } from 'vue'
-import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NCheckbox, NCheckboxGroup, NTag, NDropdown, useMessage, useDialog } from 'naive-ui'
+import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NCheckbox, NTag, NDropdown, NDivider, NEmpty, useMessage, useDialog } from 'naive-ui'
 import { listModelsAdmin, createModel, updateModel, deleteModel } from '../../api'
 import { usePagination } from '../../composables/usePagination'
-import { fix4, formatTime } from '../../utils'
+import { formatTime } from '../../utils'
+import PricingConditionEditor from '../../components/PricingConditionEditor.vue'
+import PricingConditionView from '../../components/PricingConditionView.vue'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -104,17 +176,129 @@ const form = ref(emptyForm())
 const formMsg = ref('')
 const submitting = ref(false)
 const modalFlags = ref(['text'])
+const showPricing = ref(false)
+const pricingDetail = ref(null)
+const expandedRules = ref({})
+
+let ruleKey = 0
 
 function emptyForm() {
   return {
     id: 0,
     provider: '',
     model: '',
-    input_cache_hit_price: 0,
-    input_cache_miss_price: 0,
-    output_price: 0,
     max_context_tokens: 0,
     max_completion_tokens: 0,
+    pricing: defaultPricingConfig(),
+  }
+}
+
+function defaultPricingConfig() {
+  return {
+    version: 2,
+    timezone: 'Asia/Shanghai',
+    default_price: {
+      input_cache_hit: 0,
+      input_cache_miss: 0,
+      output: 0,
+    },
+    rules: [],
+  }
+}
+
+function newRule() {
+  ruleKey += 1
+  return {
+    _key: `rule-${Date.now()}-${ruleKey}`,
+    name: '',
+    enabled: true,
+    priority: 100 - ruleKey,
+    price: { input_cache_hit: 0, input_cache_miss: 0, output: 0 },
+    when: { op: 'and', children: [] },
+  }
+}
+
+function pricingToForm(raw) {
+  let parsed
+  try { parsed = raw ? JSON.parse(raw) : defaultPricingConfig() } catch { parsed = defaultPricingConfig() }
+  const pricing = {
+    version: 2,
+    timezone: parsed.timezone || 'Asia/Shanghai',
+    default_price: {
+      input_cache_hit: parsed.default_price?.input_cache_hit ?? 0,
+      input_cache_miss: parsed.default_price?.input_cache_miss ?? 0,
+      output: parsed.default_price?.output ?? 0,
+    },
+    rules: [],
+  }
+  for (const source of (parsed.rules || [])) {
+    const rule = newRule()
+    rule.name = source.name || source.id || ''
+    rule.enabled = source.enabled !== false
+    rule.priority = source.priority ?? 0
+    rule.price = {
+      input_cache_hit: source.price?.input_cache_hit ?? 0,
+      input_cache_miss: source.price?.input_cache_miss ?? 0,
+      output: source.price?.output ?? 0,
+    }
+    rule.when = source.when?.op || source.when?.type ? source.when : legacyWhen(source.when)
+    pricing.rules.push(rule)
+  }
+  return pricing
+}
+
+function pricingFromForm(pricing) {
+  return {
+    version: 2,
+    timezone: pricing.timezone || 'Asia/Shanghai',
+    default_price: {
+      input_cache_hit: pricing.default_price.input_cache_hit ?? 0,
+      input_cache_miss: pricing.default_price.input_cache_miss ?? 0,
+      output: pricing.default_price.output ?? 0,
+    },
+    rules: pricing.rules.map(rule => ({
+        name: rule.name,
+        enabled: rule.enabled,
+        priority: rule.priority ?? 0,
+        when: stripKeys(rule.when),
+        price: {
+          input_cache_hit: rule.price.input_cache_hit ?? 0,
+          input_cache_miss: rule.price.input_cache_miss ?? 0,
+          output: rule.price.output ?? 0,
+        },
+      })),
+  }
+}
+
+function legacyWhen(when) {
+  if (!when) return { op: 'and', children: [] }
+  const children = []
+  if (when.time) {
+    if (when.time.weekdays?.length) children.push({ type: 'weekday', values: when.time.weekdays })
+    const windows = (when.time.windows || []).map(w => ({ type: 'time_range', start: w.start, end: w.end }))
+    children.push(windows.length === 1 ? windows[0] : { op: 'or', children: windows })
+  }
+  if (when.total_tokens) {
+    for (const op of ['gt', 'gte', 'lt', 'lte']) if (when.total_tokens[op] != null) children.push({ type: 'total_tokens', operator: op, value: when.total_tokens[op] })
+  }
+  return children.length === 1 ? children[0] : { op: 'and', children }
+}
+
+function stripKeys(node) {
+  if (!node) return node
+  const result = { ...node }
+  delete result._key
+  if (result.children) result.children = result.children.map(stripKeys)
+  return result
+}
+
+function pricingSummary(config) {
+  try {
+    const parsed = JSON.parse(config)
+    const price = parsed.default_price || {}
+    return `默认 ¥${price.input_cache_hit ?? 0} / ¥${price.input_cache_miss ?? 0} / ¥${price.output ?? 0}；${(parsed.rules || []).length} 条规则`
+  } catch {
+    return '未配置'
   }
 }
 
@@ -145,24 +329,24 @@ function renderModal(r) {
 const columns = [
   { title: '提供商', key: 'provider', width: 110 },
   { title: '模型', key: 'model', width: 200, ellipsis: { tooltip: true } },
-  { title: '缓存命中价', key: 'input_cache_hit_price', width: 110, render(r) { return '¥' + fix4(r.input_cache_hit_price) } },
-  { title: '缓存未命中价', key: 'input_cache_miss_price', width: 120, render(r) { return '¥' + fix4(r.input_cache_miss_price) } },
-  { title: '输出价', key: 'output_price', width: 100, render(r) { return '¥' + fix4(r.output_price) } },
+  { title: '计费配置', key: 'pricing_config', width: 260, ellipsis: { tooltip: true }, render(r) { return pricingSummary(r.pricing_config) } },
   { title: '上下文', key: 'max_context_tokens', width: 90, render(r) { return fmtK(r.max_context_tokens) } },
   { title: '最大输出', key: 'max_completion_tokens', width: 90, render(r) { return fmtK(r.max_completion_tokens) } },
   { title: '能力', key: 'modal', width: 140, render: renderModal },
   { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) } },
-  { title: '操作', key: 'actions', width: 140, fixed: 'right', render(r) {
+  { title: '操作', key: 'actions', minWidth: 150, fixed: 'right', render(r) {
     const moreOptions = [
+      { label: '编辑', key: 'edit' },
       { label: '复制', key: 'copy' },
       { label: '删除', key: 'delete' },
     ]
     function onSelect(key) {
-      if (key === 'copy') openCopy(r)
+      if (key === 'edit') openEdit(r)
+      else if (key === 'copy') openCopy(r)
       else if (key === 'delete') onDelete(r)
     }
-    return h(NSpace, { size: 6 }, () => [
-      h(NButton, { size: 'small', tertiary: true, type: 'info', onClick: () => openEdit(r) }, () => '编辑'),
+    return h('div', { class: 'model-actions' }, [
+      h(NButton, { size: 'small', tertiary: true, type: 'info', onClick: () => openPricing(r) }, () => '查看计费'),
       h(NDropdown, { options: moreOptions, trigger: 'click', onSelect: (k) => onSelect(k) }, {
         default: () => h(NButton, { size: 'small', tertiary: true }, () => '更多')
       }),
@@ -200,11 +384,9 @@ function openEdit(r) {
     id: r.id,
     provider: r.provider,
     model: r.model,
-    input_cache_hit_price: r.input_cache_hit_price,
-    input_cache_miss_price: r.input_cache_miss_price,
-    output_price: r.output_price,
     max_context_tokens: r.max_context_tokens,
     max_completion_tokens: r.max_completion_tokens,
+    pricing: pricingToForm(r.pricing_config),
   }
   modalFlags.value = modalToFlags(r)
   formMsg.value = ''
@@ -218,15 +400,95 @@ function openCopy(r) {
     id: 0,
     provider: r.provider,
     model: r.model,
-    input_cache_hit_price: r.input_cache_hit_price,
-    input_cache_miss_price: r.input_cache_miss_price,
-    output_price: r.output_price,
     max_context_tokens: r.max_context_tokens,
     max_completion_tokens: r.max_completion_tokens,
+    pricing: pricingToForm(r.pricing_config),
   }
   modalFlags.value = modalToFlags(r)
   formMsg.value = ''
   showForm.value = true
+}
+
+function addRule() {
+  form.value.pricing.rules.push(newRule())
+}
+
+function removeRule(index) {
+  form.value.pricing.rules.splice(index, 1)
+}
+
+function priceText(value) {
+  if (value == null) return '0'
+  return Number(value).toFixed(6).replace(/\.?0+$/, '')
+}
+
+function normalizeCondition(when) {
+  if (!when) return null
+  if (when.op || when.type) return when
+  const children = []
+  if (when.time) {
+    if (when.time.weekdays?.length) children.push({ type: 'weekday', values: when.time.weekdays })
+    const windows = (when.time.windows || []).map(w => ({ type: 'time_range', start: w.start, end: w.end }))
+    if (windows.length === 1) children.push(windows[0]); else if (windows.length > 1) children.push({ op: 'or', children: windows })
+  }
+  if (when.total_tokens) for (const op of ['gt', 'gte', 'lt', 'lte']) if (when.total_tokens[op] != null) children.push({ type: 'total_tokens', operator: op, value: when.total_tokens[op] })
+  return children.length === 1 ? children[0] : { op: 'and', children }
+}
+
+function openPricing(row) {
+  let config = null
+  try { config = JSON.parse(row.pricing_config) } catch {}
+  const rules = config?.rules ? [...config.rules].sort((a, b) => (b.priority || 0) - (a.priority || 0)) : []
+  pricingDetail.value = {
+    provider: row.provider,
+    model: row.model,
+    config,
+    rules,
+  }
+  expandedRules.value = Object.fromEntries(rules.map((rule, index) => [pricingRuleKey(rule, index), rules.length === 1]))
+  showPricing.value = true
+}
+
+function pricingRuleKey(rule, index) { return `${rule.name || 'rule'}-${index}` }
+function isRuleExpanded(rule, index) { return expandedRules.value[pricingRuleKey(rule, index)] === true }
+function toggleRule(rule, index) {
+  const key = pricingRuleKey(rule, index)
+  expandedRules.value[key] = !isRuleExpanded(rule, index)
+}
+
+function validatePricingForm() {
+  const pricing = form.value.pricing
+  if (!pricing.timezone.trim()) pricing.timezone = 'Asia/Shanghai'
+  const priorities = new Set()
+  for (let index = 0; index < pricing.rules.length; index += 1) {
+    const rule = pricing.rules[index]
+    const label = `规则 ${index + 1}`
+    if (!rule.name.trim()) return `${label} 的规则名称不能为空`
+    if (pricing.rules.some((item, i) => i !== index && item.name.trim() === rule.name.trim())) return `${label} 的规则名称重复`
+    if (priorities.has(rule.priority)) return `${label} 的优先级重复，请调整后再保存`
+    priorities.add(rule.priority)
+    const error = validateCondition(rule.when)
+    if (error) return `${label}：${error}`
+  }
+  return ''
+}
+
+function validateCondition(node) {
+  if (!node) return '至少添加一个匹配条件'
+  if (node.op) {
+    if (!['and', 'or'].includes(node.op)) return '条件组必须是 AND 或 OR'
+    if (!node.children?.length) return '条件组不能为空'
+    for (const child of node.children) { const error = validateCondition(child); if (error) return error }
+    return ''
+  }
+  if (node.type === 'weekday' && !node.values?.length) return '星期条件至少选择一天'
+  if (node.type === 'time_range') {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(node.start || '') || !/^([01]\d|2[0-3]):[0-5]\d$/.test(node.end || '')) return '时间段必须使用 HH:MM 格式'
+    if (node.start >= node.end) return '时间段必须满足开始时间早于结束时间'
+  }
+  if (node.type === 'month_day' && !node.month_days?.length) return '日期条件至少选择一天'
+  if (node.type === 'total_tokens' && (!['gt', 'gte', 'lt', 'lte'].includes(node.operator) || node.value == null || node.value < 0)) return 'Token 条件无效'
+  return ''
 }
 
 async function doSubmit() {
@@ -237,15 +499,18 @@ async function doSubmit() {
       return
     }
   }
+  const pricingError = validatePricingForm()
+  if (pricingError) {
+    formMsg.value = pricingError
+    return
+  }
   submitting.value = true
   try {
     if (formType.value !== 'edit') {
       await createModel({
         provider: form.value.provider,
         model: form.value.model,
-        input_cache_hit_price: form.value.input_cache_hit_price || 0,
-        input_cache_miss_price: form.value.input_cache_miss_price || 0,
-        output_price: form.value.output_price || 0,
+        pricing_config: JSON.stringify(pricingFromForm(form.value.pricing)),
         max_context_tokens: form.value.max_context_tokens || 0,
         max_completion_tokens: form.value.max_completion_tokens || 0,
         ...flagsToModal(modalFlags.value),
@@ -254,9 +519,7 @@ async function doSubmit() {
     } else {
       await updateModel({
         id: form.value.id,
-        input_cache_hit_price: form.value.input_cache_hit_price || 0,
-        input_cache_miss_price: form.value.input_cache_miss_price || 0,
-        output_price: form.value.output_price || 0,
+        pricing_config: JSON.stringify(pricingFromForm(form.value.pricing)),
         max_context_tokens: form.value.max_context_tokens || 0,
         max_completion_tokens: form.value.max_completion_tokens || 0,
         ...flagsToModal(modalFlags.value),
@@ -289,3 +552,189 @@ function onDelete(r) {
 
 onMounted(() => load())
 </script>
+
+<style scoped>
+.model-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pricing-heading,
+.timezone-row,
+.window-row,
+.token-condition-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pricing-heading {
+  justify-content: space-between;
+}
+
+.price-row {
+  border: 1px solid var(--n-border-color);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.price-title,
+.rule-section-title,
+.condition-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.price-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rule-card :deep(.n-card__content) {
+  padding-top: 4px;
+}
+
+.rule-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 120px;
+  gap: 10px;
+}
+
+.rule-section-title {
+  margin-top: 16px;
+}
+
+.condition-box {
+  border: 1px solid var(--n-border-color);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.condition-box:first-of-type {
+  margin-top: 0;
+}
+
+.field-label {
+  color: #606266;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.form-help {
+  color: #909399;
+  font-size: 12px;
+}
+
+.model-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.window-label {
+  margin-top: 12px;
+}
+
+.window-row {
+  margin-bottom: 8px;
+}
+
+.condition-and {
+  color: #909399;
+  flex: 0 0 auto;
+}
+
+.pricing-detail {
+  max-height: 65vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.detail-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.detail-meta,
+.detail-price-grid span {
+  color: #909399;
+  font-size: 12px;
+}
+
+.detail-rule-price { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 9px 10px; border-radius: 6px; background: #f7f8fa; color: #606266; font-size: 13px; line-height: 1.6; }
+.detail-rule-price span { display: inline-flex; align-items: baseline; gap: 6px; }
+.detail-rule-price em { color: #909399; font-size: 12px; font-style: normal; }
+.detail-rule-price strong { color: #303133; font-size: 14px; }
+
+.detail-condition-title {
+  margin: 14px 0 7px;
+  color: #606266;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.detail-meta {
+  margin-top: 6px;
+}
+
+.detail-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 18px 0 10px;
+}
+
+.detail-price-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detail-price-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid var(--n-border-color);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.detail-price-grid strong {
+  font-size: 15px;
+}
+
+.detail-rule {
+  margin-bottom: 10px;
+}
+
+.detail-rule-header {
+  cursor: pointer;
+}
+
+.detail-condition {
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+
+@media (max-width: 720px) {
+  .price-fields,
+  .rule-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .token-condition-row {
+    flex-wrap: wrap;
+  }
+
+  .detail-price-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

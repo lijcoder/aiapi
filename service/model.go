@@ -1,15 +1,57 @@
 package service
 
 import (
+	"errors"
+
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
 )
+
+var ErrModelAlreadyExists = errors.New("model already exists")
+
+type pricingConfigError struct{ err error }
+
+func (e *pricingConfigError) Error() string { return e.err.Error() }
+func (e *pricingConfigError) Unwrap() error { return e.err }
 
 // ModelService 封装模型相关业务逻辑。
 type ModelService struct{}
 
 // NewModelService 创建 ModelService。
 func NewModelService() *ModelService { return &ModelService{} }
+
+// Create 创建模型并校验、规范化其计费配置。
+func (s *ModelService) Create(m *model.Model) error {
+	pricingConfig, err := NormalizePricingConfig(m.PricingConfig)
+	if err != nil {
+		return &pricingConfigError{err: err}
+	}
+	m.PricingConfig = pricingConfig
+	existing, err := store.C().Model().Get(m.Provider, m.Model)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return ErrModelAlreadyExists
+	}
+	if err := store.C().Model().Create(m); err != nil {
+		if store.IsUniqueConstraintErr(err) {
+			return ErrModelAlreadyExists
+		}
+		return err
+	}
+	return nil
+}
+
+// Update 更新模型的可编辑配置，并校验、规范化其计费规则。
+func (s *ModelService) Update(m *model.Model) error {
+	pricingConfig, err := NormalizePricingConfig(m.PricingConfig)
+	if err != nil {
+		return &pricingConfigError{err: err}
+	}
+	m.PricingConfig = pricingConfig
+	return store.C().Model().Update(m)
+}
 
 // ListAvailableModels 查询某 API Key 在指定 provider 下可用的模型列表。
 // 口径与 proxy 鉴权一致：模型必须配置在该 provider 下，且 Key 为 whitelist 策略时
@@ -37,4 +79,10 @@ func (s *ModelService) ListAvailableModels(provider string, apiKeyID int64) ([]m
 		}
 	}
 	return available, nil
+}
+
+// IsPricingConfigError 报告错误是否来自用户提供的计费配置。
+func IsPricingConfigError(err error) bool {
+	var target *pricingConfigError
+	return errors.As(err, &target)
 }

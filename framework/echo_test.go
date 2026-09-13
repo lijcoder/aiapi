@@ -44,8 +44,7 @@ func setupEchoTest(t *testing.T) *echo.Echo {
 	)`)
 	db.MustExec(`CREATE TABLE models (
 		id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, model TEXT NOT NULL,
-		input_cache_hit_price REAL NOT NULL DEFAULT 0, input_cache_miss_price REAL NOT NULL DEFAULT 0,
-		output_price REAL NOT NULL DEFAULT 0, max_context_tokens INTEGER DEFAULT 0,
+		pricing_config TEXT NOT NULL DEFAULT '', max_context_tokens INTEGER DEFAULT 0,
 		max_completion_tokens INTEGER DEFAULT 0, supports_text INTEGER NOT NULL DEFAULT 1,
 		supports_image INTEGER NOT NULL DEFAULT 0, supports_video INTEGER NOT NULL DEFAULT 0,
 		created_at DATETIME DEFAULT (datetime('now', 'localtime'))
@@ -61,7 +60,7 @@ func setupEchoTest(t *testing.T) *echo.Echo {
 	sum := sha256.Sum256([]byte("sk-test"))
 	db.MustExec(`INSERT INTO users (name, account, password, unlimited) VALUES ('t', 't', 'x', 1)`)
 	db.MustExec(`INSERT INTO api_keys (user_id, key_hash) VALUES (1, ?)`, hex.EncodeToString(sum[:]))
-	db.MustExec(`INSERT INTO models (provider, model) VALUES ('default', 'gpt-4o')`)
+	db.MustExec(`INSERT INTO models (provider, model, pricing_config) VALUES ('default', 'gpt-4o', '{"version":1,"default_price":{"input_cache_hit":0,"input_cache_miss":0,"output":0},"rules":[]}')`)
 	if err := store.Init(db); err != nil {
 		t.Fatalf("store init: %v", err)
 	}
