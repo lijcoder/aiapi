@@ -7,7 +7,7 @@
         <n-button size="small" @click="resetAndLoad">查询</n-button>
       </n-space>
     </template>
-    <n-data-table :columns="columns" :data="models" :loading="loading" :bordered="false" size="small" :scroll-x="1120" :pagination="pagination" :remote="true" @update:page="onPage" @update:page-size="onPageSize" style="width:100%" />
+    <n-data-table :columns="columns" :data="models" :loading="loading" :bordered="false" size="small" table-layout="auto" :scroll-x="1260" :pagination="pagination" :remote="true" @update:page="onPage" @update:page-size="onPageSize" style="width:100%" />
   </n-card>
 
   <n-modal v-model:show="showPricing" preset="card" title="模型计费" style="width:760px">
@@ -48,7 +48,8 @@
 
 <script setup>
 import { ref, h, onMounted } from 'vue'
-import { NCard, NDataTable, NInput, NButton, NSpace, NTag, NModal, NEmpty } from 'naive-ui'
+import { NCard, NDataTable, NInput, NButton, NSpace, NTag, NModal, NEmpty, NIcon } from 'naive-ui'
+import { ArrowDownOutline, ArrowUpOutline, FlashOutline } from '@vicons/ionicons5'
 import { listModels } from '../api'
 import { usePagination } from '../composables/usePagination'
 import { formatTime } from '../utils'
@@ -56,8 +57,8 @@ import PricingConditionView from '../components/PricingConditionView.vue'
 
 const columns = [
   { title: '提供商', key: 'provider', width: 110 },
-  { title: '模型', key: 'model', width: 200, ellipsis: { tooltip: true } },
-  { title: '计费配置', key: 'pricing_config', width: 260, ellipsis: { tooltip: true }, render(r) { return pricingSummary(r.pricing_config) }},
+  { title: '模型', key: 'model', width: 200, render(r) { return h('span', { style: 'display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', title: r.model }, r.model) } },
+  { title: '计费配置', key: 'pricing_config', width: 340, render: renderPricing },
   { title: '上下文', key: 'max_context_tokens', width: 80, render(r) { return r.max_context_tokens ? (r.max_context_tokens/1000).toFixed(1).replace(/0+$/,'').replace(/\.$/,'')+'K' : '-' }},
   { title: '最大输出', key: 'max_completion_tokens', width: 80, render(r) { return r.max_completion_tokens ? (r.max_completion_tokens/1000).toFixed(1).replace(/0+$/,'').replace(/\.$/,'')+'K' : '-' }},
   { title: '能力', key: 'modal', width: 140, render(r) {
@@ -67,20 +68,53 @@ const columns = [
     if (r.supports_video) tags.push(h(NTag, { size: 'small', type: 'warning', bordered: false }, () => '视频'))
     return tags.length ? h('div', { style: 'display:flex;gap:4px;flex-wrap:wrap' }, tags) : '-'
   }},
-  { title: '创建时间', key: 'created_at', width: 170, ellipsis: { tooltip: true }, render(r) { return formatTime(r.created_at) }},
+  { title: '创建时间', key: 'created_at', width: 170, render(r) { const value = formatTime(r.created_at); return h('span', { style: 'display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', title: value }, value) }},
   { title: '操作', key: 'actions', width: 110, fixed: 'right', render(r) {
     return h(NButton, { size: 'small', tertiary: true, type: 'info', onClick: () => openPricing(r) }, () => '查看计费')
   }},
 ]
 
-function pricingSummary(config) {
+function parsePricingConfig(config) {
   try {
-    const parsed = JSON.parse(config)
-    const price = parsed.default_price || {}
-    return `默认 ¥${price.input_cache_hit ?? 0} / ¥${price.input_cache_miss ?? 0} / ¥${price.output ?? 0}；${(parsed.rules || []).length} 条规则`
+    return typeof config === 'string' ? JSON.parse(config) : config
   } catch {
-    return '未配置'
+    return null
   }
+}
+
+function renderPricing(row) {
+  const parsed = parsePricingConfig(row.pricing_config)
+  if (!parsed) return h('span', { class: 'pricing-unconfigured' }, '未配置')
+  const price = parsed.default_price || {}
+  const rules = Array.isArray(parsed.rules) ? parsed.rules : []
+  const rate = (icon, value, label, className) => h('span', {
+    class: ['pricing-rate', className],
+    title: `${label}：¥${priceText(value)}`,
+  }, [
+    h(NIcon, { size: 15 }, { default: () => h(icon) }),
+    h('span', { class: 'pricing-value' }, `¥${priceText(value)}`),
+  ])
+  return h('div', {
+    class: 'pricing-summary',
+    role: 'button',
+    tabindex: 0,
+    title: '点击查看计费详情',
+    'aria-label': '点击查看计费详情',
+    onClick: () => openPricing(row),
+    onKeydown: (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        openPricing(row)
+      }
+    },
+  }, [
+    h('span', { class: 'pricing-rule-count', title: `${rules.length} 条分段规则` }, String(rules.length)),
+    h('span', { class: 'pricing-rate-list' }, [
+      rate(FlashOutline, price.input_cache_hit, '输入（缓存命中）', 'pricing-rate-cache'),
+      rate(ArrowUpOutline, price.input_cache_miss, '输入（缓存未命中）', 'pricing-rate-input'),
+      rate(ArrowDownOutline, price.output, '输出', 'pricing-rate-output'),
+    ]),
+  ])
 }
 
 const showPricing = ref(false)
@@ -88,8 +122,8 @@ const pricingDetail = ref(null)
 const expandedRules = ref({})
 
 function priceText(value) {
-  if (value == null) return '0'
-  return Number(value).toFixed(6).replace(/\.?0+$/, '')
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toFixed(2) : '0.00'
 }
 
 function normalizeCondition(when) {
@@ -150,6 +184,75 @@ onMounted(() => load())
   overflow-y: auto;
   padding-right: 4px;
 }
+
+:global(.pricing-summary) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 3px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color .15s ease;
+}
+
+:global(.pricing-summary:hover),
+:global(.pricing-summary:focus-visible) {
+  outline: none;
+  background: var(--n-hover-color);
+}
+
+:global(.pricing-rule-count) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #d03050;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 28px;
+  box-shadow: 0 1px 2px rgba(208, 48, 80, .2);
+}
+
+:global(.pricing-rate-list) {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+:global(.pricing-rate) {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 86px;
+  box-sizing: border-box;
+  min-height: 28px;
+  padding: 2px 7px 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  transition: filter .15s ease;
+}
+
+:global(.pricing-rate:hover) { filter: brightness(.97); }
+:global(.pricing-rate-cache) { color: #16834a; background: rgba(24, 160, 88, .09); border-color: rgba(24, 160, 88, .2); }
+:global(.pricing-rate-input) { color: #1769aa; background: rgba(32, 128, 240, .09); border-color: rgba(32, 128, 240, .2); }
+:global(.pricing-rate-output) { color: #7043c3; background: rgba(138, 92, 246, .09); border-color: rgba(138, 92, 246, .2); }
+:global(.pricing-rate .n-icon) { flex: 0 0 auto; }
+:global(.pricing-value) { flex: 1; color: currentColor; font-weight: 600; text-align: left; }
+:global(.pricing-unconfigured) { color: var(--n-text-color-3); }
 
 .detail-title {
   font-size: 16px;
