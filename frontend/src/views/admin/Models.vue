@@ -16,7 +16,7 @@
         :bordered="false"
         size="small"
         table-layout="auto"
-        :scroll-x="1310"
+        :scroll-x="1490"
         :pagination="pagination"
         :remote="true"
         @update:page="onPage"
@@ -35,6 +35,10 @@
         <div>
           <div style="font-size:13px;margin-bottom:6px">模型名 model</div>
           <n-input v-model:value="form.model" placeholder="如 gpt-4o-mini" :disabled="formType==='edit'" />
+        </div>
+        <div>
+          <div style="font-size:13px;margin-bottom:6px">提供商模型名 provider_model</div>
+          <n-input v-model:value="form.provider_model" placeholder="留空则与模型名一致，转发时用它调用上游" />
         </div>
         <div style="display:flex;gap:12px">
           <div style="flex:1">
@@ -188,6 +192,7 @@ function emptyForm() {
     id: 0,
     provider: '',
     model: '',
+    provider_model: '',
     max_context_tokens: 0,
     max_completion_tokens: 0,
     pricing: defaultPricingConfig(),
@@ -370,6 +375,7 @@ function renderModal(r) {
 const columns = [
   { title: '提供商', key: 'provider', width: 110 },
   { title: '模型', key: 'model', width: 200, render(r) { return h('span', { style: 'display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', title: r.model }, r.model) } },
+  { title: '上游模型', key: 'provider_model', width: 180, render(r) { const value = r.provider_model || r.model; return h('span', { style: 'display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', title: value }, value) } },
   { title: '计费配置', key: 'pricing_config', width: 340, render: renderPricing },
   { title: '上下文', key: 'max_context_tokens', width: 90, render(r) { return fmtK(r.max_context_tokens) } },
   { title: '最大输出', key: 'max_completion_tokens', width: 90, render(r) { return fmtK(r.max_completion_tokens) } },
@@ -425,6 +431,7 @@ function openEdit(r) {
     id: r.id,
     provider: r.provider,
     model: r.model,
+    provider_model: r.provider_model || '',
     max_context_tokens: r.max_context_tokens,
     max_completion_tokens: r.max_completion_tokens,
     pricing: pricingToForm(r.pricing_config),
@@ -441,6 +448,7 @@ function openCopy(r) {
     id: 0,
     provider: r.provider,
     model: r.model,
+    provider_model: r.provider_model || '',
     max_context_tokens: r.max_context_tokens,
     max_completion_tokens: r.max_completion_tokens,
     pricing: pricingToForm(r.pricing_config),
@@ -551,6 +559,7 @@ async function doSubmit() {
       await createModel({
         provider: form.value.provider,
         model: form.value.model,
+        provider_model: form.value.provider_model.trim(),
         pricing_config: JSON.stringify(pricingFromForm(form.value.pricing)),
         max_context_tokens: form.value.max_context_tokens || 0,
         max_completion_tokens: form.value.max_completion_tokens || 0,
@@ -560,6 +569,7 @@ async function doSubmit() {
     } else {
       await updateModel({
         id: form.value.id,
+        provider_model: form.value.provider_model.trim(),
         pricing_config: JSON.stringify(pricingFromForm(form.value.pricing)),
         max_context_tokens: form.value.max_context_tokens || 0,
         max_completion_tokens: form.value.max_completion_tokens || 0,

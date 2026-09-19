@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/lijcoder/aiapi/store"
 	"github.com/lijcoder/aiapi/store/model"
@@ -20,8 +21,23 @@ type ModelService struct{}
 // NewModelService 创建 ModelService。
 func NewModelService() *ModelService { return &ModelService{} }
 
+// UpstreamModelName 返回转发时发往上游的模型名：未配置 provider_model（空或纯空格）时
+// 回退到 model。对用户可见的 model 是鉴权/计价/白名单的口径，provider_model 只影响转发。
+// 回退同时兼容尚未回填 provider_model 的存量库。
+func UpstreamModelName(m *model.Model) string {
+	if m == nil {
+		return ""
+	}
+	if name := strings.TrimSpace(m.ProviderModel); name != "" {
+		return name
+	}
+	return m.Model
+}
+
 // Create 创建模型并校验、规范化其计费配置。
 func (s *ModelService) Create(m *model.Model) error {
+	// 未传提供商模型名时与 model 保持一致，保证库中不留空
+	m.ProviderModel = UpstreamModelName(m)
 	pricingConfig, err := NormalizePricingConfig(m.PricingConfig)
 	if err != nil {
 		return &pricingConfigError{err: err}
@@ -45,6 +61,8 @@ func (s *ModelService) Create(m *model.Model) error {
 
 // Update 更新模型的可编辑配置，并校验、规范化其计费规则。
 func (s *ModelService) Update(m *model.Model) error {
+	// 提供商模型名传空表示「跟随模型名」，同样归一化后落库
+	m.ProviderModel = UpstreamModelName(m)
 	pricingConfig, err := NormalizePricingConfig(m.PricingConfig)
 	if err != nil {
 		return &pricingConfigError{err: err}

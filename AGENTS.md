@@ -144,6 +144,7 @@
 1. 在 `parser/` 下新增解析器实现 `Parser` 接口。
 2. 在 `parser/interface.go` 中注册并返回该解析器。
 3. 保持与现有解析器一致的接口签名和行为语义。
+4. 模型名相关方法成对实现：`ParseModel`（从请求中提取，供鉴权/计价）与 `ReplaceModel`（把请求中的模型名替换为上游模型名，供转发）。请求体顶层的实现可直接复用 `parser/model_rewrite.go` 的共享逻辑；模型名在 URL path（如 Gemini）或其它位置的协议需在各自解析器中额外处理，并保证无需改写时原样返回入参 body。
 
 ### 7.2 新增 Pipeline Handler
 

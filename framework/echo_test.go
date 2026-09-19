@@ -44,6 +44,7 @@ func setupEchoTest(t *testing.T) *echo.Echo {
 	)`)
 	db.MustExec(`CREATE TABLE models (
 		id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, model TEXT NOT NULL,
+		provider_model TEXT NOT NULL DEFAULT '',
 		pricing_config TEXT NOT NULL DEFAULT '', max_context_tokens INTEGER DEFAULT 0,
 		max_completion_tokens INTEGER DEFAULT 0, supports_text INTEGER NOT NULL DEFAULT 1,
 		supports_image INTEGER NOT NULL DEFAULT 0, supports_video INTEGER NOT NULL DEFAULT 0,

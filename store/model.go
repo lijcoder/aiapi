@@ -104,11 +104,12 @@ func (ms *ModelStore) GetByID(id int64) (*model.Model, error) {
 // Create 新增模型，回填 ID
 func (ms *ModelStore) Create(m *model.Model) error {
 	res, err := ms.s.Query(
-		`INSERT INTO models (provider, model, pricing_config, max_context_tokens, max_completion_tokens, supports_text, supports_image, supports_video)
-		 VALUES (:provider, :model, :pricing_config, :max_context_tokens, :max_completion_tokens, :supports_text, :supports_image, :supports_video)`,
+		`INSERT INTO models (provider, model, provider_model, pricing_config, max_context_tokens, max_completion_tokens, supports_text, supports_image, supports_video)
+		 VALUES (:provider, :model, :provider_model, :pricing_config, :max_context_tokens, :max_completion_tokens, :supports_text, :supports_image, :supports_video)`,
 		map[string]any{
 			"provider":              m.Provider,
 			"model":                 m.Model,
+			"provider_model":        m.ProviderModel,
 			"pricing_config":        m.PricingConfig,
 			"max_context_tokens":    m.MaxContextTokens,
 			"max_completion_tokens": m.MaxCompletionTokens,
@@ -131,11 +132,12 @@ func (ms *ModelStore) Create(m *model.Model) error {
 // Update 更新模型（provider+model 不可改）
 func (ms *ModelStore) Update(m *model.Model) error {
 	_, err := ms.s.Query(
-		`UPDATE models SET pricing_config=:pricing_config, max_context_tokens=:max_context_tokens, max_completion_tokens=:max_completion_tokens,
+		`UPDATE models SET provider_model=:provider_model, pricing_config=:pricing_config, max_context_tokens=:max_context_tokens, max_completion_tokens=:max_completion_tokens,
 		 supports_text=:supports_text, supports_image=:supports_image, supports_video=:supports_video
 		 WHERE id=:id`,
 		map[string]any{
 			"id":                    m.ID,
+			"provider_model":        m.ProviderModel,
 			"pricing_config":        m.PricingConfig,
 			"max_context_tokens":    m.MaxContextTokens,
 			"max_completion_tokens": m.MaxCompletionTokens,

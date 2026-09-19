@@ -73,6 +73,10 @@
 ### 12. 核心链路测试补充
 - `proxy/handler/*`、`parser/*`（流式/非流式）测试覆盖不足；已开头（`response_test.go`）
 
+### 20. Gemini 协议支持（模型名在 URL path）
+- **现状**：`parser.GetParser` 对 `gemini` 返回 nil，该格式请求实际不可用（`parser/interface.go` 中留有 TODO）
+- **要点**：Gemini 的模型名不在请求体，而在路径（如 `/v1beta/models/gemini-2.0-flash:generateContent`）。实现时除 `ParseModel` 外需实现 `ReplaceModel` 的 path 版本（用 `provider_model` 替换路径中的模型名），handler 侧需支持改写 path 而非仅 body；`ReplaceModel` 当前只覆盖请求体顶层 model，见 `parser/model_rewrite.go`
+
 ## 四、安全增强（可选）
 
 ### 13. 超管强制 2FA / 全员强制 2FA 开关

@@ -21,6 +21,11 @@ func (p *AnthropicParser) ParseModel(body []byte) string {
 	return req.Model
 }
 
+// ReplaceModel 替换请求体顶层 model（Anthropic 的模型名也在顶层）
+func (p *AnthropicParser) ReplaceModel(body []byte, name string) ([]byte, error) {
+	return replaceTopLevelModel(body, name)
+}
+
 func (p *AnthropicParser) ParseApiKey(headers map[string][]string) string {
 	if k := headerGet(headers, "x-api-key"); k != "" {
 		return k

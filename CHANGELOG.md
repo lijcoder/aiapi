@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+- 模型新增「提供商模型名 `provider_model`」，把对用户可见的模型名与发往上游的模型名解耦：`model` 仍是客户端调用、`GET v1/models` 返回、鉴权/白名单/计费/用量与日志使用的名字；`provider_model` 是转发时替换请求体顶层 `model` 的值。保存时未传或传空（含纯空格）表示与 `model` 一致，由 `service.ModelService` 归一化后落库；代理链路新增 `RewriteModel` handler（`LoadConfig` 之后、`Forward` 之前），仅在生效上游模型名不等于请求模型名时改写请求体（`Parser` 接口新增 `ReplaceModel`，三个解析器复用 `parser/model_rewrite.go` 的顶层替换逻辑，无需改写时原样返回入参、字节零变动），失败按服务端错误中断请求（`request_logs` 照常记录）。上游响应体（含 SSE）中的 `model` 不改写，仍是上游返回的真实模型名；`request_logs.request_body` 记录的是实际发往上游的请求体，便于对照排查。管理台「模型管理」新增「上游模型」列与 `provider_model` 输入框（新增/编辑/复制可填，`provider`/`model` 仍不可改），普通用户 `/manager/models` 响应不返回该字段。`models` 表新增列，存量库需手动执行 `ALTER TABLE models ADD COLUMN provider_model TEXT NOT NULL DEFAULT '';` 与 `UPDATE models SET provider_model = model WHERE provider_model = '';`（未回填时代理按 `model` 回退，行为与升级前一致）。
+
 - 管理台模型计费配置改为图形化表单：模型基础 Token 与多模态配置位于上方，分段计费位于底部；时间段使用起止时间控件，日期使用日历选择和标签管理，Token 比较符使用直观按钮组；用户端模型列表新增只读计费详情弹窗，展示默认价格、时区、规则条件和优先级。
 
 - 管理台模型列表将“编辑”收纳到“更多”菜单，原编辑按钮位置改为直接查看计费详情。

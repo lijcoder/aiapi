@@ -107,6 +107,7 @@ type Model struct {
 	ID                  int64     `db:"id" json:"id"`
 	Provider            string    `db:"provider" json:"provider"`
 	Model               string    `db:"model" json:"model"`
+	ProviderModel       string    `db:"provider_model" json:"provider_model"` // 发往上游的模型名，空串=跟随 Model
 	PricingConfig       string    `db:"pricing_config" json:"pricing_config"`
 	MaxContextTokens    int       `db:"max_context_tokens" json:"max_context_tokens"`
 	MaxCompletionTokens int       `db:"max_completion_tokens" json:"max_completion_tokens"`

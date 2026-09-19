@@ -39,6 +39,7 @@ func setupModelsTestDB(t *testing.T) {
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		provider TEXT NOT NULL,
 		model TEXT NOT NULL,
+		provider_model TEXT NOT NULL DEFAULT '',
 		pricing_config TEXT NOT NULL DEFAULT '',
 		max_context_tokens INTEGER DEFAULT 0,
 		max_completion_tokens INTEGER DEFAULT 0,
@@ -49,8 +50,9 @@ func setupModelsTestDB(t *testing.T) {
 	)`)
 	db.MustExec(`CREATE TABLE api_keys (id INTEGER PRIMARY KEY, model_policy TEXT)`)
 	db.MustExec(`CREATE TABLE apikey_model_access (api_key_id INTEGER, model_id INTEGER)`)
-	db.MustExec(`INSERT INTO models (provider, model) VALUES
-		('default', 'gpt-4o'), ('default', 'gpt-4o-mini'), ('other', 'claude-sonnet')`)
+	// 别名与上游模型名解耦：gpt-4o-mini 的上游模型名不同，列表仍须返回别名
+	db.MustExec(`INSERT INTO models (provider, model, provider_model) VALUES
+		('default', 'gpt-4o', ''), ('default', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18'), ('other', 'claude-sonnet', '')`)
 	db.MustExec(`INSERT INTO api_keys (id, model_policy) VALUES (7, 'whitelist')`)
 	db.MustExec(`INSERT INTO apikey_model_access (api_key_id, model_id) VALUES (7, 2)`)
 	if err := store.Init(db); err != nil {

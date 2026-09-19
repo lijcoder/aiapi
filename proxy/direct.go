@@ -18,6 +18,7 @@ func Handle(req types.ProxyRequest) error {
 		AddLast(handler.AuthModel).
 		AddLast(handler.BudgetCheck).
 		AddLast(handler.LoadConfig).
+		AddLast(handler.RewriteModel).
 		AddLast(handler.Forward).
 		AddLast(handler.ParseUsage).
 		AddLast(handler.Record).

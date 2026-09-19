@@ -163,7 +163,8 @@ CREATE TABLE IF NOT EXISTS request_logs (
 CREATE TABLE IF NOT EXISTS models (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     provider              TEXT NOT NULL,
-    model                 TEXT NOT NULL,
+    model                 TEXT NOT NULL,              -- 对用户可见的模型名，鉴权/计价/白名单按它匹配
+    provider_model        TEXT NOT NULL DEFAULT '',   -- 转发时替换请求体 model 的上游模型名，空串=跟随 model
     pricing_config        TEXT NOT NULL DEFAULT '',
     max_context_tokens    INTEGER DEFAULT 0,
     max_completion_tokens INTEGER DEFAULT 0,
@@ -179,6 +180,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_models_provider_model ON models(provider, m
 --   ALTER TABLE models ADD COLUMN supports_text  INTEGER NOT NULL DEFAULT 1;
 --   ALTER TABLE models ADD COLUMN supports_image INTEGER NOT NULL DEFAULT 0;
 --   ALTER TABLE models ADD COLUMN supports_video INTEGER NOT NULL DEFAULT 0;
+
+-- models 扩展：增加「提供商模型名」列（对用户可见的 model 与发往上游的模型名解耦）
+-- 新建库直接用上方定义；存量库需手动迁移（第二句回填，使旧数据行为与迁移前一致）：
+--   ALTER TABLE models ADD COLUMN provider_model TEXT NOT NULL DEFAULT '';
+--   UPDATE models SET provider_model = model WHERE provider_model = '';
 
 CREATE TABLE IF NOT EXISTS recharge_records (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,

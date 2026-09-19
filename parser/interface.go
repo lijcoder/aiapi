@@ -39,6 +39,10 @@ type Parser interface {
 	// ParseModel 从请求 body 中提取模型名
 	ParseModel(body []byte) string
 
+	// ReplaceModel 返回把请求 body 中的模型名替换为 name 的新 body，供转发上游时使用
+	// （对用户可见的模型名与上游模型名解耦）。无需改写时原样返回入参 body。
+	ReplaceModel(body []byte, name string) ([]byte, error)
+
 	// ParseApiKey 从请求头中提取 API Key
 	ParseApiKey(headers map[string][]string) string
 

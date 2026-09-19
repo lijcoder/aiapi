@@ -26,6 +26,11 @@ func (p *ResponsesParser) ParseModel(body []byte) string {
 	return req.Model
 }
 
+// ReplaceModel 替换请求体顶层 model（Responses 的模型名也在顶层）
+func (p *ResponsesParser) ReplaceModel(body []byte, name string) ([]byte, error) {
+	return replaceTopLevelModel(body, name)
+}
+
 func (p *ResponsesParser) ParseApiKey(headers map[string][]string) string {
 	return extractBearerToken(headers)
 }

@@ -19,6 +19,21 @@ type modelItem struct {
 	ID                  int64     `json:"id"`
 	Provider            string    `json:"provider"`
 	Model               string    `json:"model"`
+	ProviderModel       string    `json:"provider_model"`
+	PricingConfig       string    `json:"pricing_config"`
+	MaxContextTokens    int       `json:"max_context_tokens"`
+	MaxCompletionTokens int       `json:"max_completion_tokens"`
+	SupportsText        bool      `json:"supports_text"`
+	SupportsImage       bool      `json:"supports_image"`
+	SupportsVideo       bool      `json:"supports_video"`
+	CreatedAt           time.Time `json:"created_at"`
+}
+
+// modelPublicItem 普通用户可见的模型条目：不含 provider_model（上游模型名属于内部实现细节）
+type modelPublicItem struct {
+	ID                  int64     `json:"id"`
+	Provider            string    `json:"provider"`
+	Model               string    `json:"model"`
 	PricingConfig       string    `json:"pricing_config"`
 	MaxContextTokens    int       `json:"max_context_tokens"`
 	MaxCompletionTokens int       `json:"max_completion_tokens"`
@@ -37,6 +52,7 @@ type ListModelsAdminReq struct {
 type CreateModelReq struct {
 	Provider            string `json:"provider"`
 	Model               string `json:"model"`
+	ProviderModel       string `json:"provider_model"`
 	PricingConfig       string `json:"pricing_config"`
 	MaxContextTokens    int    `json:"max_context_tokens"`
 	MaxCompletionTokens int    `json:"max_completion_tokens"`
@@ -47,6 +63,7 @@ type CreateModelReq struct {
 
 type UpdateModelReq struct {
 	ID                  int64  `json:"id"`
+	ProviderModel       string `json:"provider_model"`
 	PricingConfig       string `json:"pricing_config"`
 	MaxContextTokens    int    `json:"max_context_tokens"`
 	MaxCompletionTokens int    `json:"max_completion_tokens"`
@@ -69,14 +86,18 @@ type ListModelsReq struct {
 }
 
 // ListModels 普通用户查询模型列表，支持按 provider/model 模糊搜索
-func ListModels(ctx context.Context, req *ListModelsReq) (*base.PageResult[model.Model], *base.BizError) {
+func ListModels(ctx context.Context, req *ListModelsReq) (*base.PageResult[modelPublicItem], *base.BizError) {
 	pc := &store.PageContext{Page: req.Page, PageSize: req.PageSize}
 	list, err := store.C().SetPage(pc).Model().List(strings.TrimSpace(req.Provider), strings.TrimSpace(req.Model))
 	if err != nil {
 		slog.Error("[Model] List failed", "err", err)
 		return nil, base.ErrInternal
 	}
-	return &base.PageResult[model.Model]{Items: list, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
+	items := make([]modelPublicItem, 0, len(list))
+	for _, m := range list {
+		items = append(items, toPublicModelItem(m))
+	}
+	return &base.PageResult[modelPublicItem]{Items: items, Total: pc.Total, Page: pc.Page, PageSize: pc.PageSize}, nil
 }
 
 // ListModelsAdmin 管理员查询全部模型，支持按 provider/model 模糊搜索
@@ -102,6 +123,7 @@ func CreateModel(ctx context.Context, req *CreateModelReq) (*modelItem, *base.Bi
 	m := &model.Model{
 		Provider:            req.Provider,
 		Model:               req.Model,
+		ProviderModel:       strings.TrimSpace(req.ProviderModel),
 		PricingConfig:       req.PricingConfig,
 		MaxContextTokens:    req.MaxContextTokens,
 		MaxCompletionTokens: req.MaxCompletionTokens,
@@ -123,7 +145,7 @@ func CreateModel(ctx context.Context, req *CreateModelReq) (*modelItem, *base.Bi
 	return &item, nil
 }
 
-// UpdateModel 管理员编辑模型（provider+model 不可改）
+// UpdateModel 管理员编辑模型（provider+model 不可改；provider_model 可改，传空表示跟随模型名）
 func UpdateModel(ctx context.Context, req *UpdateModelReq) (*modelItem, *base.BizError) {
 	if req.ID <= 0 {
 		return nil, base.ErrBadReq("id 不能为空")
@@ -136,6 +158,7 @@ func UpdateModel(ctx context.Context, req *UpdateModelReq) (*modelItem, *base.Bi
 	if m == nil {
 		return nil, base.ErrNotFound("模型不存在")
 	}
+	m.ProviderModel = strings.TrimSpace(req.ProviderModel)
 	m.PricingConfig = req.PricingConfig
 	m.MaxContextTokens = req.MaxContextTokens
 	m.MaxCompletionTokens = req.MaxCompletionTokens
@@ -175,8 +198,25 @@ func DeleteModel(ctx context.Context, req *ModelIdReq) (*struct{}, *base.BizErro
 
 // ===== 工具函数 =====
 
+// toModelItem 超管视图：provider_model 填生效值（未配置的存量数据等于模型名），避免列表出现空白
 func toModelItem(m model.Model) modelItem {
 	return modelItem{
+		ID:                  m.ID,
+		Provider:            m.Provider,
+		Model:               m.Model,
+		ProviderModel:       service.UpstreamModelName(&m),
+		PricingConfig:       m.PricingConfig,
+		MaxContextTokens:    m.MaxContextTokens,
+		MaxCompletionTokens: m.MaxCompletionTokens,
+		SupportsText:        m.SupportsText,
+		SupportsImage:       m.SupportsImage,
+		SupportsVideo:       m.SupportsVideo,
+		CreatedAt:           m.CreatedAt,
+	}
+}
+
+func toPublicModelItem(m model.Model) modelPublicItem {
+	return modelPublicItem{
 		ID:                  m.ID,
 		Provider:            m.Provider,
 		Model:               m.Model,

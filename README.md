@@ -260,6 +260,24 @@ curl http://localhost:8888/proxy/anthropic/anthropic/v1/models \
 
 `openai-responses` 协议的同路径 `GET v1/models` 可用，响应由 responses 解析器自行序列化（`{object:"list"}`，与 OpenAI List Models 形状一致）——responses 协议暂无官方模型列表格式，形状沿用 OpenAI 以兼容常用的模型列表解析，实现独立、各协议隔离。
 
+### 模型名与提供商模型名
+
+每个模型配置有「模型名 `model`」和「提供商模型名 `provider_model`」两个名字，可在管理台「模型管理」中维护：
+
+- `model`（对用户可见）：客户端调用时填写、`GET v1/models` 返回的模型名；鉴权、模型白名单、计费与用量/日志口径都按它匹配。
+- `provider_model`（发往上游）：转发时代理会把请求体顶层的 `model` 替换为该值，上游按它选择真实模型。
+- 新增/编辑时留空（或填纯空格）表示「与模型名一致」，保存时按 `model` 落库；因此只有一个上游模型名时无需关心该字段。同一别名可以在编辑/复制时改成任意上游模型名，同一上游模型名也可以被多个别名复用（例如按不同定价分成多档）。
+- 上游响应体（含 SSE 流）里的 `model` 字段不会改写，仍是上游返回的真实模型名；`usage_records.model` / `request_logs.model` 与 `GET v1/models` 始终是 `model`。`request_logs.request_body` 记录的是实际发往上游的请求体，便于对照排查。
+
+存量数据库（新增该字段前创建）需执行：
+
+```sql
+ALTER TABLE models ADD COLUMN provider_model TEXT NOT NULL DEFAULT '';
+UPDATE models SET provider_model = model WHERE provider_model = '';
+```
+
+回填前的旧行在转发时会按 `model` 处理（代理对空值自动回退），回填只是把该行为固化到数据里。
+
 ### 数据存储
 
 默认使用 SQLite，数据库文件位于 `~/.aiapi/aiapi.db`。
@@ -275,7 +293,7 @@ curl http://localhost:8888/proxy/anthropic/anthropic/v1/models \
 - `users` / `roles` / `user_roles` / `role_permission` / `user_sessions`：用户/角色/权限/会话
 - `menus` / `role_menus`：菜单与角色菜单关联
 - `recharge_records`：充值流水
-- `models`：模型配置
+- `models`：模型配置（`model` 对用户可见，`provider_model` 为转发给上游的模型名）
 
 可通过 `sql/sqlite.sql` 查看完整 DDL，初始数据参考 `sql/init-data.sql`。
 
@@ -387,9 +405,9 @@ curl http://localhost:8888/proxy/anthropic/anthropic/v1/models \
 | `POST /manager/providers/create` | 新增提供商，body `{type, domain, headers}` |
 | `POST /manager/providers/update` | 编辑提供商（type 不可改），body `{type, domain, headers}` |
 | `POST /manager/providers/toggle` | 启停提供商，body `{type}` |
-| `POST /manager/models/list` | 模型列表，body `{provider, model}` 模糊搜索，返回项含 `supports_text/supports_image/supports_video` |
-| `POST /manager/models/create` | 新增模型，body `{provider, model, pricing_config, max_context_tokens, max_completion_tokens, supports_text, supports_image, supports_video}` |
-| `POST /manager/models/update` | 编辑模型（provider+model 不可改），字段同 create（无 provider/model，多 id）|
+| `POST /manager/models/list` | 模型列表，body `{provider, model}` 模糊搜索，返回项含 `provider_model`（生效值）与 `supports_text/supports_image/supports_video` |
+| `POST /manager/models/create` | 新增模型，body `{provider, model, provider_model, pricing_config, max_context_tokens, max_completion_tokens, supports_text, supports_image, supports_video}`，`provider_model` 留空表示与 `model` 一致 |
+| `POST /manager/models/update` | 编辑模型（provider+model 不可改，`provider_model` 可改），字段同 create（无 provider/model，多 id）|
 | `POST /manager/models/delete` | 删除模型 |
 | `POST /manager/apikeys/list` | 查指定用户的 API Key，body `{user_id}` |
 | `POST /manager/apikeys/toggle` | 启停指定用户的 Key，body `{id}` |

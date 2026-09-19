@@ -21,6 +21,11 @@ func (p *OpenAIParser) ParseModel(body []byte) string {
 	return req.Model
 }
 
+// ReplaceModel 替换请求体顶层 model（OpenAI 系协议的模型名都在顶层）
+func (p *OpenAIParser) ReplaceModel(body []byte, name string) ([]byte, error) {
+	return replaceTopLevelModel(body, name)
+}
+
 func (p *OpenAIParser) ParseApiKey(headers map[string][]string) string {
 	return extractBearerToken(headers)
 }
