@@ -16,10 +16,10 @@
 ## 架构概览
 
 ```
-┌─────────┐      ┌──────────────────────┐      ┌─────────────┐      ┌────────────────────┐
-│ Client  │ ──▶  │  /proxy/openai/...   │ ──▶  │  Pipeline   │ ──▶  │  OpenAI 兼容上游   │
-│         │      │       Echo v4        │      │  handlers   │      │     Provider       │
-└─────────┘      └──────────────────────┘      └─────────────┘      └────────────────────┘
+┌─────────┐      ┌──────────────────────────────┐      ┌─────────────┐      ┌────────────────────┐
+│ Client  │ ──▶  │  /proxy/:provider/:format/*  │ ──▶  │  Pipeline   │ ──▶  │  OpenAI 兼容上游   │
+│         │      │           Echo v4            │      │  handlers   │      │     Provider       │
+└─────────┘      └──────────────────────────────┘      └─────────────┘      └────────────────────┘
                                                         │
                                                         ▼
                                                  ┌─────────────┐
@@ -31,7 +31,7 @@
 
 ### 支持的请求格式
 
-本项目代理 OpenAI 兼容格式与 Anthropic 格式的请求与响应。`:format` 决定客户端协议解析器（见下表），`:provider` 为配置的上游 Provider 标识。
+本项目代理 OpenAI 兼容格式与 Anthropic 格式的请求与响应。URL 中 `:provider` 为配置的上游 Provider 标识（在前），`:format` 决定客户端协议解析器（在后，取值见下表）。
 
 | 客户端格式 | 说明 |
 |------------|------|
@@ -185,11 +185,11 @@ curl -X DELETE http://localhost:8888/manager/providers/openai
 ## 反向代理路由
 
 ```
-/proxy/:format/:provider/*
+/proxy/:provider/:format/*
 ```
 
-- `:format`：客户端协议格式，取值见上表（`openai` / `openai-responses` / `anthropic`）
 - `:provider`：上游 Provider 的 `type` 字段
+- `:format`：客户端协议格式，取值见上表（`openai` / `openai-responses` / `anthropic`）
 - `*`：上游路径，例如 `v1/chat/completions`、`v1/responses`
 
 ### 示例
@@ -210,7 +210,7 @@ curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
 客户端以 OpenAI Responses API 格式调用时，`:format` 使用 `openai-responses`，上游路径为 `v1/responses`（请求原样透传到上游，鉴权为 `Authorization: Bearer`，请求体顶层 `model` 字段）：
 
 ```bash
-curl http://localhost:8888/proxy/openai-responses/openai/v1/responses \
+curl http://localhost:8888/proxy/openai/openai-responses/v1/responses \
   -H "Authorization: Bearer sk-xxx" \
   -H "Content-Type: application/json" \
   -d '{

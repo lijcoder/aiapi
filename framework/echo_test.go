@@ -85,7 +85,7 @@ func TestRouteModelsEndpointAnthropic(t *testing.T) {
 	e := setupEchoTest(t)
 
 	// anthropic 格式同路径 → 模型列表入口，响应为 Anthropic 格式；鉴权走 x-api-key 头
-	req := httptest.NewRequest(http.MethodGet, "/proxy/anthropic/default/v1/models", nil)
+	req := httptest.NewRequest(http.MethodGet, "/proxy/default/anthropic/v1/models", nil)
 	req.Header.Set("x-api-key", "sk-test")
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
@@ -116,7 +116,7 @@ func TestRouteModelsEndpoint(t *testing.T) {
 	e := setupEchoTest(t)
 
 	// GET v1/models → 模型列表入口，返回本地模型列表
-	rec := serve(e, http.MethodGet, "/proxy/openai/default/v1/models", "Bearer sk-test")
+	rec := serve(e, http.MethodGet, "/proxy/default/openai/v1/models", "Bearer sk-test")
 	if rec.Code != 200 {
 		t.Fatalf("expect 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -147,7 +147,7 @@ func TestRouteModelsEndpointFallback(t *testing.T) {
 	e := setupEchoTest(t)
 
 	// POST v1/models 不匹配具体路由 → 落回转发管道，body 无 model → 404 模型不存在
-	rec := serve(e, http.MethodPost, "/proxy/openai/default/v1/models", "Bearer sk-test")
+	rec := serve(e, http.MethodPost, "/proxy/default/openai/v1/models", "Bearer sk-test")
 	if rec.Code != 404 {
 		t.Fatalf("expect 404, got %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -156,7 +156,7 @@ func TestRouteModelsEndpointFallback(t *testing.T) {
 	}
 
 	// GET v1/models 无 Key → 401
-	rec = serve(e, http.MethodGet, "/proxy/openai/default/v1/models", "")
+	rec = serve(e, http.MethodGet, "/proxy/default/openai/v1/models", "")
 	if rec.Code != 401 {
 		t.Fatalf("expect 401, got %d", rec.Code)
 	}

@@ -38,12 +38,12 @@ func (w *echoResponseWrite) Write(body []byte) (int, error) {
 }
 
 // Register 在已建好的 /proxy group 上注册代理路由。
-//   - GET /:format/:provider/v1/models：模型列表元数据端点（具体路由，静态段优先于通配符 *），
+//   - GET /:provider/:format/v1/models：模型列表元数据端点（具体路由，静态段优先于通配符 *），
 //     非 GET 的同路径请求不匹配此路由，落回通配路由按转发请求处理
-//   - ANY /:format/:provider/*：转发请求，透传到上游 Provider
+//   - ANY /:provider/:format/*：转发请求，透传到上游 Provider
 func Register(g *echo.Group) {
-	g.GET("/:format/:provider/v1/models", modelsProcess)
-	g.Any("/:format/:provider/*", directProcess)
+	g.GET("/:provider/:format/v1/models", modelsProcess)
+	g.Any("/:provider/:format/*", directProcess)
 }
 
 func directProcess(c echo.Context) error {

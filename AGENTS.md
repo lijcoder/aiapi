@@ -112,7 +112,7 @@
 
 ### 4.3 元数据端点（非转发请求）
 
-- `GET v1/models` 等不依赖上游的端点，**由 `proxy/router` 注册具体路由区分入口**（echo 静态段优先于通配符 `*`：`GET /:format/:provider/v1/models` → `proxy.HandleModels`，其余 → `proxy.Handle`），proxy 不在运行时按 path 判定；具体路由无通配参数时由 router 适配层补写 `req.Path`（供日志记录）。
+- `GET v1/models` 等不依赖上游的端点，**由 `proxy/router` 注册具体路由区分入口**（echo 静态段优先于通配符 `*`：`GET /:provider/:format/v1/models` → `proxy.HandleModels`，其余 → `proxy.Handle`），proxy 不在运行时按 path 判定；具体路由无通配参数时由 router 适配层补写 `req.Path`（供日志记录）。
 - 每个入口在 `proxy/direct.go` 组装自己的 Pipeline（如 models 链路 `ParseRequest → AuthKey → ListModels`），不经 Forward、不计费、不写 `request_logs`（不挂 `Log`）；错误日志打印收敛在共享的 `logErrors`。
 - 鉴权拆分：`AuthKey`（Key/用户校验，所有链路共用）与 `AuthModel`（模型定价+白名单，仅转发链路）是两个独立 handler，新链路按需取用。
 - 协议相关的响应序列化（如模型列表的 OpenAI 格式）归 `parser`：无法放进 `Parser` 主接口的能力用可选接口 + 类型断言（参考 `ModelsFormatter` / `FormatModelList`），parser 不反向依赖 store，业务层负责映射为 parser 中立结构。
