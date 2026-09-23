@@ -1,9 +1,6 @@
 package parser
 
-import (
-	"strings"
-	"time"
-)
+import "time"
 
 // API 协议格式常量
 const (
@@ -13,6 +10,11 @@ const (
 	// FormatResponses OpenAI Responses API 协议格式
 	FormatResponses = "openai-responses"
 )
+
+// HeaderAuthorization 标准鉴权头，多数协议用它传 Bearer token。
+// 协议按自己的鉴权头优先级把它交给 util.ExtractBearerToken（如 OpenAI 只用它，
+// Anthropic 为 x-api-key → 它）。
+const HeaderAuthorization = "Authorization"
 
 // Usage 统一的用量结构
 type Usage struct {
@@ -24,14 +26,6 @@ type Usage struct {
 	RequestID       string `json:"request_id"`
 	CachedTokens    int    `json:"cached_tokens"`
 	ReasoningTokens int    `json:"reasoning_tokens"`
-}
-
-// StreamEvent 流式 SSE 事件
-type StreamEvent struct {
-	EventType string // content / usage / done / error
-	Content   string // delta 文本
-	Usage     *Usage // 仅在最后一条事件中有
-	Model     string // 模型名
 }
 
 // Parser 各 Provider 的请求/响应解析器接口
@@ -49,9 +43,9 @@ type Parser interface {
 	// ParseUsage 从非流式响应 body 中提取用量
 	ParseUsage(body []byte) (*Usage, error)
 
-	// ParseStreamEvent 解析单条 SSE data 行
-	// 返回 nil, nil 表示当前行不包含需要处理的事件
-	ParseStreamEvent(data []byte) (*StreamEvent, error)
+	// ParseStreamUsage 从完整 SSE 原始响应中提取用量。
+	// SSE 事件结构、字段合并口径与 total_tokens 口径各协议不同，由各协议自行解析。
+	ParseStreamUsage(body []byte) (*Usage, error)
 }
 
 // ModelItem 协议中立的模型条目，用于「列出模型」端点的响应序列化。
@@ -100,24 +94,4 @@ func GetParser(format string) Parser {
 	default:
 		return nil
 	}
-}
-
-// headerGet 从 map[string][]string 头部中获取指定 key 的值（不区分大小写）
-func headerGet(headers map[string][]string, key string) string {
-	lower := strings.ToLower(key)
-	for k, vs := range headers {
-		if strings.ToLower(k) == lower && len(vs) > 0 {
-			return vs[0]
-		}
-	}
-	return ""
-}
-
-// extractBearerToken 从 Authorization 头中提取 Bearer token
-func extractBearerToken(headers map[string][]string) string {
-	v := headerGet(headers, "Authorization")
-	if len(v) > 7 && strings.ToLower(v[:7]) == "bearer " {
-		return v[7:]
-	}
-	return v
 }

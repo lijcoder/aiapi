@@ -74,6 +74,7 @@
 ### 3.1 新增功能时，先找对应层次
 
 - 新增上游协议支持 → `parser/`
+- 协议无关的纯工具（SSE 行/事件切分、请求头取 API Key、请求体顶层 model 改写）→ `parser/util/`，由各协议解析器引用；该包只放无状态纯函数，且不反向依赖 `parser`（避免解析层与工具层互相依赖）
 - 新增请求处理步骤 → `proxy/handler/`，并在 `proxy/direct.go` 的 Pipeline 中注册
 - 新增管理接口 → `manager/handler/`（HTTP 适配）+ `service/`（业务逻辑）
 - 新增业务逻辑（事务编排、跨表组装、业务判断）→ `service/`
@@ -130,6 +131,7 @@
 - 仅当请求成功（`status_code < 300`）时记录 `usage_records`。
 - Token 统计应由专门的解析器或 handler 完成，避免多处重复计算。
 - 流式与非流式请求统一入口记录，逻辑差异封装在解析层。
+- 各协议的流式用量解析归该协议：`Parser.ParseStreamUsage` 自行遍历 SSE 事件、自行合并字段并决定 `total_tokens` 口径（Anthropic = 完整输入 + 输出；OpenAI / Responses = 优先上游值，缺省回退 输入 + 输出）。`parser/util` 只提供 `EachSSEData`/`SplitSSEEvents`/`SSEParseData` 这类 SSE 框架级工具，不设跨协议的事件结构（已移除 `StreamEvent` / `ParseStreamEvent`）与通用合并逻辑。
 
 ### 6.2 请求日志
 
@@ -144,7 +146,9 @@
 1. 在 `parser/` 下新增解析器实现 `Parser` 接口。
 2. 在 `parser/interface.go` 中注册并返回该解析器。
 3. 保持与现有解析器一致的接口签名和行为语义。
-4. 模型名相关方法成对实现：`ParseModel`（从请求中提取，供鉴权/计价）与 `ReplaceModel`（把请求中的模型名替换为上游模型名，供转发）。请求体顶层的实现可直接复用 `parser/model_rewrite.go` 的共享逻辑；模型名在 URL path（如 Gemini）或其它位置的协议需在各自解析器中额外处理，并保证无需改写时原样返回入参 body。
+4. 模型名相关方法成对实现：`ParseModel`（从请求中提取，供鉴权/计价）与 `ReplaceModel`（把请求中的模型名替换为上游模型名，供转发）。请求体顶层的实现可直接复用 `parser/util` 的 `util.ReplaceTopLevelModel`；模型名在 URL path（如 Gemini）或其它位置的协议需在各自解析器中额外处理，并保证无需改写时原样返回入参 body。
+5. 用量解析分非流式（`ParseUsage`）与流式（`ParseStreamUsage`）两个方法，都由本协议自行实现：流式用 `parser/util.EachSSEData` 取 SSE 的 data 载荷，事件结构、字段合并与 `total_tokens` 口径按本协议定义，不引入跨协议事件结构。
+6. 鉴权头不写死在工具函数里：`ParseApiKey` 按本协议的鉴权头优先级调用 `parser/util.ExtractBearerToken(headers, 头名...)`（如 Anthropic = `x-api-key` → `parser.HeaderAuthorization`），按顺序取第一个非空头；值带 `Bearer ` 前缀会剥掉，裸 token 原样返回。
 
 ### 7.2 新增 Pipeline Handler
 

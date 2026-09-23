@@ -466,6 +466,7 @@ UPDATE models SET provider_model = model WHERE provider_model = '';
 - `weekday.values` 使用 ISO 星期：周一为 `1`，周日为 `7`，多选值内部为 OR；`time_range` 是左闭右开区间。
 - 可用叶子条件：星期（`weekday`）、时间段（`time_range`）、日期（`month_day`，存储为 `MM-DD`、每年重复匹配）、请求 Token（`total_tokens`）。Token 条件的 `operator` 支持 `gt`、`gte`、`lt`、`lte`，可通过条件组组合出 OR 或区间。
 - 同一模型的规则 `name` 和 `priority` 均须唯一。每笔 `usage_records` 会保存 `matched_rule_name`、命中条件、实际单价、完整 `pricing_config`、时区和请求开始时间的 `pricing_snapshot`，其中 `request_started_at` 格式为 `yyyy-MM-dd HH:mm:ss`，用于独立审计。读取 v1 配置时会自动转换为 v2，保存后统一使用 v2 格式。
+- 上游用量按统一口径（OpenAI 语义）计费：`input_cache_hit` 对应命中缓存的输入、`input_cache_miss` 对应其余输入。Anthropic 的 `input_tokens` 只统计未命中缓存的输入，代理会把 `cache_creation_input_tokens`（缓存创建）与 `cache_read_input_tokens`（缓存读取）并入完整输入量，其中缓存读取按 `input_cache_hit` 计费、缓存创建按 `input_cache_miss` 计费（官方缓存写入加价未单独建模）。Anthropic 流式请求的用量取自 `message_delta` 的累计值，思考 token（`output_tokens_details.thinking_tokens`）作为 `reasoning_tokens` 单独统计，已包含在 `output_tokens` 内、不重复计费。
 
 已有数据库升级到本版本前，先执行以下迁移，然后在管理台重新配置每个模型；旧固定价格不会迁移。未配置计费的模型会被代理拒绝：
 

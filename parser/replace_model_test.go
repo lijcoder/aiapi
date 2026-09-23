@@ -6,6 +6,8 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/lijcoder/aiapi/parser/util"
 )
 
 // modelParsers 覆盖全部已实现协议的模型名改写（三者模型名都在请求体顶层）
@@ -97,8 +99,8 @@ func TestReplaceModel_NoRewriteKeepsOriginalBytes(t *testing.T) {
 func TestReplaceModel_NonStringModel(t *testing.T) {
 	for _, tc := range modelParsers {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := tc.p.ReplaceModel([]byte(`{"model":123}`), "gpt-4o"); !errors.Is(err, ErrModelNotString) {
-				t.Fatalf("err = %v, want ErrModelNotString", err)
+			if _, err := tc.p.ReplaceModel([]byte(`{"model":123}`), "gpt-4o"); !errors.Is(err, util.ErrModelNotString) {
+				t.Fatalf("err = %v, want util.ErrModelNotString", err)
 			}
 		})
 	}

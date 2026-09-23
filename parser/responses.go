@@ -2,6 +2,8 @@ package parser
 
 import (
 	"encoding/json"
+
+	"github.com/lijcoder/aiapi/parser/util"
 )
 
 // ResponsesParser OpenAI Responses API（/v1/responses）请求/响应解析器。
@@ -28,11 +30,12 @@ func (p *ResponsesParser) ParseModel(body []byte) string {
 
 // ReplaceModel 替换请求体顶层 model（Responses 的模型名也在顶层）
 func (p *ResponsesParser) ReplaceModel(body []byte, name string) ([]byte, error) {
-	return replaceTopLevelModel(body, name)
+	return util.ReplaceTopLevelModel(body, name)
 }
 
+// ParseApiKey 从 Authorization 头取 Bearer token
 func (p *ResponsesParser) ParseApiKey(headers map[string][]string) string {
-	return extractBearerToken(headers)
+	return util.ExtractBearerToken(headers, HeaderAuthorization)
 }
 
 // responsesUsage responses 非流式/流式通用的 usage 结构。
@@ -72,7 +75,7 @@ func (p *ResponsesParser) ParseUsage(body []byte) (*Usage, error) {
 		Model:           resp.Model,
 		InputTokens:     resp.Usage.InputTokens,
 		OutputTokens:    resp.Usage.OutputTokens,
-		TotalTokens:     responsesTotalTokens(&resp.Usage),
+		TotalTokens:     responsesTotalTokens(resp.Usage.TotalTokens, resp.Usage.InputTokens, resp.Usage.OutputTokens),
 		RequestID:       resp.ID,
 		CachedTokens:    extractResponsesCachedTokens(&resp.Usage),
 		ReasoningTokens: extractResponsesReasoningTokens(&resp.Usage),
@@ -86,107 +89,56 @@ type responsesResponseObj struct {
 	Usage responsesUsage `json:"usage"`
 }
 
-// responsesStreamBase 流式 data 行通用结构（含 type 字段）
-type responsesStreamBase struct {
-	Type string `json:"type"`
-}
-
-// responsesCreatedEvent response.created 事件
-type responsesCreatedEvent struct {
-	Type     string                `json:"type"`
-	Response *responsesResponseObj `json:"response"`
-}
-
-// responsesOutputTextDelta response.output_text.delta 事件
-type responsesOutputTextDelta struct {
-	Type  string `json:"type"`
-	Delta string `json:"delta"`
-}
-
-// responsesCompletedEvent response.completed 事件
+// responsesCompletedEvent response.completed 事件：
+// 携带完整的 response 对象（id / model / usage），是流式用量与 identity 的唯一来源
 type responsesCompletedEvent struct {
 	Type     string                `json:"type"`
 	Response *responsesResponseObj `json:"response"`
 }
 
-func (p *ResponsesParser) ParseStreamEvent(data []byte) (*StreamEvent, error) {
-	var base responsesStreamBase
-	if err := json.Unmarshal(data, &base); err != nil {
-		return nil, err
-	}
-
-	switch base.Type {
-	case "response.created":
-		var evt responsesCreatedEvent
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, err
-		}
-		if evt.Response == nil {
-			return nil, nil
-		}
-		// created 事件不带 usage，仅携带 model / request id；
-		// 后置流式 usage 解析的「非零字段覆盖」逻辑会保留这两项，
-		// 供后续 completed 事件补齐。
-		return &StreamEvent{
-			EventType: "usage",
-			Usage: &Usage{
-				Provider:  FormatResponses,
-				Model:     evt.Response.Model,
-				RequestID: evt.Response.ID,
-			},
-		}, nil
-
-	case "response.output_text.delta":
-		var evt responsesOutputTextDelta
-		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, err
-		}
-		if evt.Delta == "" {
-			return nil, nil
-		}
-		return &StreamEvent{
-			EventType: "content",
-			Content:   evt.Delta,
-		}, nil
-
-	case "response.completed":
+// ParseStreamUsage 提取 Responses 流式用量。
+//
+// 只看 response.completed：它带完整的 response 对象，identity（id / model）与 usage 都在里面。
+// 上游给了 total_tokens 就用它，为 0 时按协议口径回退 input + output。
+// response.created / output_text.delta / in_progress / failed / incomplete 与用量无关。
+func (p *ResponsesParser) ParseStreamUsage(body []byte) (*Usage, error) {
+	var usage *Usage
+	util.EachSSEData(body, func(data []byte) {
 		var evt responsesCompletedEvent
 		if err := json.Unmarshal(data, &evt); err != nil {
-			return nil, err
+			return // 单块解析失败不影响其它块
 		}
-		if evt.Response == nil {
-			return &StreamEvent{EventType: "done"}, nil
+		if evt.Type != "response.completed" || evt.Response == nil {
+			return
 		}
-		return &StreamEvent{
-			EventType: "usage",
-			Usage: &Usage{
-				Provider:        FormatResponses,
-				Model:           evt.Response.Model,
-				InputTokens:     evt.Response.Usage.InputTokens,
-				OutputTokens:    evt.Response.Usage.OutputTokens,
-				TotalTokens:     responsesTotalTokens(&evt.Response.Usage),
-				RequestID:       evt.Response.ID,
-				CachedTokens:    extractResponsesCachedTokens(&evt.Response.Usage),
-				ReasoningTokens: extractResponsesReasoningTokens(&evt.Response.Usage),
-			},
-		}, nil
-
-	case "response.failed", "response.incomplete":
-		// 异常结束：透传结束，无 usage（后置解析器不记录、不计费）
-		return &StreamEvent{EventType: "done"}, nil
-
-	default:
-		// response.in_progress / output_item.* / content_part.* / output_text.done → 跳过
+		resp := evt.Response
+		u := &resp.Usage
+		usage = &Usage{
+			Provider:        FormatResponses,
+			Model:           resp.Model,
+			RequestID:       resp.ID,
+			InputTokens:     u.InputTokens,
+			OutputTokens:    u.OutputTokens,
+			TotalTokens:     u.TotalTokens,
+			CachedTokens:    extractResponsesCachedTokens(u),
+			ReasoningTokens: extractResponsesReasoningTokens(u),
+		}
+	})
+	// 未完成（无 completed 事件）或上游未回传用量时不记零用量
+	if usage == nil || (usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.TotalTokens == 0) {
 		return nil, nil
 	}
+	usage.TotalTokens = responsesTotalTokens(usage.TotalTokens, usage.InputTokens, usage.OutputTokens)
+	return usage, nil
 }
 
-// responsesTotalTokens 计算 responses 的 total_tokens：优先用上游值，为 0 时回退 input+output。
-func responsesTotalTokens(u *responsesUsage) int {
-	if u.TotalTokens > 0 {
-		return u.TotalTokens
+// responsesTotalTokens responses 的 total_tokens 口径：优先用上游值，为 0 时回退 input+output。
+// 非流式、流式事件与流式聚合共用同一规则。
+func responsesTotalTokens(total, input, output int) int {
+	if total > 0 {
+		return total
 	}
-	return u.InputTokens + u.OutputTokens
+	return input + output
 }
 
 // extractResponsesCachedTokens 从 responses usage 中提取缓存命中 token

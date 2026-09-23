@@ -2,7 +2,8 @@ package parser
 
 import (
 	"encoding/json"
-	"strings"
+
+	"github.com/lijcoder/aiapi/parser/util"
 )
 
 // OpenAIParser OpenAI 请求/响应解析器
@@ -23,11 +24,12 @@ func (p *OpenAIParser) ParseModel(body []byte) string {
 
 // ReplaceModel 替换请求体顶层 model（OpenAI 系协议的模型名都在顶层）
 func (p *OpenAIParser) ReplaceModel(body []byte, name string) ([]byte, error) {
-	return replaceTopLevelModel(body, name)
+	return util.ReplaceTopLevelModel(body, name)
 }
 
+// ParseApiKey 从 Authorization 头取 Bearer token
 func (p *OpenAIParser) ParseApiKey(headers map[string][]string) string {
-	return extractBearerToken(headers)
+	return util.ExtractBearerToken(headers, HeaderAuthorization)
 }
 
 // 编译期断言：OpenAIParser 实现 ModelsFormatter
@@ -83,19 +85,11 @@ type openaiNonStreamResp struct {
 	Usage openaiUsage `json:"usage"`
 }
 
-// openaiStreamChunk 流式 chunk 结构
-type openaiStreamChunk struct {
-	ID      string `json:"id"`
-	Model   string `json:"model"`
-	Object  string `json:"object"`
-	Choices []struct {
-		Index int `json:"index"`
-		Delta struct {
-			Role    string `json:"role"`
-			Content string `json:"content"`
-		} `json:"delta"`
-		FinishReason *string `json:"finish_reason"`
-	} `json:"choices"`
+// openaiStreamUsageChunk 流式用量解析所需的 chunk 子集。
+// choices[] 的增量内容与用量无关（响应已原样透传给客户端），这里只取 identity 与 usage。
+type openaiStreamUsageChunk struct {
+	ID    string       `json:"id"`
+	Model string       `json:"model"`
 	Usage *openaiUsage `json:"usage"`
 }
 
@@ -116,67 +110,47 @@ func (p *OpenAIParser) ParseUsage(body []byte) (*Usage, error) {
 	}, nil
 }
 
-func (p *OpenAIParser) ParseStreamEvent(data []byte) (*StreamEvent, error) {
-	// 跳过 [DONE]
-	line := strings.TrimSpace(string(data))
-	if line == "[DONE]" {
-		return &StreamEvent{EventType: "done"}, nil
-	}
-
-	var chunk openaiStreamChunk
-	if err := json.Unmarshal(data, &chunk); err != nil {
-		return nil, err
-	}
-
-	event := &StreamEvent{}
-
-	// 提取 model
-	if chunk.Model != "" {
-		event.Model = chunk.Model
-	}
-
-	// 提取 content delta
-	if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-		event.Content = chunk.Choices[0].Delta.Content
-		event.EventType = "content"
-	}
-
-	// 提取 usage（最后一条 SSE 事件）
-	if chunk.Usage != nil {
-		event.Usage = &Usage{
+// ParseStreamUsage 提取 OpenAI 流式用量。
+//
+// chat/completions 只在最后一块给出 usage（stream_options.include_usage），该块同时
+// 携带本次请求的 id / model，因此只在带 usage 的块取值，不跨块合并。
+// 上游未给 total_tokens 时按协议口径回退 input + output。
+func (p *OpenAIParser) ParseStreamUsage(body []byte) (*Usage, error) {
+	var usage *Usage
+	util.EachSSEData(body, func(data []byte) {
+		var chunk openaiStreamUsageChunk
+		if err := json.Unmarshal(data, &chunk); err != nil {
+			return // [DONE] 等非 JSON 块直接跳过
+		}
+		if chunk.Usage == nil {
+			return // 内容增量块与用量无关
+		}
+		// 上游若在多个块回传累计 usage（部分网关行为），后到者覆盖前值
+		usage = &Usage{
 			Provider:        FormatOpenAI,
 			Model:           chunk.Model,
+			RequestID:       chunk.ID,
 			InputTokens:     chunk.Usage.PromptTokens,
 			OutputTokens:    chunk.Usage.CompletionTokens,
 			TotalTokens:     chunk.Usage.TotalTokens,
-			RequestID:       chunk.ID,
 			CachedTokens:    extractCachedTokens(chunk.Usage),
 			ReasoningTokens: extractReasoningTokens(chunk.Usage),
 		}
-		event.EventType = "usage"
-	}
-
-	// 没有 content 也没有 usage，可能是中间状态事件，跳过
-	if event.EventType == "" && chunk.Model == "" {
+	})
+	// 未要求用量（无 include_usage）或上游未回传时不记零用量
+	if usage == nil || (usage.InputTokens == 0 && usage.OutputTokens == 0 && usage.TotalTokens == 0) {
 		return nil, nil
 	}
-
-	return event, nil
+	usage.TotalTokens = openaiTotalTokens(usage.TotalTokens, usage.InputTokens, usage.OutputTokens)
+	return usage, nil
 }
 
-// sseDataLine 从 SSE 行中提取 data 内容
-func SSEParseData(line []byte) []byte {
-	lineStr := strings.TrimSpace(string(line))
-	if lineStr == "" {
-		return nil
+// openaiTotalTokens OpenAI 的 total_tokens 口径：优先用上游值，为 0 时回退 input+output。
+func openaiTotalTokens(total, input, output int) int {
+	if total > 0 {
+		return total
 	}
-	if strings.HasPrefix(lineStr, "data: ") {
-		return []byte(strings.TrimPrefix(lineStr, "data: "))
-	}
-	if strings.HasPrefix(lineStr, "data:") {
-		return []byte(strings.TrimPrefix(lineStr, "data:"))
-	}
-	return nil
+	return input + output
 }
 
 // extractCachedTokens 从 usage 中提取缓存命中 token

@@ -16,11 +16,11 @@ import (
 // errParser 只用于覆盖 ReplaceModel 失败路径
 type errParser struct{ err error }
 
-func (p errParser) ParseModel([]byte) string                             { return "gpt-4o" }
-func (p errParser) ReplaceModel([]byte, string) ([]byte, error)          { return nil, p.err }
-func (p errParser) ParseApiKey(map[string][]string) string               { return "" }
-func (p errParser) ParseUsage([]byte) (*parser.Usage, error)             { return nil, nil }
-func (p errParser) ParseStreamEvent([]byte) (*parser.StreamEvent, error) { return nil, nil }
+func (p errParser) ParseModel([]byte) string                       { return "gpt-4o" }
+func (p errParser) ReplaceModel([]byte, string) ([]byte, error)    { return nil, p.err }
+func (p errParser) ParseApiKey(map[string][]string) string         { return "" }
+func (p errParser) ParseUsage([]byte) (*parser.Usage, error)       { return nil, nil }
+func (p errParser) ParseStreamUsage([]byte) (*parser.Usage, error) { return nil, nil }
 
 func TestRewriteModel_RewritesBodyToProviderModel(t *testing.T) {
 	ctx := &types.Context{
