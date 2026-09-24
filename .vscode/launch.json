@@ -8,8 +8,8 @@
             "name": "local-debug",
             "request": "launch",
             "type": "go",
-            "mode": "auto",
-            "program": "${workspaceFolder}/main.go",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
             "args": [
                 "--port",
                 "8887",
