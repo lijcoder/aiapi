@@ -1,5 +1,13 @@
--- SQLite DDL — 手动执行: sqlite3 ~/.aiapi/aiapi.db < sql/sqlite.sql
--- 如果迁移到 MySQL, 参考 sql/mysql.sql
+-- SQLite 当前 schema DDL
+--
+-- 新建库（应用不会自动建库，DB 文件必须预先存在）：
+--   mkdir -p ~/.aiapi/db
+--   sqlite3 ~/.aiapi/db/aiapi.db < sql/sqlite.sql
+--   sqlite3 ~/.aiapi/db/aiapi.db < sql/init-data.sql
+--
+-- 本文件是**当前版本的完整 schema**（等价于所有历史迁移执行后的结果），不承载迁移步骤。
+-- 存量库升级步骤见 sql/migrations/README.md；schema 版本记录在 schema_meta 表（单行），
+-- 应用启动时会与 constant.SchemaVersion 比对，不一致会拒绝启动。
 --
 -- 规范:
 --   PRIMARY KEY         → 放在 CREATE TABLE 内
@@ -8,7 +16,19 @@
 --
 -- 时区说明:
 --   datetime('now', 'localtime') 使用系统本地时间（非 UTC）
---   存量数据修复: UPDATE 表名 SET created_at = datetime(created_at, '+8 hours');
+
+-- schema_meta：数据库结构版本（单行表，id 固定为 1）。
+-- 刻意不用 SQLite 专有的 PRAGMA user_version：本项目要兼容 MySQL / PostgreSQL，
+-- 元数据表是三者的公共做法，Go 侧用同一条 SELECT 读取。
+CREATE TABLE IF NOT EXISTS schema_meta (
+    id         INTEGER PRIMARY KEY,   -- 固定 1，保证单行
+    version    INTEGER NOT NULL,      -- schema 版本号，与 constant.SchemaVersion 对应
+    applied_at DATETIME NOT NULL
+);
+-- 幂等写入版本行（重复执行整个 DDL 不会报错）
+INSERT INTO schema_meta (id, version, applied_at)
+SELECT 1, 1, datetime('now', 'localtime')
+WHERE NOT EXISTS (SELECT 1 FROM schema_meta WHERE id = 1);
 
 CREATE TABLE IF NOT EXISTS providers (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,11 +40,6 @@ CREATE TABLE IF NOT EXISTS providers (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_providers_type ON providers(type);
 
--- users 扩展：增加 password 列
--- 新建库直接用上方定义；存量库需手动迁移：
---   ALTER TABLE users ADD COLUMN password TEXT NOT NULL DEFAULT '';
---   -- 然后逐个设置密码哈希：
---   -- UPDATE users SET password = '<bcrypt-hash>' WHERE account = 'admin';
 CREATE TABLE IF NOT EXISTS users (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT NOT NULL,
@@ -38,14 +53,6 @@ CREATE TABLE IF NOT EXISTS users (
     created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_account ON users(account);
-
--- users 扩展：增加 email 列
--- 新建库直接用上方定义；存量库需手动迁移：
---   ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT '';
-
--- users 扩展：增加 totp_secret 列（2FA TOTP 密钥，AES-GCM 加密存储）
--- 新建库直接用上方定义；存量库需手动迁移：
---   ALTER TABLE users ADD COLUMN totp_secret TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS api_keys (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,27 +68,6 @@ CREATE TABLE IF NOT EXISTS api_keys (
     created_at DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_key_hash ON api_keys(key_hash);
-
--- api_keys 迁移：key（明文）→ key_hash + key_show（存量库手动迁移）
--- SQLite 无 SHA-256 函数，哈希需在外部计算（如 Python hashlib / shasum -a 256）。
--- 步骤：
---   1. ALTER TABLE api_keys RENAME COLUMN key TO key_hash;
---   2. ALTER TABLE api_keys ADD COLUMN key_show TEXT NOT NULL DEFAULT '';
---   3. 对每行明文 key 计算 sha256 hex 与展示串（sk- + 前3位hex + '****' + 后3位hex），逐行：
---      UPDATE api_keys SET key_hash = '<sha256hex>', key_show = 'sk-abc****xyz' WHERE id = <id>;
---   4. DROP INDEX IF EXISTS uq_api_keys_key;
---      CREATE UNIQUE INDEX IF NOT EXISTS uq_api_keys_key_hash ON api_keys(key_hash);
--- 迁移完成后重启应用即可（鉴权按 key_hash 比对）。
-
--- api_keys 扩展：增加 model_policy 列（模型访问策略）
--- 新建库直接用上方定义；存量库需手动迁移：
---   ALTER TABLE api_keys ADD COLUMN model_policy TEXT NOT NULL DEFAULT 'all';
-
--- api_keys 扩展：增加 key_enc 列（key 原文 AES-256-GCM 密文，可还原）
--- 新建库直接用上方定义；存量库需手动迁移：
---   ALTER TABLE api_keys ADD COLUMN key_enc TEXT NOT NULL DEFAULT '';
--- 存量 key 的明文已不可还原（仅存 SHA-256），key_enc 留空；
--- 新建 key 由应用写入密文，查看接口对 key_enc='' 的记录提示无法还原。
 
 -- API Key 模型白名单明细（model_policy='whitelist' 时生效）
 CREATE TABLE IF NOT EXISTS apikey_model_access (
@@ -117,12 +103,6 @@ CREATE INDEX IF NOT EXISTS idx_usage_records_date  ON usage_records(created_at);
 CREATE INDEX IF NOT EXISTS idx_usage_records_model ON usage_records(model);
 CREATE INDEX IF NOT EXISTS idx_usage_records_api_key_id ON usage_records(api_key_id);
 
--- usage_records 迁移：api_key（明文）→ api_key_id（存量库手动执行，需 SQLite ≥ 3.35）
---   ALTER TABLE usage_records ADD COLUMN api_key_id INTEGER NOT NULL DEFAULT 0;
---   UPDATE usage_records SET api_key_id = COALESCE((SELECT id FROM api_keys WHERE api_keys.key = usage_records.api_key), 0);
---   ALTER TABLE usage_records DROP COLUMN api_key;
---   CREATE INDEX IF NOT EXISTS idx_usage_records_api_key_id ON usage_records(api_key_id);
-
 CREATE TABLE IF NOT EXISTS request_logs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     api_key_id      INTEGER NOT NULL DEFAULT 0,  -- 关联 api_keys.id，不存 key 原文
@@ -143,23 +123,6 @@ CREATE TABLE IF NOT EXISTS request_logs (
     created_at      DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 
--- request_logs 迁移：api_key（明文）→ api_key_id（存量库手动执行，需 SQLite ≥ 3.35）
---   ALTER TABLE request_logs ADD COLUMN api_key_id INTEGER NOT NULL DEFAULT 0;
---   UPDATE request_logs SET api_key_id = COALESCE((SELECT id FROM api_keys WHERE api_keys.key = request_logs.api_key), 0);
---   ALTER TABLE request_logs DROP COLUMN api_key;
-
--- 耗时字段迁移（存量库手动执行）：
---   ALTER TABLE usage_records ADD COLUMN first_token_ms INTEGER DEFAULT 0;
---   ALTER TABLE usage_records ADD COLUMN latency_ms INTEGER DEFAULT 0;
---   ALTER TABLE request_logs ADD COLUMN first_token_ms INTEGER DEFAULT 0;
---
--- 分段计费迁移（存量库手动执行，原价格不迁移，升级后请在管理台重新配置每个模型）：
---   ALTER TABLE models ADD COLUMN pricing_config TEXT NOT NULL DEFAULT '';
---   ALTER TABLE usage_records ADD COLUMN pricing_snapshot TEXT NOT NULL DEFAULT '';
---   ALTER TABLE models DROP COLUMN input_cache_hit_price;
---   ALTER TABLE models DROP COLUMN input_cache_miss_price;
---   ALTER TABLE models DROP COLUMN output_price;
-
 CREATE TABLE IF NOT EXISTS models (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     provider              TEXT NOT NULL,
@@ -174,17 +137,6 @@ CREATE TABLE IF NOT EXISTS models (
     created_at            DATETIME DEFAULT (datetime('now', 'localtime'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_models_provider_model ON models(provider, model);
-
--- models 扩展：增加多模态能力列（文本/图像/视频）
--- 新建库直接用上方定义；存量库需手动迁移：
---   ALTER TABLE models ADD COLUMN supports_text  INTEGER NOT NULL DEFAULT 1;
---   ALTER TABLE models ADD COLUMN supports_image INTEGER NOT NULL DEFAULT 0;
---   ALTER TABLE models ADD COLUMN supports_video INTEGER NOT NULL DEFAULT 0;
-
--- models 扩展：增加「提供商模型名」列（对用户可见的 model 与发往上游的模型名解耦）
--- 新建库直接用上方定义；存量库需手动迁移（第二句回填，使旧数据行为与迁移前一致）：
---   ALTER TABLE models ADD COLUMN provider_model TEXT NOT NULL DEFAULT '';
---   UPDATE models SET provider_model = model WHERE provider_model = '';
 
 CREATE TABLE IF NOT EXISTS recharge_records (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -221,9 +173,7 @@ CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_id);
 -- 接口级权限 (subject=role_id, entity, action, value)
 --   entity: 资源类型，如 'API'
 --   action: 操作，如 '*'（通配，暂未启用细粒度，保留字段）
---   value : 资源标识，如 '/manager/self'
--- 存量库迁移（role_permission 为种子数据，可丢弃重建）：
---   DROP TABLE IF EXISTS role_permission;
+--   value : 资源标识，如 '/manager/self'；'*' 为超管通配
 CREATE TABLE IF NOT EXISTS role_permission (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     role_id    INTEGER NOT NULL,
@@ -241,14 +191,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_role_permission ON role_permission(role_id,
 --   expires_at          滑动过期时间，每次刷新顺延
 --   absolute_expires_at 绝对过期上限，登录时设定不随刷新顺延
 --   ua/ip               User-Agent 摘要与登录 IP，仅展示用
---
--- 存量库迁移（双 token 机制上线时执行）：
---   ALTER TABLE user_sessions ADD COLUMN family_id TEXT NOT NULL DEFAULT '';
---   ALTER TABLE user_sessions ADD COLUMN absolute_expires_at DATETIME;
---   ALTER TABLE user_sessions ADD COLUMN ua TEXT NOT NULL DEFAULT '';
---   ALTER TABLE user_sessions ADD COLUMN ip TEXT NOT NULL DEFAULT '';
---   CREATE INDEX IF NOT EXISTS idx_user_sessions_family ON user_sessions(family_id);
---   DELETE FROM user_sessions;  -- 清空旧 session，老 token 格式不兼容，用户需重登一次
 CREATE TABLE IF NOT EXISTS user_sessions (
     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     token               TEXT NOT NULL,

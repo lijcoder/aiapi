@@ -1,0 +1,18 @@
+{
+  "id": "chatcmpl-BnK9pQ2xR7sT4vW1yZ6aD4",
+  "object": "chat.completion",
+  "created": 1735689601,
+  "model": "gpt-4o-2024-08-06",
+  "system_fingerprint": "fp_44709d6fcb",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "反向代理是中间层。"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_67c9a1B2c3D4e5F6a7B8c9E1","object":"response","created_at":1735689711,"status":"in_progress","model":"gpt-4o-2024-08-06","output":[]}}
+
+event: response.in_progress
+data: {"type":"response.in_progress","response":{"id":"resp_67c9a1B2c3D4e5F6a7B8c9E1","object":"response","created_at":1735689711,"status":"in_progress","model":"gpt-4o-2024-08-06","output":[]}}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_67c9a1B2c3D4e5F6a7B8c9E1","output_index":0,"content_index":0,"delta":"上游中途失败"}
+
+event: response.failed
+data: {"type":"response.failed","response":{"id":"resp_67c9a1B2c3D4e5F6a7B8c9E1","object":"response","created_at":1735689711,"status":"failed","model":"gpt-4o-2024-08-06","error":{"code":"server_error","message":"An error occurred while processing your request."}}}
+

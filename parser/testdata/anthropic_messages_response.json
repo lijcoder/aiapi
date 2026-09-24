@@ -1,0 +1,24 @@
+{
+  "id": "msg_01Xy8kQ2rT7vW4zB6nM3pL9d",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-4-20250514",
+  "content": [
+    {
+      "type": "text",
+      "text": "反向代理是客户端与上游服务器之间的中间层。"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 312,
+    "cache_creation_input_tokens": 1024,
+    "cache_read_input_tokens": 8192,
+    "output_tokens": 486,
+    "output_tokens_details": {
+      "thinking_tokens": 210
+    },
+    "service_tier": "standard"
+  }
+}

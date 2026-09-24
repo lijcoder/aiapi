@@ -1,253 +1,117 @@
 # AGENTS.md - 开发规则
 
-> 本文件定义项目的大方向开发规则与架构约定。AI Agent 在修改或扩展代码前，应先理解并遵循这些规则。
+> 本文件是**常驻规则**，只放"每次改代码都必须知道"的约束，目标 100 行级别。
+> 架构原理与已知偏离 → [`docs/architecture.md`](docs/architecture.md)；安全模型 → [`docs/security.md`](docs/security.md)；领域词 → [`docs/glossary.md`](docs/glossary.md)。
+> 进入某个包工作时，该目录的 `AGENTS.md` 会自动加载（`frontend/`、`parser/`、`proxy/`、`manager/`、`store/`、`sql/`），那里写该包的做法。
+> 与本文件的红线冲突时以本文件为准；代码现状与规则不符时，**新代码按规则写**，偏离记入 `docs/architecture.md` §4，不要顺手大重构。
 
-## 1. 项目定位
+## 0. 项目一句话
 
-`aiapi` 是一个轻量级 AI 大模型 API 反向代理，核心职责是：
+`aiapi` 是轻量级大模型 API 反向代理：多协议接入 → 按配置路由到上游 Provider → 透传响应（含 SSE）→ 记录用量与请求日志 → 提供管理接口。
 
-- 接收多种客户端协议（OpenAI / Gemini / Anthropic 等）的请求
-- 按配置路由到对应的上游 Provider
-- 透传响应（含 SSE 流式）
-- 记录 Token 用量与请求日志
-- 提供 Provider 与 API Key 的管理接口
+已实现协议：`openai`、`anthropic`、`openai-responses`。**`gemini` 未实现**（`parser.GetParser` 返回 `nil`，补它还需处理"模型名在 URL path"，不只是加解析器）。
 
-## 2. 架构原则
+## 1. 速查
 
-### 2.1 分层清晰，各司其责
+| 目的 | 命令 |
+|------|------|
+| 安装依赖 | `make install`（`go mod tidy`） |
+| 跑测试 | `make test`（等价 `go test ./...`） |
+| 全量检查 | `make check`（格式 + vet + 测试，含所有门禁） |
+| 构建 | `make build` |
+| 全量构建（含前端） | `make build-all` |
+| 前端调试 | `make dev-ui`（3000，代理到 Go） |
+| 本地运行 | `make run`（8887） |
+| 格式化 | `make fmt` |
 
-| 层次 | 职责 | 代表位置 |
-|------|------|----------|
-| 入口层 | 参数解析、日志/数据库初始化、启动服务 | `main.go` |
-| 框架适配层 | 创建路由组与全局中间件；各业务在自己的 router 文件注册路由、做请求参数提取与响应写入 | `framework/echo.go`、`proxy/router/`、`manager/router/` |
-| 业务编排层 | 组装并执行请求处理 Pipeline | `proxy/direct.go` |
-| 业务处理层 | 单一职责的 handler，完成具体业务逻辑 | `proxy/handler/*.go` |
-| 协议解析层 | 不同厂商的请求/响应解析与 Key 提取 | `parser/*.go` |
-| 后台管理层 | 后端给前端的接口入口，只做 HTTP 适配（参数校验、调 service、组装响应） | `manager/handler/*.go` |
-| 业务服务层 | 跨 handler 复用的业务逻辑、多表事务编排，不依赖 echo | `service/*.go` |
-| 后台中间件层 | 登录态校验、接口级权限判定，只做 HTTP 适配 | `manager/middleware/*.go` |
-| 数据持久层 | 数据库访问、模型定义、查询构造 | `store/*.go` |
-| 通用工具层 | 跨包共享常量、日志格式化等 | `constant/`、`log/` |
+- **工具链**：Go 版本以 `go.mod` 为准（当前 1.25.4）；前端 Vue 3 + Vite，Node 需 18 / 20 / 22+（Vite 6 要求）。
+- **仓库没有 CI、没有 linter**，但部分红线由 `go test` 里的门禁机械保证：架构依赖与权限种子（`arch_test.go`）、文档链接/锚点/体积（`docs_test.go`）、schema 版本一致性（`store/schema_version_test.go`）。其余靠自觉，改完必须本地 `make check`。
+- **提交信息**：Conventional Commits，`<type>(<scope>): <中文描述>`，破坏性变更加 `!`（如 `feat(proxy)!:`）；type 用 feat / fix / refactor / docs / style / chore / perf。
+- **禁改与生成物**：根目录 `aiapi` 二进制、`frontend/dist/assets` 是构建物；`frontend/dist/index.html` 被 git 跟踪且是 `go:embed all:frontend/dist` 的必需文件，**不可删除**。临时草稿放 `temp/`（已忽略）。
+- **文档分工**：规则 → 本文件 + `docs/`；用法 → `README.md`；变更历史 → `CHANGELOG.md`；已识别未实施的优化 → `TODO.md`。
 
-### 2.2 关键边界
+## 2. 目录地图（改哪里）
 
-- `framework/echo.go` 只创建路由组与挂全局中间件，不写业务逻辑；路由注册与 echo 适配（参数提取、响应写入）下沉到各业务自己的 router 文件（`proxy/router/`、`manager/router/`），路由组根路径（`/proxy`、`/manager`）由 `framework/echo.go` 直写。
-- `proxy/direct.go` 只负责 Pipeline 组装，不实现具体业务。
-- `proxy/handler/` 是代理业务逻辑唯一入口，每个 handler 应尽量独立、可测试。
-- `parser/` 只负责协议相关的解析与提取，不直接操作数据库或写响应。
-- `proxy/handler/Forward` 只负责 HTTP 转发与响应透传：发起上游请求、复制安全响应头、写回客户端并缓存原始响应；不做协议解析、用量统计或计费。响应完成后由独立 handler 调用 `parser` 消费缓存数据。
-- `store/` 是纯 SQL 包装层：只做单条/单表的数据读写（`Get/Select/Exec`），不处理 HTTP 或协议细节，**不写跨表编排、不写业务判断、不写事务体、不放纯函数业务工具**（如哈希/展示串计算属于 service）；每个 Store 的命名空间入口写在自己文件内（如 `func (s *Session) Xxx() *XxxStore`），不集中到 `store/base.go`。按表/领域拆分 Store，不同表的操作不混在同一 Store（如操作 `api_keys.model_policy` + `apikey_model_access` 的 `ModelAccessStore` 独立于操作 `models` 表的 `ModelStore`）。`IN` 查询直接写 `IN (:ids)` 传 slice 参数，QueryBuilder 内置 `sqlx.In` 自动展开，不手动拼接占位符。迁移不在应用内自动执行：DDL 迁移以 `sql/sqlite.sql` 注释形式提供手动 SQL，需外部计算（如哈希）的由人工/脚本完成。
-- `manager/handler/` 是后端给前端的接口唯一入口，只做 HTTP 适配：参数校验、调 service、组装响应；**不直接写跨表事务、不写可复用业务逻辑**。
-- `service/` 是业务逻辑承载层（manager 与 proxy 共用）：跨 handler 复用、不依赖 echo 的业务逻辑、**涉及多表/带业务语义的事务编排**、跨 Store 组装、业务判断（如分组维度→排序方向）都放这里；handler 与 middleware 只调用 service 暴露的方法，不重复实现。proxy 侧无 manager 入口的场景（如鉴权、计费）也调 `service/`，不在 `proxy/handler` 自建业务逻辑。
-- `manager/middleware/` 只做 HTTP 适配（鉴权、权限判定、登录态注入），复杂业务下沉到 service。
+| 层次 | 职责 | 位置 | 越界示例 |
+|------|------|------|----------|
+| 入口 | 参数解析、日志/DB 初始化、启动 | `main.go` | — |
+| 静态资源 | 前端 `embed` 与 SPA fallback | `frontend.go` | 在它之后注册新路由（会被 SPA 吞掉） |
+| 框架适配 | 建路由组 + 全局中间件 | `framework/echo.go` | 往里写业务逻辑 |
+| 路由适配 | 注册路由、参数提取、响应写入 | `proxy/router/`、`manager/router/` | 在 handler 里读 `c.Param` 以外的框架细节 |
+| 编排 | 组装并执行 Pipeline | `proxy/direct.go`、`proxy/pipeline.go` | 在 direct.go 实现具体业务 |
+| 代理处理 | 单一职责 handler | `proxy/handler/*.go` | 自建业务规则（应走 `service/`） |
+| 协议解析 | 各厂商请求/响应解析、Key 提取 | `parser/*.go`、`parser/util/` | 操作数据库、写响应 |
+| 后台接口 | HTTP 适配：校验、调 service、组装响应 | `manager/handler/*.go` | 写跨表事务 |
+| 后台中间件 | 鉴权、权限判定、登录态注入 | `manager/middleware/*.go` | 写复杂业务 |
+| 后台基础设施 | 分页类型、响应封装、业务码、`base.Wrap`、密钥 | `manager/base/*.go` | — |
+| 业务服务 | 复用逻辑、多表事务、跨 Store 组装、业务判断 | `service/*.go` | 依赖 echo |
+| 数据持久 | 单表 SQL、模型、QueryBuilder、分页拦截 | `store/`、`store/base/`、`store/driver/` | 跨表写、业务判断 |
+| 通用工具 | 跨包常量、数据目录路径、密钥加载、日志 | `constant/`、`log/` | 业务常量堆进 `constant` 变上帝包 |
 
-### 2.3 事务边界
+关键入口（先读这 5 个）：`main.go`、`framework/echo.go`、`proxy/direct.go`、`parser/interface.go`、`manager/router/router.go`。
 
-- `Session.T(fn)` 只提供事务执行入口，**事务体（fn 内组合多个 Store 调用、业务判断、失败回滚语义）不应写在 `store/` 内**，应写在 `service/`（manager 与 proxy 共用的业务层）。
-- `store/` 里的方法默认在调用方传入的 `*Session` 上执行：若调用方用 `Session.T(fn)` 包裹则自动进事务，若用 `store.C()` 则非事务，store 方法本身不感知是否事务。
-- Session 保存 `tx`/`page` 状态字段，不再用 `context.Value` 传业务参数（tx、分页），context 回归“请求级跨边界数据”本职。`store.C()` 无参，`Session.T(fn)` 在当前 Session 上切换 tx（嵌套调用复用当前 tx，不开新事务，保证原子性）。
-- 一个事务只编排「同一业务动作」需要的多张表，不要把无关写操作塞进同一事务。
+## 3. 红线
 
-### 2.4 并发安全（金额/计数类写操作）
+**流程**
 
-涉及余额、计数等「读后算再写」的场景，必须保证读到的值是本次写入前的稳定值，禁止「先 SELECT 再 UPDATE 写回」的读后写模式（快照读拿旧值会丢更新）。
+- **RED-01** 改完必须 `make check` + `go build` 通过；提交信息按 §1 规范，不写 `update xxx` 这类自由格式。
+- **RED-02** 规则/架构变化同步本文件与 `docs/`，用户可见变化同步 `README.md`，两者都在 `CHANGELOG.md` 记录；未实施的优化写 `TODO.md`。
 
-通用做法（跨 SQLite/MySQL/PostgreSQL）：
+**分层**
 
-1. 先 `UPDATE budget = budget + :amount`（对同一行的 UPDATE 加行锁串行执行，金额不丢更新）
-2. 再在同事务内 `SELECT budget`（事务内自己修改对后续语句立即可见，拿到的是步骤 1 之后的新值）
-3. 行锁持续到 COMMIT，期间其他事务的 UPDATE 阻塞，故步骤 2 读到的是稳定值
-4. 需要记 before/after 流水时，`before = after - amount` 反推
+- **RED-03** handler 失败时只设 `ctx.Err` + `ctx.Code`，由 Pipeline 统一输出错误；禁止在 handler 里 `c.JSON` / `c.String` 返回错误。
+- **RED-04** 禁止在 handler 中检查 `ctx.Err` 决定是否执行；不可中断的收尾操作注册为 `AddFinally`。
+- **RED-05** 事务体只能写在 `service/`；`store/` 不写跨表写操作、不写业务判断、不放纯函数业务工具。
+- **RED-06** 依赖方向单向：`store/` 不 import echo / manager / parser；`parser/` 不 import store；`framework/echo.go` 不写业务。
+- **RED-07** 可复用逻辑不重复实现：跨 handler 复用、跨表组装、业务不变量一律走 `service/`。
+- **RED-08** 错误码编号唯一；manager 侧**不新增业务码**，用 `base.ErrBadReq` / `ErrNotFound`（中文消息）/ `ErrInternal`。proxy 对外错误消息英文，manager 中文。
 
-禁止的反模式：
-- 先 `SELECT budget` 再 `UPDATE budget = :newValue`（读后写，快照读拿旧值 → 丢更新）
-- 依赖 `UPDATE ... RETURNING`（MySQL 8 不支持，跨库不通用）
-- 依赖 `SELECT ... FOR UPDATE`（SQLite 不支持该语法）
+**数据与安全**
 
-### 2.5 注释风格
+- **RED-09** 金额/计数类"读后算再写"禁止"先 SELECT 再 UPDATE 写回"，也禁止 `UPDATE ... RETURNING` / `SELECT ... FOR UPDATE`（写法见 [`architecture.md` §6](docs/architecture.md)）。
+- **RED-10** `usage_records` 仅在 `status_code < 300` 时记录；转发链路无论成败都记 `request_logs`，元数据端点（`v1/models`）不记。
+- **RED-11** 日志、错误信息、响应中禁止出现完整 API Key；保存请求头前必须脱敏。
+- **RED-12** 新增非超管 manager 接口必须同步 `sql/init-data.sql` 的 `role_permission`；新增页面还要同步 `menus` + `role_menus`，否则 403 或页面不可达。
 
-- `store/` 方法注释只说明「这个方法做什么」，不描述事务用法、调用时机、并发语义等——这些属于 service/handler 的编排逻辑，写在 store 里是越界且误导。
-- service/handler 的复杂逻辑（事务编排、并发安全原理）才需要详细注释。
+**运行时不变量**（详见 [`architecture.md` §10](docs/architecture.md)）
 
-## 3. 代码组织规则
+- **RED-13** 不得给 HTTP Server 设 `WriteTimeout`、不得给上游 client 设总超时——长 SSE 会被误杀。
+- **RED-14** 应用不自动建库/迁移：DB 文件须先手工执行 `sql/sqlite.sql`（+ `sql/init-data.sql`）。
+- **RED-15** 转发不得跟随上游 3xx（`CheckRedirect` 返回 `http.ErrUseLastResponse`）：标准库只剥离 `Authorization` 等四个头，`x-api-key` 这类上游凭证会被送给重定向目标。
+- **RED-16** 改 schema 必须同步三处：`sql/sqlite.sql`（含 `schema_meta` 版本行）、`constant.SchemaVersion`、`sql/migrations/` 台账；版本只能递增。
 
-### 3.1 新增功能时，先找对应层次
+## 4. 边界判定式
 
-- 新增上游协议支持 → `parser/`
-- 协议无关的纯工具（SSE 行/事件切分、请求头取 API Key、请求体顶层 model 改写）→ `parser/util/`，由各协议解析器引用；该包只放无状态纯函数，且不反向依赖 `parser`（避免解析层与工具层互相依赖）
-- 新增请求处理步骤 → `proxy/handler/`，并在 `proxy/direct.go` 的 Pipeline 中注册
-- 新增管理接口 → `manager/handler/`（HTTP 适配）+ `service/`（业务逻辑）
-- 新增业务逻辑（事务编排、跨表组装、业务判断）→ `service/`
-- 新增数据表或查询 → `store/` 与 `sql/`
-- 新增常量按归属分流：**跨业务复用的基础设施常量**（环境变量名、密钥长度下限等，未来新业务也可能用到，散写会导致配置重复/不当）→ 根目录 `constant/constant.go`；**业务域自用常量**（如 manager 的会话 TTL、cookie 名）→ 留在本业务包（如 `manager/base/constant.go`），不堆进 constant 形成上帝包
-- 数据目录下的文件路径（DB、日志、密钥文件等）统一由 `constant` 的路径方法提供（`DBFilePath`/`LogFilePath`/`JWTKeyFilePath` 等），业务代码不自行拼接路径；密钥加载（env > 密钥文件 > 自动生成）统一走 `constant.LoadSecret`，业务层只做编排（参考 `manager/base/secret.go`），不各自实现加载逻辑
-- 新增通用工具 → `log/`
-- 应用日志统一输出到 stdout 与 `constant.LogFilePath()`；初始化日志后，Echo 的 `e.Logger`、`e.StdLogger` 与 HTTP Server 错误日志应复用同一个 writer，避免框架日志只出现在控制台。
+| 场景 | 结论 |
+|------|------|
+| 单表 `Get/Select/Exec`、只读 JOIN/聚合 | 可留在 `store/` |
+| 一次写多张表 / 事务体 | 必须 `service/` |
+| 业务不变量、复用逻辑、纯函数业务工具 | 必须 `service/` |
+| manager handler 里的单表读写 | 可直接调 `store`（现状主流） |
+| manager handler 里的跨表校验、编排 | 移入 `service/` |
+| proxy handler（鉴权、计费） | 调 `service/`，不自建业务逻辑 |
+| 每个 Store 的命名空间入口 | 写在自己的 Store 文件内，不堆到 `store/base.go` |
 
-### 3.2 目录命名规则
+## 5. 完成前自检
 
-- 业务包使用小写、下划线命名，如 `parse_request.go`
-- 测试文件与源码文件同名，后缀 `_test.go`
-- 避免在业务目录中混入框架适配代码
+- [ ] `make check` 通过（含架构门禁、权限种子、文档链接与预算、schema 版本一致性）
+- [ ] `go build` 通过（前端改动还要 `make build-all`）
+- [ ] 新增 handler 优先覆盖失败路径，协议改动覆盖流式与非流式
+- [ ] 数据层测试用内存 SQLite 并先调 `store.Init(db)`，不连真实数据目录
+- [ ] 归属层次正确（对照 §2、§4），没有触碰 §3 红线
+- [ ] 文档已同步：`docs/` / `README.md` / `CHANGELOG.md` / `TODO.md` 按 RED-02 判定
+- [ ] 没有手改 `aiapi` 二进制、`frontend/dist/assets`
 
-### 3.3 业务模型与数据模型分离
+## 6. 什么时候读哪份文档
 
-- 数据模型定义在 `store/model/models.go`
-- 业务逻辑中不直接依赖 SQL 细节，应通过 `store` 提供的接口操作数据
+常驻规则在本文件；**进入某个包工作时该包的 `AGENTS.md` 会自动加载**，做法写在那里。
 
-## 4. Pipeline 设计规则
-
-### 4.1 核心约定
-
-- 使用 Pipeline 编排请求处理流程，每个 handler 只负责一个步骤。
-- Handler 成功时直接返回，失败时设置 `ctx.Err` 与 `ctx.Code`，由 Pipeline 统一输出错误响应。
-- 不可中断的收尾操作（如写日志）应注册为 `Finally` handler。
-- 禁止在 handler 中自行检查 `ctx.Err` 来决定是否执行。
-
-### 4.2 Handler 编写原则
-
-- 单一职责：一个 handler 只做一件事。
-- 无副作用：失败时只设置错误，不写入响应体。
-- 可测试：handler 应能独立于 Echo 和真实数据库进行单元测试。
-
-### 4.3 元数据端点（非转发请求）
-
-- `GET v1/models` 等不依赖上游的端点，**由 `proxy/router` 注册具体路由区分入口**（echo 静态段优先于通配符 `*`：`GET /:provider/:format/v1/models` → `proxy.HandleModels`，其余 → `proxy.Handle`），proxy 不在运行时按 path 判定；具体路由无通配参数时由 router 适配层补写 `req.Path`（供日志记录）。
-- 每个入口在 `proxy/direct.go` 组装自己的 Pipeline（如 models 链路 `ParseRequest → AuthKey → ListModels`），不经 Forward、不计费、不写 `request_logs`（不挂 `Log`）；错误日志打印收敛在共享的 `logErrors`。
-- 鉴权拆分：`AuthKey`（Key/用户校验，所有链路共用）与 `AuthModel`（模型定价+白名单，仅转发链路）是两个独立 handler，新链路按需取用。
-- 协议相关的响应序列化（如模型列表的 OpenAI 格式）归 `parser`：无法放进 `Parser` 主接口的能力用可选接口 + 类型断言（参考 `ModelsFormatter` / `FormatModelList`），parser 不反向依赖 store，业务层负责映射为 parser 中立结构。
-
-## 5. 错误处理规则
-
-- 所有业务错误通过 `ctx.Err` + `ctx.Code` 向上传递。
-- 错误码集中管理，新增错误码需保持编号唯一，并在 `proxy/types/bizcode.go` 中注册。
-- 禁止在 handler 中直接调用 `c.JSON` 或 `c.String` 返回错误。
-- 错误日志应包含足够上下文，但禁止记录完整的 API Key 等敏感信息。
-
-## 6. 数据与日志规则
-
-### 6.1 用量记录
-
-- 仅当请求成功（`status_code < 300`）时记录 `usage_records`。
-- Token 统计应由专门的解析器或 handler 完成，避免多处重复计算。
-- 流式与非流式请求统一入口记录，逻辑差异封装在解析层。
-- 各协议的流式用量解析归该协议：`Parser.ParseStreamUsage` 自行遍历 SSE 事件、自行合并字段并决定 `total_tokens` 口径（Anthropic = 完整输入 + 输出；OpenAI / Responses = 优先上游值，缺省回退 输入 + 输出）。`parser/util` 只提供 `EachSSEData`/`SplitSSEEvents`/`SSEParseData` 这类 SSE 框架级工具，不设跨协议的事件结构（已移除 `StreamEvent` / `ParseStreamEvent`）与通用合并逻辑。
-
-### 6.2 请求日志
-
-- 转发链路的请求无论成败都记录到 `request_logs`；元数据端点（如 `v1/models`）不记录。
-- 保存请求头前必须对敏感头（如 `Authorization`）脱敏。
-- 日志字段应能支撑问题排查、用量审计与性能分析。
-
-## 7. 扩展规则
-
-### 7.1 新增协议格式
-
-1. 在 `parser/` 下新增解析器实现 `Parser` 接口。
-2. 在 `parser/interface.go` 中注册并返回该解析器。
-3. 保持与现有解析器一致的接口签名和行为语义。
-4. 模型名相关方法成对实现：`ParseModel`（从请求中提取，供鉴权/计价）与 `ReplaceModel`（把请求中的模型名替换为上游模型名，供转发）。请求体顶层的实现可直接复用 `parser/util` 的 `util.ReplaceTopLevelModel`；模型名在 URL path（如 Gemini）或其它位置的协议需在各自解析器中额外处理，并保证无需改写时原样返回入参 body。
-5. 用量解析分非流式（`ParseUsage`）与流式（`ParseStreamUsage`）两个方法，都由本协议自行实现：流式用 `parser/util.EachSSEData` 取 SSE 的 data 载荷，事件结构、字段合并与 `total_tokens` 口径按本协议定义，不引入跨协议事件结构。
-6. 鉴权头不写死在工具函数里：`ParseApiKey` 按本协议的鉴权头优先级调用 `parser/util.ExtractBearerToken(headers, 头名...)`（如 Anthropic = `x-api-key` → `parser.HeaderAuthorization`），按顺序取第一个非空头；值带 `Bearer ` 前缀会剥掉，裸 token 原样返回。
-
-### 7.2 新增 Pipeline Handler
-
-1. 在 `proxy/handler/` 下新增文件。
-2. 函数签名统一为 `func Xxx(ctx *types.Context)`。
-3. 根据是否需要收尾执行，选择 `AddLast` 或 `AddFinally` 注册。
-4. 优先将 handler 放在逻辑上合理的位置，避免破坏现有流程顺序。
-
-### 7.3 新增 Manager API
-
-`manager/` 是后端管理服务的总入口，不仅限于 Provider，还包括用户、充值、数据统计、模型配置等管理功能。
-
-1. 在 `manager/handler/` 下按业务领域新增文件（如 `user.go`、`charge.go`）。同一领域的普通用户版与超管版合并到同一文件，不单独起 `*_admin.go` 文件。handler 只做 HTTP 适配：参数校验、调 service、组装响应，不写跨表事务。
-2. 带业务语义的逻辑（尤其多表事务编排、跨 handler 复用逻辑）下沉到 `service/`，handler 只调用 service 暴露的方法。单表的简单读写可直接在 handler 里调 store，但仍建议统一走 service 以保持一致性。
-3. 业务函数签名自由组合 `(context.Context, *Req)` 等入参，返回 `(Resp, *base.BizError)`；由 `base.Wrap` 动态包装成 echo.HandlerFunc。登录态从 `context.Context` 取（`base.CurrentUser`）。
-4. 在 `manager/router/router.go` 的 `Register(g *echo.Group)` 中用 `base.Wrap(handler.Xxx)` 注册路由；路由组根路径 `/manager` 由 `framework/echo.go` 直写。
-5. **接口命名**：列表查询统一用 `/list` 后缀（如 `/users/list`、`/providers/list`、`/models/list`、`/recharge/records/list`）。普通用户自助接口用 `/self` 后缀，超管接口不加 `/self`。
-6. **中间件挂载**：`login` / `refresh` 不挂 Auth；`logout` 挂 Auth 不挂 Require；其余挂 Auth + Require。
-7. **self / admin 合并模式**：同一业务的自助版与超管版合并为一个通用函数，self 入口只设当前用户 ID 后委托。如 `RechargeSelf` 设 `req.UserID = cur.ID` 后调 `Recharge`；`RechargeRecordsSelf` 设 `req.UserID = cur.ID` 后调 `RechargeRecords`。通用函数做参数校验 + 调 service，self 入口不重复校验逻辑。
-8. **分页接口**：列表查询接口应支持分页，采用 Session 状态 + 显式控制模式：
-   - 分页类型分层：`manager/base` 定义 `PageReq`（入参，内嵌到 Req 结构体）与 `PageResult[T]`（出参）；`store` 暴露 `PageContext`（传给 `store.C().SetPage` 的内部载体，拦截器写回 `Total`）。handler 不直接 import `store/base`。
-   - handler 创建 `store.PageContext{Page, PageSize}`，用 `store.C().SetPage(pc).Charge().List(...)` 链式调用，store 方法写普通 `Select`，`QueryBuilder` 从 Session 读 `PageContext`，有则自动拦截：先 `SELECT COUNT(*) FROM (<原SQL>) t` 查总数写回 `pc.Total`，再追加 `LIMIT ? OFFSET ?` 查当前页
-   - 非事务单次分页：链式调用，Session 用完即弃，不用 `ClearPage`
-   - 事务内多次查询：用 `s.SetPage(pc)` / `s.ClearPage()` 显式控制分页作用于哪些语句
-   - handler 从 `pc.Total` 拿总数，组装 `*base.PageResult[T]{Items, Total, Page, PageSize}` 返回
-   - `page` 1-based，`page_size` 默认 20、上限 100
-   - 未 `SetPage` 时 `Select` 退化为普通查询
-
-### 7.4 新增数据库实体
-
-1. 在 `sql/sqlite.sql` 中补充 DDL。
-2. 在 `store/model/models.go` 中定义模型。
-3. 在 `store/` 下新增对应 Store 文件，提供单表 CRUD 方法，不写跨表编排、不写业务判断。按表拆分 Store，不同表不混在同一 Store。
-4. 命名空间入口写在该 Store 文件内（如 `func (s *Session) Xxx() *XxxStore`），不要集中放到 `store/base.go`。
-5. 涉及该实体的多表事务编排、跨 Store 组装、业务判断写在 `service/`，用 `store.C().T(fn)` 包裹，在 fn 内组合多个 Store 调用。
-6. `IN` 查询直接写 `IN (:ids)` 传 slice 参数，QueryBuilder 内置 `sqlx.In` 自动展开，不手动拼接占位符。
-
-### 7.5 开发管理台前端
-
-`frontend/` 是 Vue 3 + Vite + Naive UI 管理台前端，编译后通过 Go `embed` 嵌进二进制分发。
-
-1. 开发期 `make dev-ui`（端口 3000），Vite 自动代理 `/manager` API 到 Go。
-2. 新增页面：在 `frontend/src/views/` 下写 Vue 单文件组件，使用 Naive UI 组件（`n-card`/`n-button`/`n-data-table`/`n-modal` 等），图标库用 `@vicons/ionicons5`。`router/index.js` 加入 Home 路由的 children。
-3. 新增接口调用：在 `frontend/src/api/index.js` 封装 `request(PATH, body)`。
-4. 侧栏菜单：在 `frontend/src/views/Home.vue` 的 `<nav>` 中加 `<router-link>`。
-5. 发布：`make build-all`，Go 二进制自动嵌入 `frontend/dist/`。
-
-#### 前端公共模块
-
-| 模块 | 路径 | 职责 |
-|------|------|------|
-| 工具函数 | `frontend/src/utils.js` | `fix4`（金额格式化，4 位小数去尾 0）、`formatTime`（时间格式化） |
-| 图表选项 | `frontend/src/charts.js` | ECharts option 构建器、`metricConfig` 指标配置 |
-| 图表生命周期 | `frontend/src/composables/useChart.js` | ECharts init/resize/dispose，`watch` 数据自动重绘 |
-| 分页逻辑 | `frontend/src/composables/usePagination.js` | `n-data-table` 远程分页通用逻辑（`pagination`/`onPage`/`onPageSize`/`resetAndLoad`），含 `showTotal` 展示总数 + `showSizePicker` 切换每页条数 |
-
-#### 表格风格统一
-
-所有页面使用 `n-data-table` 时保持一致：
-- `:bordered="false"` `size="small"` — 无边框紧凑风格
-- 列宽超出容器时加 `:scroll-x="总宽"` 防溢出
-- 金额列统一用 `fix4()` 格式化
-- 时间列统一用 `formatTime()` + `ellipsis: { tooltip: true }` 防换行
-- 空数据兜底 `value = (await xxx()) || []`
-- 删除/禁用等危险操作用 `useDialog` 二次确认，不用 `window.confirm`
-
-#### 菜单与权限模型
-
-- **动态菜单**：侧栏菜单由后端 `/manager/self` 返回的 `menus` 树驱动，前端 `Home.vue` 动态渲染，不硬编码。菜单数据存于 `menus` 表，角色与菜单通过 `role_menus` 关联。
-- **菜单形态**：有 `children` 为分组容器（点击展开/收起）；无 `children` 且 `path` 非空为直接跳转；`path` 为空为纯标题。
-- **超管特权**：`role_permission` 中 `value='*'` 为超管通配权限，放行所有接口。admin 角色只需配一条 `('API', '*', '*')` 即可访问全部超管接口，无需为每个接口单独授权。
-- **普通用户**：按接口路径精确授权（最小权限原则）。
-- **超管页面**：路由 `/admin/*` 下，页面组件放 `frontend/src/views/admin/`，import 路径多一级 `../../`。
-
-## 8. 测试与质量
-
-- 新增 handler 应配套单元测试，优先覆盖失败路径。
-- 数据层测试应使用 SQLite 内存数据库或事务回滚，避免污染真实数据。
-- 涉及协议解析的变更，应覆盖流式与非流式两种场景。
-- 提交前确保 `go test ./...` 与 `go build` 通过。
-
-## 9. 文档维护规则
-
-- 开发规则、架构约定或项目边界发生变化时，必须同步更新 `AGENTS.md`，并在 `CHANGELOG.md` 中说明影响。
-- 用户可见的功能、接口、部署方式发生变化时，必须同步更新 `README.md`，并在 `CHANGELOG.md` 中记录。
-- 破坏性变更、模块拆分、目录调整或接口行为变化，若可能影响使用者或其他开发者，应在 `CHANGELOG.md` 中说明。
-- 日常的内部文件移动、函数重构、变量重命名等不影响外部使用的改动，不需要单独在 `CHANGELOG.md` 中记录。
-- `AGENTS.md` 描述开发规则与架构约束，不罗列具体参数和接口返回示例。
-- `README.md` 面向使用者，包含部署、调用示例和接口说明。
-- 三者分工明确：规则在 AGENTS，用法在 README，变更历史在 CHANGELOG；已识别但暂不实施的优化项记录在 `TODO.md`（实施后可移除并写 CHANGELOG）。
-
-## 10. 安全与隐私
-
-- API Key 只在认证阶段使用，禁止在日志、错误信息或响应中泄露完整 Key。
-- 请求体中的敏感内容应谨慎记录，必要时提供脱敏开关。
-- 管理接口应考虑访问控制，避免任意用户修改 Provider 配置。
-- `manager/` 下所有需登录态的接口必须经过 `manager/middleware.Auth` 中间件（access JWT 校验 + 接口级权限 `role_permission(entity=API, value=path)` 判定 + 注入登录态），业务函数由 `base.Wrap` 做参数包装与响应输出。
-- 登录态采用双 token 机制：access JWT（HS256 自实现，15min 无状态，经 `Authorization: Bearer` 头传递，前端存内存）+ refresh token（随机串哈希存 `user_sessions` 表，HttpOnly Secure cookie `refresh_token` 传递，滑动 7 天 / 绝对 30 天，带轮换与重用检测）。`/manager/login`、`/manager/login/2fa`、`/manager/refresh` 不挂 Auth 中间件（login 无需登录态；login/2fa 凭 5 分钟 pending 票据；refresh 靠 refresh cookie 续期，不依赖 access JWT）。
-- 两步验证（2FA/TOTP）为可选开启：`users.totp_secret` 存 AES-256-GCM 加密的 TOTP 密钥（加密密钥由 `CryptoSecret` 派生，见密钥管理条目），空串=未开启。开启后登录分两步：密码通过 → 签发 pending 票据（HS256 JWT，5min，purpose=2fa_pending）→ `/manager/login/2fa` 验票 + 验证码后才发 token 对；同一票据验证码连续错 5 次作废（内存计数）。绑定用 setup 票据（purpose=2fa_setup，内含密钥，确认首个验证码后才落库）。业务封装在 `service/totp.go`（TOTPService）。
-- 密钥管理（`manager/base/secret.go`）：签名密钥 `JWTSecret`（JWT/2FA 票据签名）与加密密钥 `CryptoSecret`（`service/crypto.go` 派生 AES 密钥，加密 TOTP 密钥 / Provider 配置等落库敏感字段）分离。加载优先级：环境变量（`AIAPI_JWT_SECRET` / `AIAPI_CRYPTO_SECRET`）> 密钥文件（`<DataDir>/keys/*.key`，0600）> 自动生成写文件；crypto.key 缺失且签名密钥来自环境变量时从其播种（旧部署兼容）。密钥与 DB 分离存放，备份 DB 须排除 keys/ 目录。登录会话业务封装在 `service` 的 `SessionService`，改密 / 禁用用户 / 重置密码后吊销该用户所有会话。
-- 登录态不复用 proxy 的 header 鉴权字段；账号不存在 / 禁用 / 密码错统一返回相同文案防枚举。
-- `manager` 自有业务码定义在 `manager/base/bizcode.go`，与 `proxy/types/bizcode.go` 解耦，两套独立编号。manager 侧只保留 7 个通用码：有消费方按 code 分支的（前端唯一依赖 `CodeTokenExpired` 1016 触发 refresh，编号不可变）或 HTTP 状态语义不同的；**业务错误不为每种业务定义独立码**，handler 统一用 `base.ErrBadReq(中文消息)` / `base.ErrNotFound(中文消息)` 返回，错误信息必须中文；DB 等内部错误统一返回预置实例 `base.ErrInternal`。
+| 要做的事 | 读 |
+|----------|-----|
+| 理解分层、边界、事务、并发语义 | [`docs/architecture.md`](docs/architecture.md) |
+| 查领域词（provider/format/pricing_snapshot/schema version…） | [`docs/glossary.md`](docs/glossary.md) |
+| 改认证、鉴权、密钥、脱敏 | [`docs/security.md`](docs/security.md) |
+| 想知道某个设计为什么这么做 | [`docs/decisions/`](docs/decisions/README.md) |
+| 排查"这类 bug 为什么没被拦住" | [`docs/postmortem/`](docs/postmortem/README.md) |
+| 加数据表 / 改 schema / 写迁移 | [`sql/AGENTS.md`](sql/AGENTS.md)、[`sql/migrations/README.md`](sql/migrations/README.md) |
+| 文档该写在哪、写多长 | [`docs/AGENTS.md`](docs/AGENTS.md) |

@@ -1,0 +1,30 @@
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_67c9a1B2c3D4e5F6a7B8c9E0","object":"response","created_at":1735689710,"status":"in_progress","model":"gpt-4o-2024-08-06","output":[]}}
+
+event: response.in_progress
+data: {"type":"response.in_progress","response":{"id":"resp_67c9a1B2c3D4e5F6a7B8c9E0","object":"response","created_at":1735689710,"status":"in_progress","model":"gpt-4o-2024-08-06","output":[]}}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_67c9a1B2c3D4e5F6a7B8c9E0","type":"message","status":"in_progress","role":"assistant","content":[]}}
+
+event: response.content_part.added
+data: {"type":"response.content_part.added","item_id":"msg_67c9a1B2c3D4e5F6a7B8c9E0","output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_67c9a1B2c3D4e5F6a7B8c9E0","output_index":0,"content_index":0,"delta":"反向代理"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_67c9a1B2c3D4e5F6a7B8c9E0","output_index":0,"content_index":0,"delta":"是中间层。"}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","item_id":"msg_67c9a1B2c3D4e5F6a7B8c9E0","output_index":0,"content_index":0,"text":"反向代理是中间层。"}
+
+event: response.content_part.done
+data: {"type":"response.content_part.done","item_id":"msg_67c9a1B2c3D4e5F6a7B8c9E0","output_index":0,"content_index":0,"part":{"type":"output_text","text":"反向代理是中间层。","annotations":[]}}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_67c9a1B2c3D4e5F6a7B8c9E0","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"反向代理是中间层。","annotations":[]}]}}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_67c9a1B2c3D4e5F6a7B8c9E0","object":"response","created_at":1735689710,"status":"completed","model":"gpt-4o-2024-08-06","output":[{"id":"msg_67c9a1B2c3D4e5F6a7B8c9E0","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"反向代理是中间层。","annotations":[]}]}],"usage":{"input_tokens":4096,"output_tokens":1024,"total_tokens":5120,"input_tokens_details":{"cached_tokens":3072},"output_tokens_details":{"reasoning_tokens":256}}}}
+

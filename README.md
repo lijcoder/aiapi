@@ -1,535 +1,280 @@
-# aiapi - 大模型 API 网关
+# aiapi — 大模型 API 网关
 
-一个轻量级 OpenAI 兼容格式的大模型 API 反向代理，支持多上游 Provider 路由、Token 用量统计、SSE 流式透传与请求日志。
+轻量级大模型 API 反向代理：用统一入口接入多种客户端协议（OpenAI / Anthropic / OpenAI Responses），按配置路由到上游 Provider，透传响应（含 SSE 流式），并记录 Token 用量、请求日志与计费。
+
+自带 Web 管理台（Provider / 模型 / 计费 / API Key / 用户 / 充值 / 统计），前端编译后嵌入 Go 二进制，**单文件部署**。
 
 ## 功能特性
 
-- **OpenAI 兼容代理**：客户端使用标准 OpenAI API 格式请求，统一转发给兼容的上游提供商
-- **多上游路由**：可将请求转发到任意配置的 OpenAI 兼容 Provider（如 OpenAI、Azure、OneAPI 等）
-- **SSE 流式透传**：支持流式聊天补全响应的透明转发
-- **Token 用量统计**：自动记录 input / output tokens，以及流式请求首 token 耗时和端到端耗时（毫秒）
-- **请求日志**：保存每次请求的参数、响应状态、首 token/端到端耗时与错误信息（非流式首 token 耗时为 0）
-- **Provider 管理**：内置 CRUD 接口动态管理上游配置
-- **API Key 管理**：校验调用方身份，支持启用/禁用；key 原文以 AES-256-GCM 密文落库（可还原查看），同时存 SHA-256 哈希用于鉴权比对，展示为 `sk-abc****xyz` 头尾片段；明文可在创建后通过查看接口还原复制
-- **管理台**：内置 Web 管理界面，支持双 token 安全登录、TOTP 两步验证（2FA）、充值、流水查询
+- **多协议接入**：`openai`（Chat Completions）、`anthropic`（Messages）、`openai-responses`（Responses API），各自独立解析与用量口径
+- **多上游路由**：URL 中指定 Provider，请求原样转发，响应（含 SSE）透明透传
+- **鉴权与额度**：管理台签发 API Key，支持 Key 级启停、额度、模型白名单与用户余额校验
+- **模型名解耦**：对用户可见的模型名与发往上游的模型名分离，同一上游模型可按不同定价映射成多个别名
+- **用量与计费**：记录 input / output / 缓存命中 / 推理 tokens 与首 token、端到端耗时，按可组合的分段规则计费，每笔用量保存计费快照供审计
+- **请求日志**：记录请求参数、响应状态、耗时与错误，管理台可直接查看最近日志
+- **管理台**：接口级权限 + 动态菜单，双 token 登录与可选的 TOTP 两步验证
 
 ## 架构概览
 
 ```
-┌─────────┐      ┌──────────────────────────────┐      ┌─────────────┐      ┌────────────────────┐
-│ Client  │ ──▶  │  /proxy/:provider/:format/*  │ ──▶  │  Pipeline   │ ──▶  │  OpenAI 兼容上游   │
-│         │      │           Echo v4            │      │  handlers   │      │     Provider       │
-└─────────┘      └──────────────────────────────┘      └─────────────┘      └────────────────────┘
-                                                        │
-                                                        ▼
-                                                 ┌─────────────┐
-                                                 │ SQLite 存储  │
-                                                 │ usage_logs  │
-                                                 │ request_logs│
-                                                 └─────────────┘
+                    ┌────────────────────────────┐
+ 客户端 ──────────▶ │  /proxy/:provider/:format/* │
+ (OpenAI/Anthropic/ │         Echo v4            │
+  Responses)        └─────────────┬──────────────┘
+                                  ▼
+                     Pipeline: ParseRequest → AuthKey → AuthModel
+                     → BudgetCheck → LoadConfig → RewriteModel
+                     → Forward → ParseUsage → Record (+ Log)
+                                  │
+                     ┌────────────┴────────────┐
+                     ▼                         ▼
+             上游 Provider（HTTP/SSE）    SQLite（用量/日志/配置/用户）
 ```
 
-### 支持的请求格式
+一个请求的处理过程：解析客户端协议 → 校验 API Key 与用户 → 校验模型可用性与定价 → 校验余额 → 载入 Provider 配置 → 把模型名改写为上游模型名 → 转发并透传响应 → 解析用量 → 记录用量并扣费 → 写请求日志。
 
-本项目代理 OpenAI 兼容格式与 Anthropic 格式的请求与响应。URL 中 `:provider` 为配置的上游 Provider 标识（在前），`:format` 决定客户端协议解析器（在后，取值见下表）。
+### 支持的协议
 
-| 客户端格式 | 说明 |
-|------------|------|
-| `openai` | OpenAI Chat Completions 兼容格式（`v1/chat/completions` 等） |
-| `openai-responses` | OpenAI Responses API 格式（`v1/responses`，含 `stream: true` 流式） |
-| `anthropic` | Anthropic Messages 格式（`v1/messages`，鉴权走 `x-api-key` 头） |
+| `:format` | 说明 | 客户端鉴权头 | 上游端点 |
+|-----------|------|--------------|----------|
+| `openai` | OpenAI Chat Completions 兼容格式 | `Authorization: Bearer <key>` | 由 URL 通配段决定，如 `v1/chat/completions` |
+| `anthropic` | Anthropic Messages 格式 | `x-api-key: <key>`（也接受 `Authorization`） | 如 `v1/messages` |
+| `openai-responses` | OpenAI Responses API 格式 | `Authorization: Bearer <key>` | 如 `v1/responses` |
+| `gemini` | **未实现**：解析器返回 `nil`，请求最终以 401 `missing api key` 失败 | — | — |
 
-未来如需支持其他客户端协议（如 Gemini），需在 `parser/` 层扩展实现转换。
-
-### 分层架构
-
-| 层 | 目录 | 职责 |
-|----|------|------|
-| 入口层 | `main.go` | 参数解析、日志/数据库初始化、启动服务 |
-| 框架适配层 | `framework/echo.go` | HTTP 路由注册、请求参数提取、响应写入 |
-| 代理编排层 | `proxy/direct.go` | 组装并执行请求处理 Pipeline |
-| 代理处理层 | `proxy/handler/*.go` | 单一职责 handler，完成代理业务逻辑（鉴权、计费、转发等） |
-| 协议解析层 | `parser/*.go` | 不同厂商的请求/响应解析与 Key 提取 |
-| 后台接口层 | `manager/handler/*.go` | 后端给前端的接口入口，只做 HTTP 适配（参数校验、调 service、组装响应） |
-| 业务服务层 | `service/*.go` | 跨 handler 复用的业务逻辑、多表事务编排、业务判断（manager 与 proxy 共用） |
-| 后台中间件 | `manager/middleware/*.go` | 登录态校验、接口级权限判定 |
-| 数据持久层 | `store/*.go` | 纯 SQL 包装层，单表/单条数据读写，不写事务编排与业务判断 |
-| 通用工具层 | `constant/`、`log/` | 常量、日志格式化 |
+> 分层、边界、事务与并发语义见 [`docs/architecture.md`](docs/architecture.md)；领域词见 [`docs/glossary.md`](docs/glossary.md)；接入新协议见 [`parser/AGENTS.md`](parser/AGENTS.md)。
 
 ## 快速开始
 
-### 环境要求
+### 1. 环境要求
 
-- Go 1.22+
-- 操作系统：Linux / macOS / Windows（推荐 Linux/macOS）
+- **Go 1.25+**（以 [`go.mod`](go.mod) 为准）
+- **Node.js 18 / 20 / 22+**：仅在需要自行构建管理台前端时要求（Vite 6）
+- **SQLite 3**：命令行工具 `sqlite3`，用于初始化数据库
+- Linux / macOS / Windows（推荐 Linux）
 
-### 编译
-
-```bash
-go build -o aiapi .
-```
-
-### 启动
-
-密钥加载优先级：**环境变量 > 密钥文件 > 自动生成**。
-不设置任何环境变量也能启动——首次启动自动生成随机密钥写入 `<数据目录>/keys/`（0600 权限），后续启动直接复用：
+### 2. 编译
 
 ```bash
-# 默认端口 8888，数据目录 ~/.aiapi
-./aiapi
-
-# 如需显式管理密钥（生产推荐），通过环境变量提供（≥32 字节）：
-export AIAPI_JWT_SECRET="your-jwt-secret-at-least-32-bytes"       # 签名密钥（access JWT / 2FA 票据）
-export AIAPI_CRYPTO_SECRET="your-crypto-secret-at-least-32-bytes" # 加密密钥（TOTP / Provider 配置落库加密）
+make install        # go mod tidy
+make build-all      # 构建前端 + 编译后端（部署与首次构建用这个）
+make build          # 只编译后端，复用本地已有的 frontend/dist
 ```
 
-密钥说明：
-- **两把钥匙职责分离**：签名密钥轮换代价低（用户重登即可）；加密密钥轮换会使历史密文（2FA 密钥、provider 配置）无法解密，需重新绑定/保存
-- 密钥文件为 `<数据目录>/keys/jwt.key` 与 `crypto.key`；**备份数据库时必须排除 `keys/` 目录**，且不要将数据目录提交到任何仓库/网盘
-- 旧版本升级：首次启动时加密密钥自动从 `AIAPI_JWT_SECRET` 播种（历史密文保持可解），此后两把钥匙独立演进；请保持原环境变量至少完成一次启动
+产物是当前目录下的 `./aiapi`（管理台前端通过 `go:embed` 嵌入）。
 
-# 指定端口
-./aiapi --port 8888
-```
+> ⚠️ 仓库只跟踪 `frontend/dist/index.html`，`assets/` 与 `favicon.svg` 都不入库。**全新 clone 后直接 `make build`，二进制里的管理台会因为静态资源缺失而白屏**（请求 JS/CSS 会落到 SPA fallback 返回 HTML）。首次构建与部署请用 `make build-all`。
 
-### 测试代理
+### 3. 初始化数据库
+
+**应用不会自动建库或迁移**，首次部署需手动初始化：
 
 ```bash
-curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{
-    "model": "gpt-4o-mini",
-    "messages": [{"role": "user", "content": "Hello"}]
-  }'
+mkdir -p ~/.aiapi/db
+sqlite3 ~/.aiapi/db/aiapi.db < sql/sqlite.sql      # 建表
+sqlite3 ~/.aiapi/db/aiapi.db < sql/init-data.sql   # 角色、权限、菜单等种子数据（可重复执行）
 ```
 
-### 管理台
-
-`frontend/` 是 Vue 3 + Vite + Naive UI 管理台前端，编译后通过 Go `embed` 嵌进二进制。
-
-#### 两步验证（2FA / TOTP）
-
-管理台支持 TOTP 两步验证（Google Authenticator / 1Password / 微软 Authenticator 等），在个人设置页自助开启：
-
-1. 点击「开启」→ 用 Authenticator App 扫描二维码（或手动输入 Base32 密钥）
-2. 输入 App 显示的 6 位验证码完成绑定
-3. 之后登录需在密码验证后再输入一次验证码
-
-安全设计：
-- TOTP 密钥经 AES-256-GCM 加密后入库（加密密钥独立于签名密钥，见「启动」一节密钥说明），数据库泄露不直接暴露 2FA
-- 密码验证通过后只签发 5 分钟有效的 pending 票据，同一票据验证码连续错 5 次即作废
-- 关闭 2FA 需重新校验登录密码
-
-存量数据库迁移：
-```bash
-sqlite3 ~/.aiapi/aiapi.db "ALTER TABLE users ADD COLUMN totp_secret TEXT NOT NULL DEFAULT '';"
-sqlite3 ~/.aiapi/aiapi.db < sql/init-data.sql   # 补普通用户角色的 2FA 接口权限
-```
+创建管理员账号（`password` 需填 bcrypt 哈希）：
 
 ```bash
-# 开发模式（前端热更新）
-make dev-ui     # → http://localhost:3000（自动代理 API 到 8887）
-
-# 生产构建（前端嵌入 Go 二进制）
-make build-all  # → ./aiapi 一个文件启动，浏览器打开 http://localhost:8887
+# 生成哈希（任选一种）
+htpasswd -bnBC 10 "" '你的密码' | tr -d ':\n'      # 需要 apache2-utils / httpd-tools
+python3 -c "import bcrypt;print(bcrypt.hashpw(b'你的密码', bcrypt.gensalt()).decode())"
 ```
-
-## 配置 Provider
-
-### 新增 Provider
-
-```bash
-curl -X POST http://localhost:8888/manager/providers \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "openai",
-    "config": {
-      "domain": "https://api.openai.com",
-      "headers": {
-        "Authorization": "Bearer sk-xxxxxxxx"
-      }
-    },
-    "enabled": 1
-  }'
-```
-
-### 列出所有 Provider
-
-```bash
-curl http://localhost:8888/manager/providers
-```
-
-### 查询指定 Provider
-
-```bash
-curl http://localhost:8888/manager/providers/openai
-```
-
-### 删除 Provider
-
-```bash
-curl -X DELETE http://localhost:8888/manager/providers/openai
-```
-
-### Provider 配置字段说明
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `type` | string | Provider 唯一标识，URL 中的 `:provider` |
-| `config` | object | 上游配置 |
-| `config.domain` | string | 上游基础域名，如 `https://api.openai.com` |
-| `config.headers` | object | 转发到上游时附加的 HTTP 头 |
-| `enabled` | int | 是否启用，`1` 启用，`0` 禁用 |
-
-## 反向代理路由
-
-```
-/proxy/:provider/:format/*
-```
-
-- `:provider`：上游 Provider 的 `type` 字段
-- `:format`：客户端协议格式，取值见上表（`openai` / `openai-responses` / `anthropic`）
-- `*`：上游路径，例如 `v1/chat/completions`、`v1/responses`
-
-### 示例
-
-```bash
-curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
-  -H "Authorization: Bearer sk-xxx" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o-mini",
-    "messages": [{"role": "user", "content": "hi"}],
-    "stream": false
-  }'
-```
-
-### OpenAI Responses（v1/responses）
-
-客户端以 OpenAI Responses API 格式调用时，`:format` 使用 `openai-responses`，上游路径为 `v1/responses`（请求原样透传到上游，鉴权为 `Authorization: Bearer`，请求体顶层 `model` 字段）：
-
-```bash
-curl http://localhost:8888/proxy/openai/openai-responses/v1/responses \
-  -H "Authorization: Bearer sk-xxx" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4o",
-    "input": "hi",
-    "stream": false
-  }'
-```
-
-流式（`"stream": true`）时响应为 SSE 事件流（`response.created` / `response.output_text.delta` / `response.completed` 等）。AIAPI 保持事件内容原样透传；为降低客户端在完成事件后立即断开导致的上游收尾取消，首个读取块直接发送，后续读取块在收到下一块后再发送，最后一块在上游 EOF 后发送。
-
-### 列出可用模型（v1/models）
-
-`GET v1/models` 为本地元数据端点（不经上游转发、不计费），返回当前 Provider 下、且当前 API Key 有权访问的模型列表（与代理鉴权的可用性口径一致）：
-
-```bash
-curl http://localhost:8888/proxy/openai/openai/v1/models \
-  -H "Authorization: Bearer sk-xxx"
-```
-
-```json
-{
-  "object": "list",
-  "data": [
-    {"id": "gpt-4o-mini", "object": "model", "created": 1715000000, "owned_by": "openai"}
-  ]
-}
-```
-
-Anthropic 协议同路径可用（响应为 Anthropic 格式，鉴权走 `x-api-key` 头）：
-
-```bash
-curl http://localhost:8888/proxy/anthropic/anthropic/v1/models \
-  -H "x-api-key: sk-xxx"
-```
-
-```json
-{
-  "data": [
-    {"type": "model", "id": "claude-sonnet-4-5", "display_name": "claude-sonnet-4-5", "created_at": "2026-07-28T00:00:00Z"}
-  ],
-  "first_id": "claude-sonnet-4-5",
-  "last_id": "claude-sonnet-4-5",
-  "has_more": false
-}
-```
-
-`openai-responses` 协议的同路径 `GET v1/models` 可用，响应由 responses 解析器自行序列化（`{object:"list"}`，与 OpenAI List Models 形状一致）——responses 协议暂无官方模型列表格式，形状沿用 OpenAI 以兼容常用的模型列表解析，实现独立、各协议隔离。
-
-### 模型名与提供商模型名
-
-每个模型配置有「模型名 `model`」和「提供商模型名 `provider_model`」两个名字，可在管理台「模型管理」中维护：
-
-- `model`（对用户可见）：客户端调用时填写、`GET v1/models` 返回的模型名；鉴权、模型白名单、计费与用量/日志口径都按它匹配。
-- `provider_model`（发往上游）：转发时代理会把请求体顶层的 `model` 替换为该值，上游按它选择真实模型。
-- 新增/编辑时留空（或填纯空格）表示「与模型名一致」，保存时按 `model` 落库；因此只有一个上游模型名时无需关心该字段。同一别名可以在编辑/复制时改成任意上游模型名，同一上游模型名也可以被多个别名复用（例如按不同定价分成多档）。
-- 上游响应体（含 SSE 流）里的 `model` 字段不会改写，仍是上游返回的真实模型名；`usage_records.model` / `request_logs.model` 与 `GET v1/models` 始终是 `model`。`request_logs.request_body` 记录的是实际发往上游的请求体，便于对照排查。
-
-存量数据库（新增该字段前创建）需执行：
 
 ```sql
-ALTER TABLE models ADD COLUMN provider_model TEXT NOT NULL DEFAULT '';
-UPDATE models SET provider_model = model WHERE provider_model = '';
+INSERT INTO users (name, account, password, unlimited, enabled)
+VALUES ('管理员', 'admin', '<bcrypt-hash>', 1, 1);
+INSERT INTO user_roles (user_id, role_id)
+VALUES ((SELECT id FROM users WHERE account='admin'), 1);
 ```
 
-回填前的旧行在转发时会按 `model` 处理（代理对空值自动回退），回填只是把该行为固化到数据里。
-
-### 数据存储
-
-默认使用 SQLite，数据库文件位于 `~/.aiapi/aiapi.db`。
-
-> 双 token 登录机制上线后，存量库需迁移 `user_sessions` 表（加 `family_id` / `absolute_expires_at` / `ua` / `ip` 列、建 family 索引、清空旧 session），详见 `sql/sqlite.sql` 内注释。
-
-### 核心数据表
-
-- `providers`：上游提供商配置
-- `api_keys`：调用方 API Key（存 `key_hash` 鉴权比对 + `key_enc` 密文可还原 + `key_show` 展示片段）
-- `usage_records`：Token 用量记录
-- `request_logs`：请求日志与错误信息
-- `users` / `roles` / `user_roles` / `role_permission` / `user_sessions`：用户/角色/权限/会话
-- `menus` / `role_menus`：菜单与角色菜单关联
-- `recharge_records`：充值流水
-- `models`：模型配置（`model` 对用户可见，`provider_model` 为转发给上游的模型名）
-
-可通过 `sql/sqlite.sql` 查看完整 DDL，初始数据参考 `sql/init-data.sql`。
-
-## 日志与调试
-
-### 应用日志
-
-默认输出到标准输出与 `~/.aiapi/logs/app.log`，支持按大小/时间轮转。
-
-## 开发扩展
-
-- 新增上游响应解析逻辑：参考 `parser/openai.go` 与 `parser/anthropic.go`
-- 新增 Pipeline 处理步骤：参考 `proxy/handler/` 目录
-- 新增管理接口：`manager/handler/`（HTTP 适配）+ `service/`（业务逻辑）+ `manager/router/router.go`（路由注册）
-- 新增业务逻辑（事务编排、跨表组装、业务判断）：写在 `service/`，用 `store.C().T(fn)` 包裹事务
-- 新增数据表：`sql/sqlite.sql`（DDL）+ `store/model/models.go`（模型）+ `store/`（纯 SQL Store）
-- 开发规则与架构约束详见 `AGENTS.md`
-
-## 后台管理 API
-
-`/manager` 下提供账号密码登录、权限与充值管理。**所有接口均为 POST，参数放在 JSON body**。
-
-### 双 token 登录机制
-
-为适配公网部署，登录态采用 access JWT + refresh token 双 token 方案：
-
-| token | 载体 | 有效期 | 状态 |
-|-------|------|--------|------|
-| access JWT | 响应体返回，前端存内存，请求经 `Authorization: Bearer` 头携带 | 15 分钟 | 无状态（HS256 自实现，不落库） |
-| refresh token | HttpOnly cookie `refresh_token`（Path=`/manager`，SameSite=Lax，HTTPS 下带 Secure 标记） | 滑动 7 天 / 绝对 30 天 | 落库（仅存 SHA-256 哈希） |
-
-要点：
-- access JWT 过期（HTTP 401 + 业务码 1016）后前端自动调 `POST /manager/refresh` 续期并重试原请求，并发请求只触发一次刷新。
-- refresh token 轮换：每次刷新删旧发新（同 family）。
-- 重用检测：旧 refresh token 再次被使用时吊销整个 family，强制重登。
-- 改密 / 禁用用户 / 重置密码后吊销该用户所有会话，即时失效。
-- 账号不存在 / 禁用 / 密码错统一返回相同文案，防账号枚举。
-- 签名密钥（JWT/票据）与加密密钥（落库敏感字段）分离，支持环境变量或 `<数据目录>/keys/` 密钥文件（0600）提供，未配置时自动生成。
-- **HTTPS 反代部署**：refresh cookie 的 `Secure` 标记由后端根据请求 scheme 动态判定。若用 nginx 终止 TLS、HTTP 反代到后端，需转发 `X-Forwarded-Proto` 头（或 `X-Forwarded-Protocol` / `X-Forwarded-Ssl: on` / `X-Url-Scheme` 任一），后端据此识别为 HTTPS 并设置 `Secure`，否则会被误判为 HTTP：
-  ```nginx
-  location / {
-      proxy_pass http://127.0.0.1:8887;
-      proxy_set_header Host $host;
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $scheme;   # 必须转发，否则 Secure cookie 识别失败
-  }
-  ```
-
-### 权限模型
-
-采用接口级权限 `(role_id, entity, action, value)`，存于 `role_permission` 表：
-- `entity`：资源类型，如 `API`
-- `action`：操作，如 `*`（通配，暂未启用细粒度，保留字段）
-- `value`：资源标识，即接口路径，如 `/manager/self`；特殊值 `*` 为超管通配，放行所有接口
-- 用户经 `user_roles` 关联多个角色，权限取并集
-- 判定规则：当前请求路径 `c.Path()` 命中某条 `(entity=API, value=path)` 即通过；`value='*'` 直接放行所有接口；否则 403
-
-即"某角色被授权某接口路径，就能访问该接口"。admin 角色配一条 `('API', '*', '*')` 即可访问全部超管接口；普通用户按接口路径精确授权（最小权限原则）。`/self` 后缀表示用户自助接口（只操作自己的数据），不加 `/self` 为超管接口。
-
-### 菜单模型
-
-侧栏菜单由后端驱动，存于 `menus` 表，通过 `role_menus` 与角色关联：
-- `/manager/self` 接口返回当前用户的菜单树（按 `parent_id` 组装）
-- 前端 `Home.vue` 动态渲染，不硬编码
-- 菜单形态：有 `children` 为分组容器（点击展开）；无 `children` 且 `path` 非空为直接跳转；`path` 为空为纯标题
-- 登录后默认跳转第一个可导航菜单
-
-### 接口一览
-
-> **分页接口**：标注「分页」的接口接受 `page`（页码，1-based，<1 当 1）和 `page_size`（每页条数，默认 20，上限 100）参数，返回 `{items, total, page, page_size}` 结构。
-
-| 路径 | 说明 | 需登录 |
-|------|------|--------|
-| `POST /manager/login` | 登录，body `{account, password}`，返回 `{access_token, expires_in}` 并写 refresh cookie | 否 |
-| `POST /manager/refresh` | 刷新 access JWT + 轮换 refresh token（靠 cookie，不走 access JWT） | 否 |
-| `POST /manager/logout` | 登出，吊销当前登录链并清 cookie | 是 |
-| `POST /manager/self` | 当前用户基本信息 | 是 |
-| `POST /manager/recharge/self` | 给自己充值，body `{amount, remark}`（`userId` 由服务端注入当前用户，传入会被覆盖） | 是 |
-| `POST /manager/recharge` | 管理员充值，body `{userId, amount, remark}` | 是 |
-| `POST /manager/recharge/records` | 管理员查指定用户充值流水（分页），body `{userId, page, page_size}` | 是 |
-| `POST /manager/recharge/records/self` | 查自己的充值流水（分页），body `{page, page_size}`（`userId` 由服务端注入当前用户） | 是 |
-| `POST /manager/models` | 模型列表 | 是 |
-| `POST /manager/apikeys/list/self` | 查自己的 API Key 列表（key 脱敏） | 是 |
-| `POST /manager/apikeys/create/self` | 创建 API Key，body `{name, budget, unlimited}`，明文 key 仅本次返回 | 是 |
-| `POST /manager/apikeys/toggle/self` | 启用/禁用 API Key，body `{id}` | 是 |
-| `POST /manager/apikeys/delete/self` | 删除 API Key，body `{id}` | 是 |
-| `POST /manager/apikeys/rename/self` | 重命名 API Key，body `{id, name}` | 是 |
-| `POST /manager/apikeys/budget/self` | 修改 API Key 额度/限额模式，body `{id, budget, unlimited}`，有限额 key 总和不能超过账户余额 | 是 |
-| `POST /manager/apikeys/reveal/self` | 查看自己 API Key 明文，body `{id}`，返回 `{key, revealable}`（旧版本 key 不可还原） | 是 |
-| `POST /manager/apikeys/models/get/self` | 查自己的 Key 的模型访问策略，body `{api_key_id}`，返回 `{model_policy, model_ids}` | 是 |
-| `POST /manager/apikeys/models/set/self` | 设置自己的 Key 的模型访问策略，body `{api_key_id, model_policy(all\|whitelist), model_ids}` | 是 |
-| `POST /manager/profile/update/self` | 修改个人资料，body `{name, email}` | 是 |
-| `POST /manager/profile/password/self` | 修改密码，body `{old_password, new_password}`，需校验旧密码 | 是 |
-| `POST /manager/usage/stats/self` | Token 用量统计，body `{mode, start_date, end_date, api_key_id(可选), model(可选), provider(可选), group_by(可选: model/provider/api_key)}`，返回 `{summary:{request_count, input_tokens, output_tokens, cached_tokens, cache_miss_tokens, reasoning_tokens, total_tokens, cache_hit_rate, total_cost, avg_cost}, rows:[{label, ...}]}` | 是 |
-| `POST /manager/usage/filters/self` | 获取筛选选项（用过的 api_key / model / provider 列表）| 是 |
-
-#### 超管接口（需 admin 角色）
-
-| 路径 | 说明 |
-|------|------|
-| `POST /manager/users/list` | 用户列表（含角色），body `{keyword}` 按姓名/账号搜索 |
-| `POST /manager/users/create` | 创建用户，body `{name, account, password, budget, unlimited}` |
-| `POST /manager/users/update` | 编辑用户（账号不可改），body `{id, name, budget, unlimited}` |
-| `POST /manager/users/toggle` | 启停用户，body `{id}` |
-| `POST /manager/users/reset-password` | 重置密码，body `{id, password}` |
-| `POST /manager/users/assign-roles` | 分配角色，body `{id, role_ids}` |
-| `POST /manager/roles/list` | 角色列表 |
-| `POST /manager/providers/list` | 提供商列表 |
-| `POST /manager/providers/create` | 新增提供商，body `{type, domain, headers}` |
-| `POST /manager/providers/update` | 编辑提供商（type 不可改），body `{type, domain, headers}` |
-| `POST /manager/providers/toggle` | 启停提供商，body `{type}` |
-| `POST /manager/models/list` | 模型列表，body `{provider, model}` 模糊搜索，返回项含 `provider_model`（生效值）与 `supports_text/supports_image/supports_video` |
-| `POST /manager/models/create` | 新增模型，body `{provider, model, provider_model, pricing_config, max_context_tokens, max_completion_tokens, supports_text, supports_image, supports_video}`，`provider_model` 留空表示与 `model` 一致 |
-| `POST /manager/models/update` | 编辑模型（provider+model 不可改，`provider_model` 可改），字段同 create（无 provider/model，多 id）|
-| `POST /manager/models/delete` | 删除模型 |
-| `POST /manager/apikeys/list` | 查指定用户的 API Key，body `{user_id}` |
-| `POST /manager/apikeys/toggle` | 启停指定用户的 Key，body `{id}` |
-| `POST /manager/apikeys/delete` | 删除指定用户的 Key，body `{id}` |
-| `POST /manager/apikeys/rename` | 重命名指定用户的 Key，body `{id, name}` |
-| `POST /manager/apikeys/budget` | 修改指定用户 Key 额度，body `{id, budget, unlimited}` |
-| `POST /manager/apikeys/reveal` | 查看指定用户 Key 明文，body `{id}`，返回 `{key, revealable}` |
-| `POST /manager/apikeys/models/get` | 查指定 Key 的模型访问策略，body `{api_key_id}`，返回 `{model_policy, model_ids}` |
-| `POST /manager/apikeys/models/set` | 设置指定 Key 的模型访问策略，body `{api_key_id, model_policy(all\|whitelist), model_ids}` |
-| `POST /manager/recharge/records/list` | 全平台充值流水（分页），body `{keyword, page, page_size}` 按用户名/账号/备注搜索 |
-| `POST /manager/usage/stats` | 全局统计，body `{mode, start_date, end_date, user_id(可选), api_key_id(可选), model(可选), provider(可选), group_by(可选: user/model/provider/api_key)}` |
-| `POST /manager/usage/filters` | 全局筛选选项（含用户列表） |
-| `POST /manager/dashboard` | 仪表盘：汇总指标 + 近 7 天趋势 |
-
-> admin 角色配一条 `role_permission('API', '*', '*')` 即可访问全部超管接口。
-
-### 模型分段计费配置
-
-模型的 `pricing_config` 是版本化 JSON（当前为 `version: 2`）。单价单位均为元/百万 Token；未命中规则时使用 `default_price`。规则的 `when` 是可嵌套的 `and`/`or` 条件树，多个规则命中时选择 `priority` 最大的一条。未填写 `timezone` 时使用 `Asia/Shanghai`，时间按请求开始时刻匹配。
-
-```json
-{
-  "version": 2,
-  "timezone": "Asia/Shanghai",
-  "default_price": {
-    "input_cache_hit": 0.5,
-    "input_cache_miss": 2,
-    "output": 8
-  },
-  "rules": [
-    {
-      "name": "工作日高峰大请求",
-      "enabled": true,
-      "priority": 100,
-      "when": {
-        "op": "and",
-        "children": [
-          {"type": "weekday", "values": [1, 2, 3, 4, 5]},
-          {"op": "or", "children": [
-            {"type": "time_range", "start": "09:00", "end": "12:00"},
-            {"type": "time_range", "start": "14:00", "end": "18:00"}
-          ]},
-          {"type": "total_tokens", "operator": "gte", "value": 10000}
-        ]
-      },
-      "price": {
-        "input_cache_hit": 0.8,
-        "input_cache_miss": 3,
-        "output": 12
-      }
-    }
-  ]
-}
-```
-
-- `weekday.values` 使用 ISO 星期：周一为 `1`，周日为 `7`，多选值内部为 OR；`time_range` 是左闭右开区间。
-- 可用叶子条件：星期（`weekday`）、时间段（`time_range`）、日期（`month_day`，存储为 `MM-DD`、每年重复匹配）、请求 Token（`total_tokens`）。Token 条件的 `operator` 支持 `gt`、`gte`、`lt`、`lte`，可通过条件组组合出 OR 或区间。
-- 同一模型的规则 `name` 和 `priority` 均须唯一。每笔 `usage_records` 会保存 `matched_rule_name`、命中条件、实际单价、完整 `pricing_config`、时区和请求开始时间的 `pricing_snapshot`，其中 `request_started_at` 格式为 `yyyy-MM-dd HH:mm:ss`，用于独立审计。读取 v1 配置时会自动转换为 v2，保存后统一使用 v2 格式。
-- 上游用量按统一口径（OpenAI 语义）计费：`input_cache_hit` 对应命中缓存的输入、`input_cache_miss` 对应其余输入。Anthropic 的 `input_tokens` 只统计未命中缓存的输入，代理会把 `cache_creation_input_tokens`（缓存创建）与 `cache_read_input_tokens`（缓存读取）并入完整输入量，其中缓存读取按 `input_cache_hit` 计费、缓存创建按 `input_cache_miss` 计费（官方缓存写入加价未单独建模）。Anthropic 流式请求的用量取自 `message_delta` 的累计值，思考 token（`output_tokens_details.thinking_tokens`）作为 `reasoning_tokens` 单独统计，已包含在 `output_tokens` 内、不重复计费。
-
-已有数据库升级到本版本前，先执行以下迁移，然后在管理台重新配置每个模型；旧固定价格不会迁移。未配置计费的模型会被代理拒绝：
-
-```sql
-ALTER TABLE models ADD COLUMN pricing_config TEXT NOT NULL DEFAULT '';
-ALTER TABLE usage_records ADD COLUMN pricing_snapshot TEXT NOT NULL DEFAULT '';
-ALTER TABLE models DROP COLUMN input_cache_hit_price;
-ALTER TABLE models DROP COLUMN input_cache_miss_price;
-ALTER TABLE models DROP COLUMN output_price;
-```
-
-### 初始化管理员
-
-执行 `sql/sqlite.sql` 建表后，再执行 `sql/init-data.sql` 初始化角色、权限、菜单等种子数据（用 `INSERT OR IGNORE` 可重复执行）：
+### 4. 启动
 
 ```bash
-sqlite3 ~/.aiapi/aiapi.db < sql/sqlite.sql
-sqlite3 ~/.aiapi/aiapi.db < sql/init-data.sql
+./aiapi                         # 默认监听 :8888，数据目录 ~/.aiapi
+./aiapi --port 9000             # 指定端口
+./aiapi --address 127.0.0.1:    # 只监听本机（注意结尾的冒号）
+./aiapi --data-dir /var/lib/aiapi
 ```
 
-`init-data.sql` 包含：
-- 2 个角色：`admin`（管理员）/ `user`（普通用户）
-- admin 角色一条通配权限 `('API', '*', '*')`，放行所有超管接口
-- user 角色按接口路径精确授权（自助接口）
-- 10 条菜单及角色菜单关联
+> `--address` 是**地址前缀**，最终监听地址 = `--address` + `--port`，所以必须带结尾冒号；写 `--address 127.0.0.1` 会拼出 `127.0.0.18888` 导致监听失败。
 
-最后手动创建管理员账号（`password` 列写 bcrypt 哈希）：
+启动时会打印监听端口与数据目录；若数据库文件不存在，进程会在打印前直接报错退出（错误信息含缺失路径）。
 
-```sql
-INSERT INTO users (name, account, password, unlimited, enabled) VALUES ('管理员', 'admin', '<bcrypt-hash>', 1, 1);
-INSERT INTO user_roles (user_id, role_id) VALUES ((SELECT id FROM users WHERE account='admin'), 1);
+### 5. 第一个请求
+
+在管理台创建 Provider、模型、API Key 后（见 [管理台](#管理台)），即可调用：
+
+```bash
+curl http://localhost:8888/proxy/<provider>/openai/v1/chat/completions \
+  -H "Authorization: Bearer <你的 API Key>" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"你好"}]}'
 ```
+
+无 API Key 时任一请求都会返回 401，说明服务已就绪。
+
+### 6. 打开管理台
+
+浏览器访问 `http://localhost:8888/`，用上面创建的管理员账号登录。
+
+## 调用代理 API
+
+### 路由与鉴权
+
+```
+ANY /proxy/:provider/:format/*
+GET /proxy/:provider/:format/v1/models
+```
+
+- `:provider`：Provider 的 `type`（管理台配置的唯一标识，如 `openai`）
+- `:format`：客户端协议格式，见[支持的协议](#支持的协议)
+- `*`：转发到上游的路径。上游完整 URL = `Provider.config.domain` + `/` + 该路径，因此 `domain` 不要以 `/` 结尾
+
+鉴权头按协议不同（见上表）：`openai` / `openai-responses` 用 `Authorization: Bearer <API Key>`，`anthropic` 用 `x-api-key`。这里传的是 **aiapi 签发的 Key**，不是上游 Key。
+
+**请求头不会透传给上游**：上游请求头只取 Provider 配置里的 `config.headers`（含 `Content-Type` 与上游鉴权头）。客户端请求头仅用于提取 API Key 和写日志。
 
 ### 调用示例
 
 ```bash
-# 登录（access token 返回体，refresh token 写 cookie.jar）
-curl -c cookie.jar -X POST http://localhost:8888/manager/login \
-  -H 'Content-Type: application/json' \
-  -d '{"account":"admin","password":"你的密码"}'
-# 返回示例：{"code":0,"data":{"access_token":"eyJ...","expires_in":900}}
+# OpenAI Chat Completions
+curl http://localhost:8888/proxy/openai/openai/v1/chat/completions \
+  -H "Authorization: Bearer <key>" -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}],"stream":false}'
 
-# 刷新 access（带 refresh cookie，无需 access token）
-curl -b cookie.jar -X POST http://localhost:8888/manager/refresh
+# Anthropic Messages
+curl http://localhost:8888/proxy/anthropic/anthropic/v1/messages \
+  -H "x-api-key: <key>" -H "Content-Type: application/json" \
+  -d '{"model":"claude-sonnet-4-5","max_tokens":1024,"messages":[{"role":"user","content":"hi"}]}'
 
-# 后续业务请求需带 access token（cookie 仅用于 refresh）
-curl -b cookie.jar -H "Authorization: Bearer <access_token>" \
-  -X POST http://localhost:8888/manager/recharge \
-  -H 'Content-Type: application/json' \
-  -d '{"userId":2,"amount":10,"remark":"月度充值"}'
+# OpenAI Responses
+curl http://localhost:8888/proxy/openai/openai-responses/v1/responses \
+  -H "Authorization: Bearer <key>" -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o","input":"hi","stream":false}'
 ```
 
-> 注意：当前项目仅代理 OpenAI 兼容格式的请求。若未来需要支持非 OpenAI 的客户端协议，需新增 `parser/` 实现并在 `framework/echo.go` 或 `proxy/direct.go` 中做必要适配。
+### 流式（SSE）
 
-详细的开发规范与约定请查看 [`AGENTS.md`](./AGENTS.md)。
+把请求体的 `stream` 置为 `true`，响应即为 SSE 事件流，内容原样透传（Anthropic 的 `message_delta`、Responses 的 `response.*` 等事件不改写）。服务端不缓冲、逐块转发，**不设写超时与上游总超时**，长流不会被切断；客户端断开时通过请求 context 取消上游请求。用量在响应结束后单独解析。
 
-## 贡献指南
+### 获取可用模型列表
 
-1. Fork 本仓库
-2. 在 `main` 之外创建功能分支
-3. 保持 `AGENTS.md` 与代码同步
-4. 提交 PR 并描述变更点
+`GET .../v1/models` 是本地元数据端点：不访问上游、不计费、不写 `request_logs`，返回当前 API Key 有权访问的模型，响应格式按 `:format` 输出。
+
+```bash
+curl http://localhost:8888/proxy/openai/openai/v1/models -H "Authorization: Bearer <key>"
+# → {"object":"list","data":[{"id":"gpt-4o-mini","object":"model","created":1715000000,"owned_by":"openai"}]}
+```
+
+Anthropic 格式返回 Anthropic 的模型列表结构（`{data:[{type,id,display_name,created_at}], first_id, last_id, has_more}`）；`openai-responses` 沿用 OpenAI 形状。该端点不校验 Provider 是否存在或启用，并忽略 query 参数。
+
+### 模型名与上游模型名
+
+模型配置有两个名字，在管理台「模型管理」中维护：`model`（对用户可见：客户端调用时填、`v1/models` 返回、鉴权/白名单/计费/日志都用它）与 `provider_model`（发往上游：转发时替换请求体顶层的 `model`，留空表示与 `model` 相同）。
+
+同一 `provider_model` 可被多个别名复用（例如按不同定价分成多档）；上游响应里的 `model` 不改写；`request_logs.request_body` 记录的是**实际发往上游**的请求体，便于对照排查。
+
+### 错误响应
+
+代理链路遵循客户端协议返回错误，业务码集中在 [`proxy/types/bizcode.go`](proxy/types/bizcode.go)：
+
+| HTTP | 场景 |
+|------|------|
+| 401 | 缺少/无效 API Key，或用户被禁用 |
+| 402 | 余额或 Key 额度不足 |
+| 404 | Provider 不存在、模型不存在、模型未配置或定价非法、Key 无该模型权限（白名单无权对外统一表现为"模型不存在"） |
+| 5xx | 上游或内部错误（错误详情写入 `request_logs`） |
+
+## 管理台
+
+浏览器访问 `http://<host>:<port>/`。侧栏菜单由后端按当前用户权限动态下发，普通用户与超管看到不同页面。
+
+- **登录态**：账号密码登录，access JWT（15 分钟，走 `Authorization` 头）+ refresh token（HttpOnly cookie，滑动 7 天 / 绝对 30 天，轮换 + 重用检测）。改密/禁用/重置密码会吊销该用户全部会话。
+- **两步验证（2FA）**：在「个人设置」自助开启，扫码绑定后登录需再输验证码；TOTP 密钥加密落库。
+- **权限与菜单**：接口级权限（`role_permission` 按路径授权，`value='*'` 为超管通配）+ 菜单表驱动侧栏；`/self` 后缀为普通用户自助接口。
+
+**完整的接口清单（含请求字段与调用示例）见 [`docs/api.md`](docs/api.md)**；认证、密钥与权限模型见 [`docs/security.md`](docs/security.md)。
+
+## 配置参考
+
+### 命令行参数
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--address` | `:` | 监听地址**前缀**，最终地址 = `--address` + `--port`，必须带结尾冒号（如 `127.0.0.1:`） |
+| `--port` | `8888` | 监听端口 |
+| `--data-dir` | `~/.aiapi` | 数据根目录 |
+
+### 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `AIAPI_JWT_SECRET` | 签名密钥（access JWT / 2FA 票据），≥32 字节 |
+| `AIAPI_CRYPTO_SECRET` | 加密密钥（派生 AES 密钥，加密 TOTP 密钥、Provider 配置、API Key 原文），≥32 字节 |
+
+未配置时会自动生成随机密钥写入 `<数据目录>/keys/`（文件 0600、目录 0700）并在后续启动复用。**轮换密钥的后果**与数据目录结构见 [`docs/deployment.md`](docs/deployment.md)。
+
+### Provider 配置
+
+Provider 决定请求转发到哪里。`config.headers` 是**唯一**发往上游的请求头来源，因此必须包含上游鉴权头与 `Content-Type`。
+
+```bash
+curl -X POST http://localhost:8888/manager/providers/create \
+  -H "Authorization: Bearer <access_token>" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "type": "openai",
+    "domain": "https://api.openai.com",
+    "headers": {
+      "Authorization": ["Bearer sk-xxxxxxxx"],
+      "Content-Type": ["application/json"]
+    }
+  }'
+```
+
+| 字段 | 说明 |
+|------|------|
+| `type` | Provider 唯一标识，即 URL 中的 `:provider`；创建后不可改 |
+| `domain` | 上游基础域名，**不要以 `/` 结尾**（上游 URL = `domain` + `/` + 通配路径） |
+| `headers` | 转发到上游的请求头，值为字符串数组 |
+| `enabled` | 是否启用（管理台可切换） |
+
+`config` 落库时加密存储（兼容历史明文），接口返回脱敏后的展示值。
+
+## 部署与运维
+
+数据库为单实例 SQLite，数据目录默认 `~/.aiapi`（`db/`、`logs/`、`keys/` 三个子目录）；公网部署需在前置反代终结 TLS，并**必须转发 `X-Forwarded-Proto`**，否则 refresh cookie 不带 `Secure`。
+
+升级不会自动迁移：先备份，再按 [`sql/migrations/README.md`](sql/migrations/README.md) 执行缺失的迁移。数据库结构版本记录在 `schema_meta` 表，启动时与二进制比对，**库比二进制旧或新都会拒绝启动**。
+
+完整的反代配置、生产检查清单、日志轮转、备份、升级流程与数据表说明见 [`docs/deployment.md`](docs/deployment.md)。
+
+## 已知限制
+
+- **单实例部署**：使用本地 SQLite，多实例无法共享数据；TOTP 失败计数存在进程内存中（会话本身落库）
+- **登录接口无限流**：密码错误无锁定与速率限制，公网部署建议在反代层做限流与封禁
+- **请求/响应体全量入库**：`request_logs` 保存完整 body 且该表无索引，暂无截断与脱敏开关，注意隐私合规与表体积
+- **余额并发可透支**：先放行后扣费，高并发下余额可能变为负值
+- **Gemini 协议未实现**：`format=gemini` 的请求会被拒绝（表现为 401 `missing api key`）
+- **模型的上限与模态字段不参与校验**：`max_context_tokens`、`max_completion_tokens`、`supports_*` 目前只用于配置与展示
+- **无 CI**：测试与构建需本地执行 `make check` / `make build`
+
+其余待优化项见 [`TODO.md`](TODO.md)。
+
+## 开发
+
+开发规则（红线、边界、自检）见 [`AGENTS.md`](AGENTS.md)；**进入某个包工作时该目录的 `AGENTS.md` 会自动加载**（`frontend/` / `parser/` / `proxy/` / `manager/` / `store/` / `sql/`）。设计理由见 [`docs/decisions/`](docs/decisions/README.md)，变更记录见 [`CHANGELOG.md`](CHANGELOG.md)。
+
+```bash
+make check       # 提交前必跑：格式 + go vet + go test（含架构、权限种子、文档、schema 版本门禁）
+make test        # 只跑测试
+make dev-ui      # 前端开发模式（3000 端口，代理 /manager 到后端）
+make build-all   # 构建含前端的完整二进制
+```
 
 ## 许可证
 
-[MIT](LICENSE)（待补充）
+仓库暂未包含 LICENSE 文件。

@@ -40,6 +40,15 @@ func LogFilePath() string {
 	return filepath.Join(LogDir(), "app.log")
 }
 
+// ===== 数据库 schema 版本 =====
+//
+// SchemaVersion 是数据库结构的**唯一版本权威**：应用启动时与库里 schema_meta 表记录的版本比对，
+// 不一致会拒绝启动。用元数据表而不是 PRAGMA user_version，是为了兼容 MySQL / PostgreSQL。
+// 改动 schema 时必须同步：
+//   - sql/sqlite.sql 里 schema_meta 的版本行（store 包测试会校验两者一致）
+//   - sql/migrations/ 下新增增量迁移文件，并在 sql/migrations/README.md 登记
+const SchemaVersion = 1
+
 // ===== 密钥基础设施（跨业务共享）=====
 //
 // 环境变量名、密钥文件名、长度下限是部署契约：未来新业务配置密钥时

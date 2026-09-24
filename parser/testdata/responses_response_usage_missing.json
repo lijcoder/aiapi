@@ -1,0 +1,22 @@
+{
+  "id": "resp_67c9a1B2c3D4e5F6a7B8c9D1",
+  "object": "response",
+  "created_at": 1735689701,
+  "status": "completed",
+  "model": "gpt-4o-2024-08-06",
+  "output": [
+    {
+      "id": "msg_67c9a1B2c3D4e5F6a7B8c9D1",
+      "type": "message",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "上游未回传 usage 字段。",
+          "annotations": []
+        }
+      ]
+    }
+  ]
+}

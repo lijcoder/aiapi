@@ -1,0 +1,12 @@
+{
+  "id": "resp_67c9a1B2c3D4e5F6a7B8c9D2",
+  "object": "response",
+  "created_at": 1735689702,
+  "status": "completed",
+  "model": "gpt-4o-2024-08-06",
+  "output": [],
+  "usage": {
+    "input_tokens": 640,
+    "output_tokens": 160
+  }
+}

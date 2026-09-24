@@ -44,4 +44,3 @@ func AuthKey(ctx *types.Context) {
 	ctx.UserID = user.ID
 	ctx.ApiKeyID = key.ID
 }
-

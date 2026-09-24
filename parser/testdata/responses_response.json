@@ -1,0 +1,33 @@
+{
+  "id": "resp_67c9a1B2c3D4e5F6a7B8c9D0",
+  "object": "response",
+  "created_at": 1735689700,
+  "status": "completed",
+  "model": "gpt-4o-2024-08-06",
+  "output": [
+    {
+      "id": "msg_67c9a1B2c3D4e5F6a7B8c9D0",
+      "type": "message",
+      "status": "completed",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "反向代理是客户端与上游服务器之间的中间层。",
+          "annotations": []
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "input_tokens": 2048,
+    "output_tokens": 512,
+    "total_tokens": 2560,
+    "input_tokens_details": {
+      "cached_tokens": 1536
+    },
+    "output_tokens_details": {
+      "reasoning_tokens": 96
+    }
+  }
+}

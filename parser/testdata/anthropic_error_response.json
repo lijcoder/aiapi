@@ -1,0 +1,8 @@
+{
+  "type": "error",
+  "error": {
+    "type": "invalid_request_error",
+    "message": "max_tokens: field required"
+  },
+  "request_id": "req_011CQ9pQ2xR7sT4vW1yZ6aD3"
+}

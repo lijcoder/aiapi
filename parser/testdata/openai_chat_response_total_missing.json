@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-BnK9pQ2xR7sT4vW1yZ6aD5",
+  "object": "chat.completion",
+  "created": 1735689602,
+  "model": "gpt-4o-2024-08-06",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "上游省略了 total_tokens 字段。"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 512,
+    "completion_tokens": 128
+  }
+}

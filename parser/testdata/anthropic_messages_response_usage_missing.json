@@ -1,0 +1,14 @@
+{
+  "id": "msg_01AbC2dE3fG4hI5jK6lM7nO9",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-4-20250514",
+  "content": [
+    {
+      "type": "text",
+      "text": "上游未回传 usage 字段。"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null
+}

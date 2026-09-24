@@ -1,0 +1,14 @@
+{
+  "model": "gpt-4o-2024-08-06",
+  "input": [
+    {
+      "role": "user",
+      "content": "用一句话解释什么是反向代理。"
+    }
+  ],
+  "instructions": "You are a helpful assistant.",
+  "max_output_tokens": 1024,
+  "temperature": 0.7,
+  "stream": false,
+  "store": false
+}

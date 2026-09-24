@@ -76,6 +76,19 @@ func initStore() {
 		panic(err)
 	}
 
+	// schema 版本校验：库比二进制旧（缺迁移）或更新（二进制过旧）都拒绝启动，
+	// 避免带着不匹配的结构跑出难以定位的数据错误。未标记版本仅告警。
+	status, err := driver.CheckSchemaVersion(db, constant.SchemaVersion)
+	if err != nil {
+		slog.Error("db schema version check failed", "err", err, "doc", "sql/migrations/README.md")
+		panic(err)
+	}
+	if status == driver.SchemaUnversioned {
+		slog.Warn("db schema version is unmarked (no schema_meta row, or version <= 0); "+
+			"verify against sql/migrations/README.md and record the version in schema_meta",
+			"want", constant.SchemaVersion)
+	}
+
 	// 连接池配置
 	db.SetMaxOpenConns(10)
 	db.SetMaxIdleConns(5)

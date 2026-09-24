@@ -10,16 +10,21 @@ INSERT OR IGNORE INTO roles (id, code, name) VALUES (2, 'user',  '普通用户')
 INSERT OR IGNORE INTO role_permission (role_id, entity, action, value) VALUES
   (1, 'API', '*', '*');
 -- user 角色权限（id=2）按接口路径精确授权
+-- 注意：所有 /xxx/self 路由都必须在这里授权（arch_test.go 有门禁校验），
+-- 另外「面向普通用户但不带 /self 后缀」的路由（目前只有 /manager/models，菜单「模型列表」在用）
+-- 需要人工判断后补上——门禁推导不出这类路由。
 INSERT OR IGNORE INTO role_permission (role_id, entity, action, value) VALUES
   (2, 'API', '*', '/manager/self'),
   (2, 'API', '*', '/manager/recharge/self'),
   (2, 'API', '*', '/manager/recharge/records/self'),
+  (2, 'API', '*', '/manager/models'),
   (2, 'API', '*', '/manager/apikeys/list/self'),
   (2, 'API', '*', '/manager/apikeys/create/self'),
   (2, 'API', '*', '/manager/apikeys/toggle/self'),
   (2, 'API', '*', '/manager/apikeys/delete/self'),
   (2, 'API', '*', '/manager/apikeys/rename/self'),
   (2, 'API', '*', '/manager/apikeys/budget/self'),
+  (2, 'API', '*', '/manager/apikeys/reveal/self'),
   (2, 'API', '*', '/manager/apikeys/models/get/self'),
   (2, 'API', '*', '/manager/apikeys/models/set/self'),
   (2, 'API', '*', '/manager/profile/update/self'),
