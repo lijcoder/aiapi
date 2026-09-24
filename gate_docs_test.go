@@ -1,3 +1,14 @@
+// 门禁文件（不是行为测试）：断言**仓库自身**的文档规范与一致性，不验证生产代码的行为。
+//
+//   - 链接与锚点：所有相对链接可达
+//   - 体积预算：常驻/规则类文档不超预算（目录型文档不设预算，改由一致性门禁约束）
+//   - skill frontmatter：可被 YAML 解析且具备 name / description
+//
+// 运行方式：`make gate`（只跑门禁，等价 go test -run '^TestGate' ./...）。
+// 它同时留在 `go test ./...` 里——本仓库没有 CI，放进默认测试是让门禁不会被绕过的唯一保证。
+//
+// 约定：门禁文件以 gate_ 开头、测试函数以 TestGate 开头；其余 *_test.go 是行为测试。
+
 package main
 
 import (
@@ -44,14 +55,14 @@ var fencedBlock = regexp.MustCompile("(?s)```.*?```")
 var inlineCode = regexp.MustCompile("`[^`\n]*`")
 var headingLine = regexp.MustCompile(`(?m)^#{1,6}\s+(.*)$`)
 
-// TestSkillFrontmatterParses 校验 .agents/skills/*/SKILL.md 的 YAML frontmatter：
+// TestGateSkillFrontmatterParses 校验 .agents/skills/*/SKILL.md 的 YAML frontmatter：
 // 必须具备 name / description，且值不能使用会让 YAML 解析失败的裸标量写法。
 //
 // 起因：description 里写了 "… AGENTS.md owns: gates, schema version …" 这样含 ": " 的裸值，
 // YAML 会把它解析成嵌套 mapping（"Nested mappings are not allowed in compact mappings"），
 // 整个 skill 加载失败，而仓库里没有任何检查会发现——只有 GUI 上弹一行报错。
 // 仓库不引 YAML 依赖，这里按 YAML 对 plain scalar 的规则做最小校验（值含 ": " 必须加引号）。
-func TestSkillFrontmatterParses(t *testing.T) {
+func TestGateSkillFrontmatterParses(t *testing.T) {
 	files, err := filepath.Glob(".agents/skills/*/SKILL.md")
 	if err != nil {
 		t.Fatalf("查找 skill 失败: %v", err)
@@ -112,8 +123,8 @@ func frontmatterBlock(src string) (string, bool) {
 	return "", false
 }
 
-// TestMarkdownLinksResolve 校验文档里的相对链接与锚点。
-func TestMarkdownLinksResolve(t *testing.T) {
+// TestGateMarkdownLinksResolve 校验文档里的相对链接与锚点。
+func TestGateMarkdownLinksResolve(t *testing.T) {
 	files := markdownFiles(t)
 	if len(files) < 5 {
 		t.Fatalf("只找到 %d 个 markdown 文件，规则失效", len(files))
@@ -165,8 +176,8 @@ func TestMarkdownLinksResolve(t *testing.T) {
 	}
 }
 
-// TestDocBudgets 校验常驻文档不超过预算。
-func TestDocBudgets(t *testing.T) {
+// TestGateDocBudgets 校验常驻文档不超过预算。
+func TestGateDocBudgets(t *testing.T) {
 	for path, budget := range docBudgets {
 		info, err := os.Stat(path)
 		if err != nil {

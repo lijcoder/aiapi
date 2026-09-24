@@ -1,4 +1,4 @@
-.PHONY: install build build-all dev-ui test check fmt-check vet run clean fmt
+.PHONY: install build build-all dev-ui test gate check fmt-check vet run clean fmt
 
 install:
 	go mod tidy
@@ -16,8 +16,12 @@ dev-ui:
 test:
 	go test ./...
 
-# check 是提交前必须跑的门禁：格式 + 静态检查 + 测试。
-# 架构依赖、权限种子、文档链接/锚点/预算、schema 版本一致性都在 go test 里。
+# gate 只跑门禁：断言仓库自身的一致性（依赖方向、权限种子、接口文档↔路由、文档链接/预算、
+# schema 版本），不验证代码行为。文件以 gate_ 开头、函数以 TestGate 开头。
+gate:
+	go test -run '^TestGate' ./...
+
+# check 是提交前必须跑的：格式 + 静态检查 + 全部测试（含门禁，所以不再单独跑 gate）。
 check: fmt-check vet test
 
 fmt-check:

@@ -1,3 +1,13 @@
+// 门禁文件（不是行为测试）：断言**仓库自身**的 schema 定义与版本常量一致，不验证生产代码的行为。
+//
+//   - sql/sqlite.sql 写入 schema_meta 的版本 == constant.SchemaVersion
+//   - 整份 DDL 可重复执行，且 schema_meta 保持单行
+//
+// 运行方式：`make gate`（只跑门禁，等价 go test -run '^TestGate' ./...）。
+// 它同时留在 `go test ./...` 里——本仓库没有 CI，放进默认测试是让门禁不会被绕过的唯一保证。
+//
+// 约定：门禁文件以 gate_ 开头、测试函数以 TestGate 开头；store/driver/schema_test.go 是行为测试。
+
 package store
 
 import (
@@ -10,10 +20,10 @@ import (
 	"github.com/lijcoder/aiapi/constant"
 )
 
-// TestSchemaVersionMatchesConstant 校验 sql/sqlite.sql 写入 schema_meta 的版本
+// TestGateSchemaVersionMatchesConstant 校验 sql/sqlite.sql 写入 schema_meta 的版本
 // 与 constant.SchemaVersion 一致——这是 schema 版本的唯一权威与 DDL 之间的机械约束，
 // 改 schema 时漏改任何一处都会在这里失败。
-func TestSchemaVersionMatchesConstant(t *testing.T) {
+func TestGateSchemaVersionMatchesConstant(t *testing.T) {
 	ddl, err := os.ReadFile("../sql/sqlite.sql")
 	if err != nil {
 		t.Fatalf("读取 DDL 失败: %v", err)
@@ -38,9 +48,9 @@ func TestSchemaVersionMatchesConstant(t *testing.T) {
 	}
 }
 
-// TestSchemaDDLIsIdempotent 校验整份 DDL 可以重复执行（建表用 IF NOT EXISTS、版本行幂等写入）。
+// TestGateSchemaDDLIsIdempotent 校验整份 DDL 可以重复执行（建表用 IF NOT EXISTS、版本行幂等写入）。
 // 运维在存量库上重跑 sql/sqlite.sql 是允许的操作，不能因此报错或写入重复版本行。
-func TestSchemaDDLIsIdempotent(t *testing.T) {
+func TestGateSchemaDDLIsIdempotent(t *testing.T) {
 	ddl, err := os.ReadFile("../sql/sqlite.sql")
 	if err != nil {
 		t.Fatalf("读取 DDL 失败: %v", err)

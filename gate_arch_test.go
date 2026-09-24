@@ -1,11 +1,25 @@
+// 门禁文件（不是行为测试）：断言**仓库自身**的结构与一致性，不验证生产代码的行为。
+//
+//   - 依赖方向：各层的 import 约束（store/parser/service/handler）
+//   - 响应写入：proxy handler 不得直接写响应
+//   - 权限种子：/self 路由与 sql/init-data.sql 双向一致
+//   - 接口文档：docs/api.md 的接口表与 manager/router 双向一致
+//
+// 运行方式：`make gate`（只跑门禁，等价 go test -run '^TestGate' ./...）。
+// 它同时留在 `go test ./...` 里——本仓库没有 CI，放进默认测试是让门禁不会被绕过的唯一保证。
+//
+// 约定：门禁文件以 gate_ 开头、测试函数以 TestGate 开头；其余 *_test.go 是行为测试。
+
 package main
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -51,8 +65,8 @@ var bannedImports = []bannedImport{
 	},
 }
 
-// TestPackageDependencies 断言各层的 import 方向。
-func TestPackageDependencies(t *testing.T) {
+// TestGatePackageDependencies 断言各层的 import 方向。
+func TestGatePackageDependencies(t *testing.T) {
 	for _, rule := range bannedImports {
 		rule := rule
 		t.Run(rule.dir, func(t *testing.T) {
@@ -77,9 +91,9 @@ func TestPackageDependencies(t *testing.T) {
 	}
 }
 
-// TestProxyHandlerDoesNotWriteResponse 断言 proxy handler 不直接写响应。
+// TestGateProxyHandlerDoesNotWriteResponse 断言 proxy handler 不直接写响应。
 // 失败时只允许设置 ctx.Err / ctx.Code，由 Pipeline 统一输出（AGENTS.md RED-03）。
-func TestProxyHandlerDoesNotWriteResponse(t *testing.T) {
+func TestGateProxyHandlerDoesNotWriteResponse(t *testing.T) {
 	for _, file := range goFilesIn(t, "proxy/handler") {
 		if strings.HasSuffix(file, "_test.go") {
 			continue
@@ -96,13 +110,13 @@ func TestProxyHandlerDoesNotWriteResponse(t *testing.T) {
 	}
 }
 
-// TestRoutesHavePermissionSeed 断言后台路由与权限种子一致：
+// TestGateRoutesHavePermissionSeed 断言后台路由与权限种子一致：
 //   - 所有 /self 路由必须在 sql/init-data.sql 里授予 user 角色，否则普通用户调用直接 403
 //   - 种子里出现的路径必须是已注册路由，避免改名后留下死权限
 //
 // 覆盖范围说明：非 /self 但面向普通用户的路由（如 /manager/models）不在本规则的推导范围内，
 // 新增这类路由时需人工在 init-data.sql 授权，见 docs/howto 与 manager/AGENTS.md 的收尾清单。
-func TestRoutesHavePermissionSeed(t *testing.T) {
+func TestGateRoutesHavePermissionSeed(t *testing.T) {
 	routerSrc, err := os.ReadFile("manager/router/router.go")
 	if err != nil {
 		t.Fatalf("读取 router 失败: %v", err)
@@ -112,7 +126,10 @@ func TestRoutesHavePermissionSeed(t *testing.T) {
 		t.Fatalf("读取权限种子失败: %v", err)
 	}
 
-	routes := registeredRoutes(string(routerSrc))
+	routes, err := registeredRoutes(string(routerSrc))
+	if err != nil {
+		t.Fatalf("解析 router 失败: %v", err)
+	}
 	seeded := seededPermissions(string(seedSrc))
 	if len(routes) == 0 || len(seeded) == 0 {
 		t.Fatalf("解析结果为空（routes=%d seeded=%d），规则失效", len(routes), len(seeded))
@@ -133,34 +150,62 @@ func TestRoutesHavePermissionSeed(t *testing.T) {
 	}
 }
 
-// registeredRoutes 从 router 源码里提取 g.POST("...") 的路径，返回带 /manager 前缀的集合。
-func registeredRoutes(src string) map[string]bool {
+// docRoutePattern 匹配 docs/api.md 接口表里的行内代码写法：`POST /manager/xxx`。
+var docRoutePattern = regexp.MustCompile("`POST (/manager/[^`]+)`")
+
+// httpVerbNames 是路由注册用的方法名（echo 风格）。
+var httpVerbNames = map[string]bool{
+	"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true, "HEAD": true, "OPTIONS": true, "Any": true,
+}
+
+// registeredRoutes 解析 router 源码里注册的路由，返回带 /manager 前缀的路径集合。
+//
+// 用 AST 而不是字符串匹配：注释里的调用、换行、空格都不影响结果——字符串匹配会把
+// "注释掉的一行"当成真实路由，门禁于是静默失效。解析辅助函数本身有单测（repoparse_test.go）。
+func registeredRoutes(src string) (map[string]bool, error) {
+	f, err := parser.ParseFile(token.NewFileSet(), "router.go", src, 0)
+	if err != nil {
+		return nil, err
+	}
 	out := map[string]bool{}
-	for _, line := range strings.Split(src, "\n") {
-		line = strings.TrimSpace(line)
-		idx := strings.Index(line, `g.POST("`)
-		if idx < 0 {
-			continue
+	ast.Inspect(f, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
 		}
-		rest := line[idx+len(`g.POST("`):]
-		end := strings.Index(rest, `"`)
-		if end < 0 {
-			continue
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || !httpVerbNames[sel.Sel.Name] || len(call.Args) == 0 {
+			return true
 		}
-		out["/manager"+rest[:end]] = true
+		lit, ok := call.Args[0].(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		path, err := strconv.Unquote(lit.Value)
+		if err != nil {
+			return true
+		}
+		out["/manager"+path] = true
+		return true
+	})
+	return out, nil
+}
+
+// documentedRoutes 解析 docs/api.md 接口表里的路径（`POST /manager/xxx` 形式的行内代码）。
+func documentedRoutes(src string) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range docRoutePattern.FindAllStringSubmatch(src, -1) {
+		out[m[1]] = true
 	}
 	return out
 }
 
-// docRoutePattern 匹配 docs/api.md 接口表里的行内代码写法：`POST /manager/xxx`。
-var docRoutePattern = regexp.MustCompile("`POST (/manager/[^`]+)`")
-
-// TestAPIDocCoversAllRoutes 断言 docs/api.md 的接口表与 manager/router 的路由集合**双向一致**：
+// TestGateAPIDocCoversAllRoutes 断言 docs/api.md 的接口表与 manager/router 的路由集合**双向一致**：
 // 漏写的新接口、改名后没跟着改的旧路径都会在这里失败。
 //
 // docs/api.md 是目录型文档（长度随接口数增长），所以它不设字节预算，靠这条一致性门禁兜底——
 // 目录型文档真正的风险是"腐化"，不是"啰嗦"。
-func TestAPIDocCoversAllRoutes(t *testing.T) {
+func TestGateAPIDocCoversAllRoutes(t *testing.T) {
 	routerSrc, err := os.ReadFile("manager/router/router.go")
 	if err != nil {
 		t.Fatalf("读取 router 失败: %v", err)
@@ -170,11 +215,11 @@ func TestAPIDocCoversAllRoutes(t *testing.T) {
 		t.Fatalf("读取 docs/api.md 失败: %v", err)
 	}
 
-	routes := registeredRoutes(string(routerSrc))
-	documented := map[string]bool{}
-	for _, m := range docRoutePattern.FindAllStringSubmatch(string(docSrc), -1) {
-		documented[m[1]] = true
+	routes, err := registeredRoutes(string(routerSrc))
+	if err != nil {
+		t.Fatalf("解析 router 失败: %v", err)
 	}
+	documented := documentedRoutes(string(docSrc))
 	if len(routes) == 0 || len(documented) == 0 {
 		t.Fatalf("解析结果为空（routes=%d documented=%d），门禁失效", len(routes), len(documented))
 	}
