@@ -112,10 +112,6 @@ export function self() {
   return request('/self')
 }
 
-export function rechargeSelf(amount, remark) {
-  return request('/recharge/self', { amount, remark })
-}
-
 export function rechargeAdmin(userId, amount, remark) {
   return request('/recharge', { userId, amount, remark })
 }

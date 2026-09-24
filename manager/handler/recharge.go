@@ -31,13 +31,6 @@ type RechargeResult struct {
 	Budget float64               `json:"budget"`
 }
 
-// RechargeSelf 普通用户给自己充值
-func RechargeSelf(ctx context.Context, req *RechargeReq) (*RechargeResult, *base.BizError) {
-	cur := base.CurrentUser(ctx)
-	req.UserID = cur.ID
-	return Recharge(ctx, req)
-}
-
 // Recharge 给指定用户充值
 func Recharge(ctx context.Context, req *RechargeReq) (*RechargeResult, *base.BizError) {
 	cur := base.CurrentUser(ctx)

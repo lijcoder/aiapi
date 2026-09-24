@@ -40,7 +40,7 @@ func Xxx(ctx context.Context, req *XxxReq) (*XxxResp, *base.BizError)
 - 列表查询统一 `/list` 后缀（`/users/list`、`/providers/list`、`/models/list`、`/recharge/records/list`）。
 - 普通用户自助接口用 `/self` 后缀，超管接口不加 `/self`。
 - 存量反例（新接口不要照抄）：`/manager/models`（用户模型列表）、`/manager/apikeys/list/self`（`list` 成了中缀）、`/manager/recharge/records`（自助流水无 `/self`）。
-- self / admin 合并模式：同一业务的自助版与超管版**合并为一个通用函数**，self 入口只设 `req.UserID = cur.ID` 后委托（参考 `RechargeSelf` → `Recharge`）。现状只有 recharge 按此落地，`apikey` 仍是两份近似实现，属待收敛项。
+- self / admin 合并模式：同一业务的自助版与超管版**合并为一个通用函数**，self 入口只设 `req.UserID = cur.ID` 后委托（参考 `RechargeRecordsSelf` → `RechargeRecords`）。现状只有充值流水按此落地，`apikey` 仍是两份近似实现，属待收敛项。
 
 ## 分页
 

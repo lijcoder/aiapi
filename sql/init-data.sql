@@ -15,7 +15,6 @@ INSERT OR IGNORE INTO role_permission (role_id, entity, action, value) VALUES
 -- 需要人工判断后补上——门禁推导不出这类路由。
 INSERT OR IGNORE INTO role_permission (role_id, entity, action, value) VALUES
   (2, 'API', '*', '/manager/self'),
-  (2, 'API', '*', '/manager/recharge/self'),
   (2, 'API', '*', '/manager/recharge/records/self'),
   (2, 'API', '*', '/manager/models'),
   (2, 'API', '*', '/manager/apikeys/list/self'),
@@ -40,7 +39,7 @@ INSERT OR IGNORE INTO menus (id, parent_id, name, path, sort_order) VALUES
   (1,  0, '使用统计',     '/usage',           1),
   (2,  0, 'API 密钥',     '/apikeys',         2),
   (3,  0, '模型列表',     '/models',          3),
-  (4,  0, '充值中心',     '/recharge',        4),
+  (4,  0, '充值记录',     '/recharge',        4),
   (5,  0, '仪表盘',       '/admin/dashboard', 5),
   (6,  0, '用户管理',     '/admin/users',     6),
   (7,  0, '提供商管理', '/admin/providers', 7),
@@ -50,8 +49,10 @@ INSERT OR IGNORE INTO menus (id, parent_id, name, path, sort_order) VALUES
 INSERT OR IGNORE INTO menus (id, parent_id, name, path, sort_order) VALUES
   (11, 0, '个人设置',     '/profile',          11);
 
--- 存量库菜单名升级（原「模型定价」改名为「模型管理」）：
---   UPDATE menus SET name='模型管理' WHERE id=8;
+-- 存量库升级（种子是 INSERT OR IGNORE，改名与删除不会自动生效，升级后需手工执行一次）：
+--   UPDATE menus SET name='模型管理' WHERE id=8;   -- 原「模型定价」
+--   UPDATE menus SET name='充值记录' WHERE id=4;   -- 原「充值中心」
+--   DELETE FROM role_permission WHERE role_id=2 AND entity='API' AND value='/manager/recharge/self';
 
 -- 分配菜单给角色
 -- admin 角色（id=1）→ 全部菜单

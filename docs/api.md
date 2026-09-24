@@ -28,7 +28,6 @@
 |------|------|
 | `POST /manager/logout` | 登出（需登录态，不需接口授权） |
 | `POST /manager/self` | 当前用户信息 + 菜单树 + 权限列表 |
-| `POST /manager/recharge/self` | 给自己充值。body `{amount, remark}`（`userId` 由服务端注入） |
 | `POST /manager/recharge/records/self` | 自己的充值流水（分页） |
 | `POST /manager/models` | 可用模型列表（分页，body `{provider, model}` 模糊搜索；不含上游模型名） |
 | `POST /manager/apikeys/list/self` | 自己的 API Key 列表（分页） |
