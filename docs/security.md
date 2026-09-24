@@ -15,8 +15,8 @@
 - `manager/` 下所有需登录态的接口必须经过 `manager/middleware.Auth`：access JWT 校验 + 接口级权限判定（`role_permission(entity=API, value=path)`）+ 注入登录态；业务函数由 `base.Wrap` 做参数包装与响应输出。
 - **不挂 Auth 的接口只有三个**：`/manager/login`（无需登录态）、`/manager/login/2fa`（凭 5 分钟 pending 票据）、`/manager/refresh`（靠 refresh cookie 续期）。`logout` 挂 Auth 但不挂 Require。
 - 权限种子：超管角色 `role_permission` 中 `value='*'` 为通配权限，放行所有接口；普通用户按接口路径精确授权（最小权限原则）。**新增非超管接口必须同步 `sql/init-data.sql` 的 `role_permission`**（路径须与路由完整路径一致，含 `/manager` 前缀），否则用户调用直接 403。
-- 该义务有门禁兜底：`arch_test.go` 校验所有 `/self` 路由都已授权、且种子里没有野路径。**非 `/self` 但面向普通用户的路由推导不出来**（如 `/manager/models`），需人工判断——历史事故见 [`postmortem/2026-09-24-user-role-permission-seed-gap.md`](postmortem/2026-09-24-user-role-permission-seed-gap.md)。
-- 菜单可见性由 `menus` + `role_menus` 决定，与接口权限是两套：新增页面需同时补 `router/index.js` children、`menus` 数据与 `role_menus` 授权，否则页面不可达。
+- 该义务有门禁兜底：`gate_arch_test.go` 校验所有 `/self` 路由都已授权、且种子里没有野路径。**非 `/self` 但面向普通用户的路由推导不出来**（如 `/manager/models`），需人工判断——历史事故见 [`postmortem/2026-09-24-user-role-permission-seed-gap.md`](postmortem/2026-09-24-user-role-permission-seed-gap.md)。
+- 菜单可见性由 `menus` + `role_menus` 决定，与接口权限是两套：新增页面需同时补 `frontend/src/router/index.js` children、`menus` 数据与 `role_menus` 授权，否则页面不可达。
 
 ## 3. 登录态：双 token 机制
 

@@ -115,7 +115,7 @@ func TestGateProxyHandlerDoesNotWriteResponse(t *testing.T) {
 //   - 种子里出现的路径必须是已注册路由，避免改名后留下死权限
 //
 // 覆盖范围说明：非 /self 但面向普通用户的路由（如 /manager/models）不在本规则的推导范围内，
-// 新增这类路由时需人工在 init-data.sql 授权，见 docs/howto 与 manager/AGENTS.md 的收尾清单。
+// 新增这类路由时需人工在 init-data.sql 授权，见 manager/AGENTS.md 的「新增接口收尾清单」。
 func TestGateRoutesHavePermissionSeed(t *testing.T) {
 	routerSrc, err := os.ReadFile("manager/router/router.go")
 	if err != nil {

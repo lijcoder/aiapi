@@ -47,7 +47,7 @@ main.go / frontend.go
 constant / log：最底层，谁都可以依赖；它们不反向依赖任何业务包
 ```
 
-明确禁止的三条（新增代码由 review 把关，仓库暂无自动化拦截）：
+明确禁止的三条（前两条由 `gate_arch_test.go` 机械校验）：
 
 - `store/` 不得 import echo / manager / parser（纯 SQL 层）
 - `parser/` 不得 import store（协议层不碰数据库）
@@ -196,7 +196,7 @@ constant / log：最底层，谁都可以依赖；它们不反向依赖任何业
 | 应用不自动建库、不自动迁移 | `store/driver/sqlite.go` | DB 文件不存在直接报错；须先手工执行 `sql/sqlite.sql`（+ `sql/init-data.sql`） |
 | 客户端请求头不转发 | `proxy/handler/config.go` + `forward.go` | 上游请求头只取 `providers.config.headers`（含 `Content-Type`）；`config.domain` 不带尾斜杠，否则拼出 `//v1/...` |
 | 上游 3xx 不跟随 | `proxy/handler/forward.go` 的 `CheckRedirect` | 标准库只在跨域时剥离 `Authorization`/`Cookie` 等四个头，`x-api-key`、`api-key` 这类自定义凭证头会被转发给重定向目标。理由与代价见 [`decisions/2026-09-24-refuse-upstream-redirects.md`](decisions/2026-09-24-refuse-upstream-redirects.md) |
-| schema 版本三处一致 | `sql/sqlite.sql` 的 `schema_meta` 版本行、`constant.SchemaVersion`、`sql/migrations/` | 不一致会导致带着错误结构运行；门禁在 `store/schema_version_test.go` |
+| schema 版本三处一致 | `sql/sqlite.sql` 的 `schema_meta` 版本行、`constant.SchemaVersion`、`sql/migrations/` | 不一致会导致带着错误结构运行；门禁在 `store/gate_schema_test.go` |
 
 ## 11. 测试约定
 
@@ -220,11 +220,11 @@ constant / log：最底层，谁都可以依赖；它们不反向依赖任何业
 
 | 门禁 | 位置 | 覆盖 |
 |------|------|------|
-| 架构依赖 | `arch_test.go` | `store` 不依赖 echo/manager/parser/service；`parser` 不依赖 store 与业务层；`service` 不依赖 echo/proxy；`manager/handler` 只有 `login.go` 允许用 echo；proxy handler 不出现 `c.JSON`/`c.String` |
-| 权限种子 | `arch_test.go` | 所有 `/self` 路由必须在 `sql/init-data.sql` 给 user 角色授权；种子里的路径必须是已注册路由（非 `/self` 的普通用户路由推导不出来，仍需人工判断） |
-| 文档 | `docs_test.go` | 相对链接与锚点可达；常驻/规则类文档不超字节预算；skill 的 YAML frontmatter 可解析 |
-| 接口文档一致性 | `arch_test.go` | `docs/api.md` 的接口表与 `manager/router` 的路由集合双向一致（目录型文档不比字节，比是否腐化） |
-| schema 版本 | `store/schema_version_test.go` | `sql/sqlite.sql` 写入 `schema_meta` 的版本等于 `constant.SchemaVersion`；整份 DDL 可重复执行 |
+| 架构依赖 | `gate_arch_test.go` | `store` 不依赖 echo/manager/parser/service；`parser` 不依赖 store 与业务层；`service` 不依赖 echo/proxy；`manager/handler` 只有 `login.go` 允许用 echo；proxy handler 不出现 `c.JSON`/`c.String` |
+| 权限种子 | `gate_arch_test.go` | 所有 `/self` 路由必须在 `sql/init-data.sql` 给 user 角色授权；种子里的路径必须是已注册路由（非 `/self` 的普通用户路由推导不出来，仍需人工判断） |
+| 文档 | `gate_docs_test.go` | 相对链接与锚点可达；常驻/规则类文档不超字节预算；skill 的 YAML frontmatter 可解析 |
+| 接口文档一致性 | `gate_arch_test.go` | `docs/api.md` 的接口表与 `manager/router` 的路由集合双向一致（目录型文档不比字节，比是否腐化） |
+| schema 版本 | `store/gate_schema_test.go` | `sql/sqlite.sql` 写入 `schema_meta` 的版本等于 `constant.SchemaVersion`；整份 DDL 可重复执行 |
 
 新增一条可机械判定的规则时，优先写成门禁，文档里只留一句指路（见 [`AGENTS.md`](AGENTS.md) 的放置判定）。
 

@@ -3,7 +3,7 @@
 本文件补充仓库级规则 [`../AGENTS.md`](../AGENTS.md)，只写 `store/` 特有的约定。
 DDL 规范与迁移在 [`../sql/AGENTS.md`](../sql/AGENTS.md)。
 
-`store/` 是纯 SQL 包装层：**单表读写 + 只读 JOIN/聚合**，不写跨表写操作、不写事务体、不写业务判断、不放纯函数业务工具。这些有门禁校验（根目录 `arch_test.go`），越界会编译期失败。
+`store/` 是纯 SQL 包装层：**单表读写 + 只读 JOIN/聚合**，不写跨表写操作、不写事务体、不写业务判断、不放纯函数业务工具。这些有门禁校验（根目录 `gate_arch_test.go`），越界会编译期失败。
 
 ## 边界判定
 
@@ -32,4 +32,4 @@ DDL 规范与迁移在 [`../sql/AGENTS.md`](../sql/AGENTS.md)。
 
 ## 测试
 
-数据层测试自建内存 SQLite 并先调 `store.Init(db)`，不要连真实数据目录。改动列结构时同步 [`../sql/sqlite.sql`](../sql/sqlite.sql)（`store/schema_test.go` 与 `store/schema_version_test.go` 会校验 DDL 与模型/版本号一致）。
+数据层测试自建内存 SQLite 并先调 `store.Init(db)`，不要连真实数据目录。改动列结构时同步 [`../sql/sqlite.sql`](../sql/sqlite.sql)（`store/schema_test.go` 与 `store/gate_schema_test.go` 会校验 DDL 与模型/版本号一致）。

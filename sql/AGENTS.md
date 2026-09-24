@@ -11,7 +11,7 @@ Go 侧的数据访问写法见 [`../store/AGENTS.md`](../store/AGENTS.md)。
 | [`init-data.sql`](init-data.sql) | 种子数据：角色、权限、菜单、角色菜单。用 `INSERT OR IGNORE`，**可重复执行** |
 | [`migrations/README.md`](migrations/README.md) | 迁移台账：版本表、每版增量 SQL、升级流程 |
 
-**版本权威是 `constant.SchemaVersion`**，启动时与库里 `schema_meta` 表的版本行比对，不一致拒绝启动。`store/schema_version_test.go` 校验 DDL 写入的版本与常量一致，并校验整份 DDL 可重复执行。
+**版本权威是 `constant.SchemaVersion`**，启动时与库里 `schema_meta` 表的版本行比对，不一致拒绝启动。`store/gate_schema_test.go` 校验 DDL 写入的版本与常量一致，并校验整份 DDL 可重复执行。
 
 **为什么用元数据表而不是 `PRAGMA user_version`**：本项目要兼容 MySQL / PostgreSQL，而 `user_version` 是 SQLite 专有（MySQL 没有等价物）。`schema_meta` 是三者的公共做法，Go 侧读取只有一条 `SELECT version FROM schema_meta WHERE id = 1`，不按驱动分支。新增其它数据库的 DDL 时，只有建表语句与写入版本行的语法不同（SQLite/PG 用 `INSERT ... SELECT ... WHERE NOT EXISTS`，MySQL 需要 `FROM DUAL`）。
 

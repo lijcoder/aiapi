@@ -13,7 +13,7 @@
 1. 重构文档时逐条核对 `manager/router/router.go` 与 `sql/init-data.sql`，发现两边条数对不上。
 2. 确认两条路由已在 router 注册（`/manager/models`、`/manager/apikeys/reveal/self`），但种子里的 user 角色权限列表没有它们。
 3. 另发现前端确实会调用：`frontend/src/views/ApiKeys.vue` 的「查看」按钮走 `/apikeys/reveal/self`，说明不是"预留但未使用"的接口。
-4. 补种子，并加上 `arch_test.go` 的双向校验门禁。
+4. 补种子，并加上 `gate_arch_test.go`（当时名为 `arch_test.go`）的双向校验门禁。
 
 ## 根因
 
@@ -31,7 +31,7 @@
 
 ## 护栏
 
-- `arch_test.go` 的 `TestRoutesHavePermissionSeed`：**双向**校验——所有 `/self` 路由必须在 user 角色种子里；种子里出现的路径必须是已注册路由（防改名后留下死权限）。已用变异验证：删掉一行种子，测试立即失败。
+- `gate_arch_test.go` 的 `TestGateRoutesHavePermissionSeed`（当时分别为 `arch_test.go` 与 `TestRoutesHavePermissionSeed`）：**双向**校验——所有 `/self` 路由必须在 user 角色种子里；种子里出现的路径必须是已注册路由（防改名后留下死权限）。已用变异验证：删掉一行种子，测试立即失败。
 - `sql/init-data.sql` 在权限块上方写明义务，并指出门禁位置。
 - 收尾清单进入 [`../../manager/AGENTS.md`](../../manager/AGENTS.md)。
 

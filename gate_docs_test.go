@@ -29,7 +29,7 @@ import (
 // 只给这一类设预算的原因：它们膨胀意味着"写啰嗦了"，超限的正确反应是把细节下沉。
 // 而**目录型参考文档**（如 docs/api.md：一行一个接口，长度随接口数线性增长）不设预算——
 // 给它设上限等于给接口数量设上限。这类文档改用"与源头一致性"门禁：
-//   - docs/api.md ↔ manager/router/router.go 的路由集合（arch_test.go 的 TestAPIDocCoversAllRoutes）
+//   - docs/api.md ↔ manager/router/router.go 的路由集合（gate_arch_test.go 的 TestGateAPIDocCoversAllRoutes）
 var docBudgets = map[string]int{
 	"AGENTS.md":                9500,
 	"README.md":                17000,

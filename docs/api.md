@@ -3,7 +3,7 @@
 > `/manager` 下的全部接口。认证与权限模型见 [`security.md`](security.md)，接口开发规范见 [`../manager/AGENTS.md`](../manager/AGENTS.md)。
 > 面向使用者的快速上手在 [`../README.md`](../README.md)。
 >
-> 本文件是目录型参考：**接口表与 `manager/router/router.go` 双向校验**（`arch_test.go` 的 `TestAPIDocCoversAllRoutes`）——
+> 本文件是目录型参考：**接口表与 `manager/router/router.go` 双向校验**（`gate_arch_test.go` 的 `TestGateAPIDocCoversAllRoutes`）——
 > 新增或改名路由后忘了同步这里会直接测试失败，所以它不设字节预算，只管跟着接口走。
 
 ## 约定

@@ -2,7 +2,7 @@
 
 本文件补充仓库级规则 [`../AGENTS.md`](../AGENTS.md)，只写 `parser/` 特有的约定。
 
-`parser/` 只做协议相关的解析与提取：**不操作数据库、不写响应、不依赖 store**（有门禁校验，见根目录 `arch_test.go`）。协议无关的纯工具放 `parser/util/`（无状态纯函数，且不反向依赖 `parser`）。
+`parser/` 只做协议相关的解析与提取：**不操作数据库、不写响应、不依赖 store**（有门禁校验，见根目录 `gate_arch_test.go`）。协议无关的纯工具放 `parser/util/`（无状态纯函数，且不反向依赖 `parser`）。
 
 ## 现状
 

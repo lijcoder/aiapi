@@ -42,7 +42,7 @@
 
 - **现状**：`parser/openai.go` 的非流式 `ParseUsage` 直接取上游 `total_tokens`，**不做回退**（回退函数 `openaiTotalTokens` 只在流式路径被调用）；而 `parser/AGENTS.md` 的口径表与 CHANGELOG 声明「优先上游值，缺省回退 输入 + 输出」，Responses 非流式确实回退。
 - **风险 / 影响**：上游省略 `total_tokens` 时 `usage_records.total_tokens = 0`，而该字段参与分段计费的条件匹配，可能命中错误的计费规则；同一场景流式却会回退。
-- **方案**：非流式也走 `openaiTotalTokens` 回退。golden fixture（`parser/testdata/openai_response_total_missing.json`）已就绪，改完直接补断言。
+- **方案**：非流式也走 `openaiTotalTokens` 回退。golden fixture（`parser/testdata/openai_chat_response_total_missing.json`）已就绪，改完直接补断言。
 - **关联**：`parser/openai.go`、`parser/golden_openai_test.go`。
 
 ### 7. 非流式「上游没给 usage」被记成 0 用量

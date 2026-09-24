@@ -65,5 +65,5 @@ return &base.PageResult[T]{Items: items, Total: pc.Total, Page: pc.Page, PageSiz
 - [ ] 失败路径（非法参数、越权、资源不存在）有单测
 - [ ] `README.md` 接口说明与 `CHANGELOG.md` 同步
 
-> 权限种子有门禁兜底：`arch_test.go` 的 `TestRoutesHavePermissionSeed` 校验所有 `/self` 路由都已授权、且种子里没有已删除路由的死权限。
+> 权限种子有门禁兜底：`gate_arch_test.go` 的 `TestGateRoutesHavePermissionSeed` 校验所有 `/self` 路由都已授权、且种子里没有已删除路由的死权限。
 > **覆盖边界**：非 `/self` 但面向普通用户的路由（如 `/manager/models`）推导不出来，必须人工判断。历史事故见 [`../docs/postmortem/2026-09-24-user-role-permission-seed-gap.md`](../docs/postmortem/2026-09-24-user-role-permission-seed-gap.md)。
