@@ -23,7 +23,17 @@ import (
 //     （慢模型可能数分钟才吐第一个 token），任何固定死线都会误杀健康长流
 //   - 连接生命周期由请求 context 控制（客户端断开即取消，见 NewRequestWithContext）
 //   - 只对「建连/TLS 握手」这类有合理上限的阶段设超时
+//
+// 重定向设计：拒绝跟随上游 3xx，直接把它透传给客户端。
+// 标准库只在跨域时剥离 Authorization / Www-Authenticate / Cookie / Cookie2
+// （net/http/client.go 的 shouldCopyHeaderOnRedirect），而本项目的上游凭证放在
+// providers.config.headers 里，常见形态是 Anthropic 的 x-api-key、Azure 的 api-key——
+// 这些自定义头会被原样转发到重定向目标，等于把上游密钥交给第三方。
+// 因此这里返回 ErrUseLastResponse：不发起第二次请求，3xx 原样返回。
 var upstreamClient = &http.Client{
+	CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
 	Transport: &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
