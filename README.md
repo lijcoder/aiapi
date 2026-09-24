@@ -269,6 +269,7 @@ curl -X POST http://localhost:8888/manager/providers/create \
 开发规则（红线、边界、自检）见 [`AGENTS.md`](AGENTS.md)；**进入某个包工作时该目录的 `AGENTS.md` 会自动加载**（`frontend/` / `parser/` / `proxy/` / `manager/` / `store/` / `sql/`）。设计理由见 [`docs/decisions/`](docs/decisions/README.md)，变更记录见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 ```bash
+make hooks       # 每个 clone 跑一次：启用 .githooks/pre-commit，提交前自动跑 make check
 make check       # 提交前必跑：格式 + go vet + go test（含架构、权限种子、文档、schema 版本门禁）
 make test        # 只跑测试
 make dev-ui      # 前端开发模式（3000 端口，代理 /manager 到后端）

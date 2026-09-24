@@ -11,6 +11,7 @@ description: "Use when preparing or reviewing a release, upgrade, or schema chan
 ## 1. 改完代码后的门禁
 
 ```bash
+make hooks    # 每个 clone 只跑一次：启用 .githooks/pre-commit，提交前自动跑 make check
 make check    # gofmt 检查 + go vet + go test（含架构/权限种子/文档/schema 版本门禁）
 make build
 ```
@@ -48,4 +49,4 @@ make build
 
 - 提交信息用 Conventional Commits：`<type>(<scope>): <中文描述>`，破坏性变更加 `!`（如 `feat(proxy)!:`）。
 - 破坏性变更要同时更新 `README.md` 的升级说明与 `CHANGELOG.md`。
-- 提交前再跑一次 `make check`；门禁失败不要用跳过的方式绕过（改了 schema 却忘了同步常量，正是门禁要拦的情况）。
+- 提交前再跑一次 `make check`；门禁失败不要用跳过的方式绕过（改了 schema 却忘了同步常量，正是门禁要拦的情况）。装了钩子后这一步会自动发生；`git commit --no-verify` 能跳过它，用一次等于放弃一次门禁。

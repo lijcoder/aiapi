@@ -16,6 +16,7 @@
 | 目的 | 命令 |
 |------|------|
 | 安装依赖 | `make install`（`go mod tidy`） |
+| 启用预提交门禁 | `make hooks`（提交前自动跑 `make check`；每个 clone 各跑一次） |
 | 跑测试 | `make test`（等价 `go test ./...`） |
 | 全量检查 | `make check`（格式 + vet + 测试，含所有门禁） |
 | 构建 | `make build` |
@@ -25,7 +26,7 @@
 | 格式化 | `make fmt` |
 
 - **工具链**：Go 版本以 `go.mod` 为准（当前 1.25.4）；前端 Vue 3 + Vite，Node 需 18 / 20 / 22+（Vite 6 要求）。
-- **仓库没有 CI、没有 linter**，但部分红线由 `go test` 里的门禁机械保证：架构依赖与权限种子（`gate_arch_test.go`）、文档链接/锚点/体积（`gate_docs_test.go`）、schema 版本一致性（`store/gate_schema_test.go`）。其余靠自觉，改完必须本地 `make check`。
+- **仓库没有 CI、没有 linter**，但部分红线由 `go test` 里的门禁机械保证：架构依赖、权限种子与预提交钩子的接线（`gate_arch_test.go`）、文档链接/锚点/体积（`gate_docs_test.go`）、schema 版本一致性（`store/gate_schema_test.go`）。`make hooks` 把 `make check` 挂到 pre-commit——`core.hooksPath` 不入库，**每个 clone 各执行一次**，否则门禁只在手动跑时生效。
 - **提交信息**：Conventional Commits，`<type>(<scope>): <中文描述>`，破坏性变更加 `!`（如 `feat(proxy)!:`）；type 用 feat / fix / refactor / docs / style / chore / perf。
 - **禁改与生成物**：根目录 `aiapi` 二进制、`frontend/dist/assets` 是构建物；`frontend/dist/index.html` 被 git 跟踪且是 `go:embed all:frontend/dist` 的必需文件，**不可删除**。临时草稿放 `temp/`（已忽略）。
 - **文档分工**：规则 → 本文件 + `docs/`；用法 → `README.md`；变更历史 → `CHANGELOG.md`；已识别未实施的优化 → `TODO.md`。

@@ -4,9 +4,11 @@
 //   - 响应写入：proxy handler 不得直接写响应
 //   - 权限种子：/self 路由与 sql/init-data.sql 双向一致
 //   - 接口文档：docs/api.md 的接口表与 manager/router 双向一致
+//   - 预提交门禁：.githooks/pre-commit 存在、可执行且仍调用 make check
 //
 // 运行方式：`make gate`（只跑门禁，等价 go test -run '^TestGate' ./...）。
-// 它同时留在 `go test ./...` 里——本仓库没有 CI，放进默认测试是让门禁不会被绕过的唯一保证。
+// 它同时留在 `go test ./...` 里——本仓库没有 CI，默认测试（谁跑都全跑）加上
+// `make hooks` 启用的 pre-commit 钩子（默认提交路径自动跑）是门禁不会被绕过的两道保证。
 //
 // 约定：门禁文件以 gate_ 开头、测试函数以 TestGate 开头；其余 *_test.go 是行为测试。
 
@@ -255,6 +257,44 @@ func seededPermissions(src string) map[string]bool {
 		}
 	}
 	return out
+}
+
+// TestGateGitHooksIsWired 断言预提交门禁仍挂在默认提交路径上（AGENTS.md RED-01）。
+//
+// 仓库没有 CI，`go test` 里的门禁只有"有人跑"才生效；`.githooks/pre-commit` +
+// `core.hooksPath` 是唯一不依赖自觉的触发点。本门禁防止它被删除、被去掉可执行位
+// （git 会静默跳过）、被改成空操作，或安装路径与钩子目录脱钩：
+//   - `.githooks/pre-commit` 存在、可执行、仍调用 `make check`
+//   - `Makefile` 的 hooks 目标把 core.hooksPath 指向 `.githooks`
+//
+// 覆盖边界：本门禁只看仓库内的接线，**不看本机是否执行过 `make hooks`**——core.hooksPath
+// 存在本地 .git/config（不入库），判它会让全新 clone 与将来的 CI 误报。本地未启用时
+// `make check` 末尾会提示。
+func TestGateGitHooksIsWired(t *testing.T) {
+	const hookPath = ".githooks/pre-commit"
+
+	info, err := os.Stat(hookPath)
+	if err != nil {
+		t.Fatalf("%s 不存在：预提交门禁被删除或改名（AGENTS.md RED-01）", hookPath)
+	}
+	if info.Mode().Perm()&0o111 == 0 {
+		t.Errorf("%s 没有可执行位（mode %v）：git 会静默跳过它，门禁等于没装", hookPath, info.Mode().Perm())
+	}
+	src, err := os.ReadFile(hookPath)
+	if err != nil {
+		t.Fatalf("读取 %s 失败: %v", hookPath, err)
+	}
+	if !strings.Contains(string(src), "make check") {
+		t.Errorf("%s 不再调用 make check（只留注释也算）：钩子被架空，提交时什么都不会拦", hookPath)
+	}
+
+	mk, err := os.ReadFile("Makefile")
+	if err != nil {
+		t.Fatalf("读取 Makefile 失败: %v", err)
+	}
+	if !strings.Contains(string(mk), "core.hooksPath .githooks") {
+		t.Errorf("Makefile 的 hooks 目标必须执行 `git config core.hooksPath .githooks`；路径与钩子目录脱钩时，改了钩子也不会生效")
+	}
 }
 
 // goFilesIn 返回目录下（含子目录）的所有 .go 文件。

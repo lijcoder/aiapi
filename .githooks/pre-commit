@@ -1,0 +1,30 @@
+#!/bin/sh
+# pre-commit 门禁：提交前跑 `make check`（gofmt + go vet + 全量测试，含所有 TestGate* 断言）。
+#
+# 安装：`make hooks`（把 core.hooksPath 指向本目录，幂等，可重复执行）。
+# 为什么在这里：仓库没有 CI，`go test` 里的门禁只有"有人跑"才生效；挂到 pre-commit 是
+# 唯一不依赖自觉的触发点。理由见 docs/architecture.md §11。
+# 跳过：`git commit --no-verify`——只应在确知原因时使用，跳过即等于本次放弃门禁。
+# 本文件的存在、可执行与"仍调用 make check"由 gate_arch_test.go 的 TestGateGitHooksInstalled 保证。
+
+set -u
+
+root=$(git rev-parse --show-toplevel) || {
+	echo "pre-commit: 不在 git 仓库内，无法定位仓库根目录" >&2
+	exit 1
+}
+cd "$root" || exit 1
+
+if ! command -v go >/dev/null 2>&1; then
+	echo "pre-commit: 未找到 go，无法跑门禁（make check 需要 Go，版本见 go.mod）" >&2
+	echo "           装好 Go 后重试；确需提交用 git commit --no-verify（本次放弃门禁）" >&2
+	exit 1
+fi
+
+echo "pre-commit: make check（gofmt + go vet + 测试，含门禁）"
+if ! make check; then
+	echo "" >&2
+	echo "pre-commit: 门禁未通过，提交已中止。" >&2
+	echo "           修好后重试；确需跳过用 git commit --no-verify。" >&2
+	exit 1
+fi
