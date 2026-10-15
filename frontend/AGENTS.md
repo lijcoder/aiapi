@@ -35,7 +35,7 @@
 
 | 模块 | 路径 | 职责 |
 |------|------|------|
-| 工具函数 | `frontend/src/utils.js` | `fix4`（金额格式化，4 位小数去尾 0）、`formatTime`（时间格式化） |
+| 工具函数 | `frontend/src/utils.js` | `fix4`（金额格式化，4 位小数去尾 0）、`formatTime`（时间格式化）、`copyText`（复制到剪贴板，非安全上下文回退 `execCommand`，返回是否成功）。**不要直接调 `navigator.clipboard`**：明文 HTTP 访问时它不存在，复制必然失败 |
 | 图表选项 | `frontend/src/charts.js` | ECharts option 构建器、`metricConfig` 指标配置 |
 | 图表生命周期 | `frontend/src/composables/useChart.js` | ECharts init/resize/dispose，`watch` 数据自动重绘 |
 | 分页逻辑 | `frontend/src/composables/usePagination.js` | `n-data-table` 远程分页通用逻辑（`pagination`/`onPage`/`onPageSize`/`resetAndLoad`），含 `showTotal` 与 `showSizePicker` |

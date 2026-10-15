@@ -39,16 +39,16 @@
       </template>
     </n-modal>
 
-    <!-- 创建成功弹窗：明文 key 只展示这一次 -->
-    <n-modal v-model:show="showPlain" preset="card" title="密钥创建成功" style="width:560px" :mask-closable="false" :close-on-esc="false">
+    <!-- 明文弹窗：创建成功后展示，或「复制明文」被浏览器拒绝时兜底展示 -->
+    <n-modal v-model:show="showPlain" preset="card" :title="plainTitle" style="width:560px" :mask-closable="false" :close-on-esc="false" @after-enter="selectPlain">
       <n-alert type="warning" :show-icon="true" style="margin-bottom:12px">
-        请立即复制保存，关闭后将无法再次查看完整密钥。
+        {{ plainTip }}
       </n-alert>
-      <n-input :value="plainKey" readonly type="text" />
+      <n-input ref="plainInputRef" :value="plainKey" readonly type="text" />
       <template #footer>
         <n-space justify="end">
           <n-button @click="copyPlain">复制</n-button>
-          <n-button type="primary" @click="showPlain=false">我已保存</n-button>
+          <n-button type="primary" @click="showPlain=false">{{ plainOkText }}</n-button>
         </n-space>
       </template>
     </n-modal>
@@ -99,14 +99,14 @@
 </template>
 
 <script setup>
-import { ref, h, onMounted, computed } from 'vue'
+import { ref, h, onMounted, computed, nextTick } from 'vue'
 import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NAlert, NTag, NIcon, NTooltip, NDropdown, NRadioGroup, NRadio, useMessage, useDialog } from 'naive-ui'
 import { CreateOutline, CopyOutline } from '@vicons/ionicons5'
 import { listMyApiKeys, createApiKey, toggleApiKey, deleteApiKey, renameApiKey, updateApiKeyBudget, revealApiKey } from '../api'
 import { usePagination } from '../composables/usePagination'
 import ModelAccessDialog from '../components/ModelAccessDialog.vue'
 import { useUser } from '../stores/user'
-import { fix4, formatTime } from '../utils'
+import { fix4, formatTime, copyText } from '../utils'
 
 const message = useMessage()
 const dialog = useDialog()
@@ -120,6 +120,10 @@ const showCreate = ref(false)
 const showPlain = ref(false)
 const showRename = ref(false)
 const plainKey = ref('')
+const plainTitle = ref('密钥创建成功')
+const plainTip = ref('请立即复制保存，关闭后将无法再次查看完整密钥。')
+const plainOkText = ref('我已保存')
+const plainInputRef = ref(null)
 const creating = ref(false)
 const createMsg = ref('')
 const form = ref({ name: '', budget: 0, mode: 'limited' })
@@ -250,6 +254,9 @@ async function doCreate() {
       form.value.mode === 'unlimited'
     )
     plainKey.value = data.apiKey.key
+    plainTitle.value = '密钥创建成功'
+    plainTip.value = '请立即复制保存，关闭后将无法再次查看完整密钥。'
+    plainOkText.value = '我已保存'
     showCreate.value = false
     showPlain.value = true
     await loadKeys()
@@ -260,13 +267,15 @@ async function doCreate() {
   }
 }
 
+// 明文弹窗出现后自动全选，用户直接 Ctrl+C 即可（内容只读，选中不会误改）
+async function selectPlain() {
+  await nextTick()
+  plainInputRef.value?.select()
+}
+
 async function copyPlain() {
-  try {
-    await navigator.clipboard.writeText(plainKey.value)
-    message.success('已复制')
-  } catch {
-    message.error('复制失败，请手动选中复制')
-  }
+  if (await copyText(plainKey.value)) message.success('已复制')
+  else message.error('复制失败，请手动选中复制')
 }
 
 async function onReveal(r) {
@@ -276,12 +285,17 @@ async function onReveal(r) {
       message.warning('该密钥为旧版本创建，无法查看明文，请新建')
       return
     }
-    try {
-      await navigator.clipboard.writeText(data.key)
+    if (await copyText(data.key)) {
       message.success('已复制明文')
-    } catch {
-      message.error('复制失败，请稍后重试')
+      return
     }
+    // 自动复制失败（浏览器拒绝剪贴板，常见于明文 HTTP 下的 Safari）时把明文展示出来，让用户手动复制
+    plainKey.value = data.key
+    plainTitle.value = 'API 密钥明文'
+    plainTip.value = '自动复制被浏览器拒绝。下方内容已全选，直接按 Ctrl+C 复制（用 HTTPS 访问管理台可恢复自动复制）。'
+    plainOkText.value = '关闭'
+    showPlain.value = true
+    message.warning('自动复制失败，请手动复制')
   } catch (e) {
     message.error(e.msg || '复制失败')
   }

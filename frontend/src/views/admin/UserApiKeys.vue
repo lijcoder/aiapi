@@ -47,6 +47,19 @@
         </n-space>
       </template>
     </n-modal>
+    <!-- 明文弹窗：「复制明文」被浏览器拒绝时兜底展示，供手动复制 -->
+    <n-modal v-model:show="showPlain" preset="card" title="API 密钥明文" style="width:560px" :mask-closable="false" :close-on-esc="false" @after-enter="selectPlain">
+      <n-alert type="warning" :show-icon="true" style="margin-bottom:12px">
+        自动复制被浏览器拒绝。下方内容已全选，直接按 Ctrl+C 复制（用 HTTPS 访问管理台可恢复自动复制）。
+      </n-alert>
+      <n-input ref="plainInputRef" :value="plainKey" readonly type="text" />
+      <template #footer>
+        <n-space justify="end">
+          <n-button @click="copyPlain">复制</n-button>
+          <n-button type="primary" @click="showPlain=false">关闭</n-button>
+        </n-space>
+      </template>
+    </n-modal>
     <!-- 模型权限弹窗 -->
     <ModelAccessDialog
       v-model:visible="showModelAccess"
@@ -59,14 +72,14 @@
 </template>
 
 <script setup>
-import { ref, h, computed, onMounted } from 'vue'
+import { ref, h, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NTag, NIcon, NTooltip, NDropdown, NRadioGroup, NRadio, NBreadcrumb, NBreadcrumbItem, useMessage, useDialog } from 'naive-ui'
+import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NAlert, NTag, NIcon, NTooltip, NDropdown, NRadioGroup, NRadio, NBreadcrumb, NBreadcrumbItem, useMessage, useDialog } from 'naive-ui'
 import { CreateOutline, CopyOutline } from '@vicons/ionicons5'
 import { listUserApiKeys, toggleUserApiKey, deleteUserApiKey, renameUserApiKey, updateUserApiKeyBudget, revealUserApiKey, getUser } from '../../api'
 import { usePagination } from '../../composables/usePagination'
 import ModelAccessDialog from '../../components/ModelAccessDialog.vue'
-import { fix4, formatTime } from '../../utils'
+import { fix4, formatTime, copyText } from '../../utils'
 
 const route = useRoute()
 const router = useRouter()
@@ -92,6 +105,11 @@ const budgetMode = ref('limited')
 const budgetVal = ref(0)
 const budgetMax = ref(0)
 const savingBudget = ref(false)
+
+// 明文弹窗（自动复制失败时兜底展示）
+const showPlain = ref(false)
+const plainKey = ref('')
+const plainInputRef = ref(null)
 
 // 模型权限弹窗
 const showModelAccess = ref(false)
@@ -170,15 +188,29 @@ async function onReveal(r) {
       message.warning('该密钥为旧版本创建，无法查看明文，请新建')
       return
     }
-    try {
-      await navigator.clipboard.writeText(data.key)
+    if (await copyText(data.key)) {
       message.success('已复制明文')
-    } catch {
-      message.error('复制失败，请稍后重试')
+      return
     }
+    // 自动复制失败（浏览器拒绝剪贴板，常见于明文 HTTP 下的 Safari）时把明文展示出来，让用户手动复制
+    plainKey.value = data.key
+    showPlain.value = true
+    message.warning('自动复制失败，请手动复制')
   } catch (e) {
     message.error(e.msg || '复制失败')
   }
+}
+
+// 明文弹窗出现后自动全选，用户直接 Ctrl+C 即可（内容只读，选中不会误改）
+async function selectPlain() {
+  await nextTick()
+  plainInputRef.value?.select()
+}
+
+// copyPlain 兜底弹窗里的复制按钮
+async function copyPlain() {
+  if (await copyText(plainKey.value)) message.success('已复制')
+  else message.error('复制失败，请手动选中复制')
 }
 
 async function loadUserInfo() {
