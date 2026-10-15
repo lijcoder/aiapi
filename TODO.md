@@ -59,6 +59,21 @@
 - **方案**：按事件聚合 data 行后再回调。fixture `anthropic_messages_stream_multiline_data.sse` 已固化当前行为，改后需同步更新断言。
 - **关联**：`parser/util/sse.go`、`parser/testdata/`。
 
+### 9. deferred 事务内「先读后写」在 WAL 下会随机 BUSY
+
+- **现状**：`Transaction` 用 `BEGIN DEFERRED`（`store/base/session.go`），DSN 为 WAL + `_busy_timeout=5000`（`store/driver/sqlite.go`）；WAL 下事务内**先读后写**在写锁升级时命中 `SQLITE_BUSY_SNAPSHOT`，`busy_timeout` 对它无效。存量写法见 `service/auth.go` 的 `rotate()`（事务内先 `GetByToken` 再删旧建新）。
+- **风险 / 影响**：并发刷新 token 时该事务可能随机报 `database is locked`（一次刷新失败，无脏数据、重试可用）。
+- **方案**：① 事务体只写或先写后读（`service/charge.go` 已是此形，见 `docs/architecture.md` §6）；② DSN 加 `_txlock=immediate`（实测失败归零，但所有事务起手取写锁、改全局语义，需先写决策记录）；③ 对 BUSY 做有限重试。
+- **前置条件**：并发刷新 / 创建量上来，或再出现「事务内先读后写」的新写法时。
+- **关联**：`store/base/session.go`、`store/driver/sqlite.go`、`service/auth.go`。
+
+### 10. 创建用户响应里的 `created_at` 恒为零值
+
+- **现状**：`store/user.go` 的 `Create` 只发 `INSERT`，不回读 `created_at`，`POST /manager/users/create` 因此返回 `0001-01-01T00:00:00Z`（列表接口正常）。属存量问题，本次未改。
+- **风险 / 影响**：仅该响应字段失真；管理台创建后立即重新拉列表，界面不受影响。
+- **方案**：`Create` 后补一次 `GetByID`，或 INSERT 时显式写 `created_at`。
+- **关联**：`store/user.go`、`manager/handler/user.go`。
+
 ## 登记格式
 
 新增时按上面格式追加，编号递增（不复用旧编号）：

@@ -53,7 +53,7 @@
 |------|------|
 | `POST /manager/users/list` | 用户列表（分页，body `{keyword}` 按姓名/账号搜索） |
 | `POST /manager/users/get` | 用户详情。body `{id}` |
-| `POST /manager/users/create` | 创建用户。body `{name, account, password, budget, unlimited}` |
+| `POST /manager/users/create` | 创建用户。body `{name, account, password, budget, unlimited, role_ids}`（`role_ids` 可选，为空则建出无角色用户；含不存在的角色 id 时返回「角色不存在」，且不创建用户） |
 | `POST /manager/users/update` | 编辑用户（账号不可改）。body `{id, name, budget, unlimited}` |
 | `POST /manager/users/toggle` | 启停用户。body `{id}` |
 | `POST /manager/users/reset-password` | 重置密码。body `{id, password}` |

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -37,6 +38,7 @@ type CreateUserReq struct {
 	Password  string  `json:"password"`
 	Budget    float64 `json:"budget"`
 	Unlimited bool    `json:"unlimited"`
+	RoleIDs   []int64 `json:"role_ids"` // 可选，为空则建出无角色用户
 }
 
 type UpdateUserReq struct {
@@ -186,12 +188,28 @@ func CreateUser(ctx context.Context, req *CreateUserReq) (*userItem, *base.BizEr
 		Unlimited: req.Unlimited,
 		Enabled:   true,
 	}
-	if err := store.C().User().Create(u); err != nil {
+	if err := service.NewUserService().CreateUserWithRoles(u, req.RoleIDs); err != nil {
+		if errors.Is(err, service.ErrRoleNotFound) {
+			return nil, base.ErrBadReq("角色不存在")
+		}
 		if store.IsUniqueConstraintErr(err) {
 			return nil, base.ErrBadReq("账号已存在")
 		}
-		slog.Error("[User] Create failed", "err", err)
+		slog.Error("[User] CreateUserWithRoles failed", "err", err)
 		return nil, base.ErrInternal
+	}
+
+	// 回查角色，返回实际写入的角色。
+	// 用户已创建成功，回查失败只记日志并返回空角色，不能报错让管理员重试（重试会撞「账号已存在」）。
+	roles, err := store.C().Role().ListRolesByUser(u.ID)
+	if err != nil {
+		slog.Error("[User] ListRolesByUser failed", "err", err, "id", u.ID)
+	}
+	roleNames := make([]string, 0, len(roles))
+	roleIDs := make([]int64, 0, len(roles))
+	for _, r := range roles {
+		roleNames = append(roleNames, r.Name)
+		roleIDs = append(roleIDs, r.ID)
 	}
 
 	return &userItem{
@@ -202,8 +220,8 @@ func CreateUser(ctx context.Context, req *CreateUserReq) (*userItem, *base.BizEr
 		Unlimited: u.Unlimited,
 		Enabled:   true,
 		CreatedAt: u.CreatedAt,
-		RoleNames: []string{},
-		RoleIDs:   []int64{},
+		RoleNames: roleNames,
+		RoleIDs:   roleIDs,
 	}, nil
 }
 

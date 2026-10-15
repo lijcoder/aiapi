@@ -50,6 +50,11 @@
           <div style="font-size:13px;margin-bottom:6px">额度金额</div>
           <n-input-number v-model:value="form.budget" :min="0" :step="1" style="width:100%" />
         </div>
+        <div>
+          <div style="font-size:13px;margin-bottom:6px">角色</div>
+          <n-select v-model:value="form.roleIds" multiple clearable :options="roleOptions" placeholder="请选择角色" style="width:100%" />
+          <div style="color:#999;font-size:12px;margin-top:4px">不选角色时，该用户登录后没有任何菜单与接口权限</div>
+        </div>
       </div>
       <p v-if="formMsg" style="color:#d03050;font-size:13px;margin-top:8px">{{ formMsg }}</p>
       <template #footer>
@@ -143,8 +148,8 @@
 </template>
 
 <script setup>
-import { ref, h, onMounted } from 'vue'
-import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NTag, NDropdown, NRadioGroup, NRadio, NCheckboxGroup, NCheckbox, useMessage, useDialog } from 'naive-ui'
+import { ref, h, computed, onMounted } from 'vue'
+import { NCard, NDataTable, NModal, NInput, NInputNumber, NButton, NSpace, NTag, NDropdown, NRadioGroup, NRadio, NSelect, NCheckboxGroup, NCheckbox, useMessage, useDialog } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import { listUsers, createUser, updateUser, toggleUser, resetPassword as resetPasswordApi, assignRoles, rechargeAdmin, listRoles } from '../../api'
 import { usePagination } from '../../composables/usePagination'
@@ -162,7 +167,7 @@ const { pagination, onPage, onPageSize, resetAndLoad } = usePagination(load)
 
 // 创建
 const showCreate = ref(false)
-const form = ref({ name: '', account: '', password: '', budget: 0, mode: 'limited' })
+const form = ref({ name: '', account: '', password: '', budget: 0, mode: 'limited', roleIds: defaultRoleIds() })
 const formMsg = ref('')
 
 // 编辑
@@ -249,8 +254,16 @@ async function load() {
   } finally { tableLoading.value = false }
 }
 
+// 默认预选普通用户角色（code === 'user'），不硬编码角色 id
+function defaultRoleIds() {
+  return allRoles.value.filter(r => r.code === 'user').map(r => r.id)
+}
+
+// 角色下拉选项：value 必须是 number（后端 role_ids 为 []int64）
+const roleOptions = computed(() => allRoles.value.map(r => ({ label: r.name, value: r.id })))
+
 function openCreate() {
-  form.value = { name: '', account: '', password: '', budget: 0, mode: 'limited' }
+  form.value = { name: '', account: '', password: '', budget: 0, mode: 'limited', roleIds: defaultRoleIds() }
   formMsg.value = ''
   showCreate.value = true
 }
@@ -263,7 +276,7 @@ async function doCreate() {
   }
   submitting.value = true
   try {
-    await createUser(form.value.name, form.value.account, form.value.password, form.value.budget || 0, form.value.mode === 'unlimited')
+    await createUser(form.value.name, form.value.account, form.value.password, form.value.budget || 0, form.value.mode === 'unlimited', form.value.roleIds)
     showCreate.value = false
     await load()
     message.success('创建成功')

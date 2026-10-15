@@ -202,8 +202,8 @@ export function getUser(id) {
   return request('/users/get', { id })
 }
 
-export function createUser(name, account, password, budget, unlimited) {
-  return request('/users/create', { name, account, password, budget, unlimited })
+export function createUser(name, account, password, budget, unlimited, roleIds) {
+  return request('/users/create', { name, account, password, budget, unlimited, role_ids: roleIds || [] })
 }
 
 export function updateUser(id, name, budget, unlimited) {
